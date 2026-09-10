@@ -178,6 +178,9 @@
   .sec-chevron:focus-visible{ outline:2px solid var(--brand); outline-offset:1px; }
   .sec-chevron svg{ transition:transform .18s var(--ease); }
   .collapsed > *:not(.sec-head){ display:none; }
+  /* Số tóm tắt chỉ hiện lúc gập — mở ra thì đã có sẵn ở thân, không lặp lại. */
+  .sec-head .only-collapsed{ display:none; }
+  .collapsed > .sec-head .only-collapsed{ display:inline; }
   .collapsed > .sec-head{ margin-bottom:0; }
   .collapsed .sec-chevron svg{ transform:rotate(-90deg); }
 
@@ -418,6 +421,10 @@
   <div class="panel" id="panel-danh-muc" role="tabpanel" aria-labelledby="tab-danh-muc">
 
   <section>
+    <div class="sec-head" data-sec="tong-quan">
+      <h2>Tổng quan</h2>
+      <span class="meta num only-collapsed" id="ov-sub"></span>
+    </div>
     <div class="stats">
       <div class="stat">
         <div class="k">Tổng tài sản</div>
@@ -876,6 +883,7 @@ function render(){
 
   $("s-total").textContent = fmtVND(s.total);
   $("s-total-sub").textContent = "";
+  $("ov-sub").textContent = fmtVND(s.total);   // chỉ nhìn thấy khi khối này đang gập
 
   $("s-mkt").textContent = fmtVND(s.marketValue);
   $("s-mkt-sub").textContent = "Giá vốn " + fmtVND(s.investedCost);

@@ -6,6 +6,17 @@ Ngày mới nhất trên đầu.
 
 ## 2026-09-10
 
+### Gập được cả khối tài sản
+Owner báo: 11 phần gập được nhưng đúng khối 4 ô tài sản trên cùng thì không, vì nó là khối
+duy nhất không có đầu đề.
+
+- **Thêm đầu đề "Tổng quan"** cho khối 4 ô (Tổng tài sản · Giá trị đầu tư · Tiền mặt · Lãi/lỗ),
+  khoá gập `tong-quan`. Tổng cộng **12 phần gập được**.
+- **Gập rồi vẫn liếc được số:** đầu đề có ô `#ov-sub` hiện tổng tài sản, nhưng **chỉ hiện khi
+  đang gập** (class `.only-collapsed`). Mở ra thì ẩn đi vì thân đã có sẵn con số đó — không
+  bày hai lần. Cơ chế này thuần CSS, `render()` cứ đổ số vào vô điều kiện, không phải biết
+  khối đang gập hay mở.
+
 ### Nút lấy giá cho tab Theo dõi + thu gọn từng section
 Hai việc nhỏ làm ngay sau gói watchlist: mã theo dõi vẫn phải nhập giá tay, và trang
 một màn quá dài trên điện thoại.
