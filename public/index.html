@@ -165,6 +165,22 @@
   .sec-head h2{ font-size:var(--fs-section); flex:1; min-width:0; }
   .sec-head .meta{ font-size:var(--fs-meta); color:var(--text-muted); }
 
+  /* Thu gọn: đóng/mở bằng class trên thẻ CHA (section hoặc .card).
+     Giấu mọi thứ sau phần đầu đề — không cần bọc thêm thẻ nào. */
+  .sec-head[data-sec]{ cursor:pointer; }
+  .sec-chevron{
+    flex:none; width:26px; height:26px; margin:-4px -4px -4px 0;
+    display:inline-flex; align-items:center; justify-content:center;
+    border:0; background:transparent; color:var(--text-muted);
+    border-radius:var(--r-pill);
+  }
+  .sec-chevron:hover{ background:var(--surface-2); color:var(--text); }
+  .sec-chevron:focus-visible{ outline:2px solid var(--brand); outline-offset:1px; }
+  .sec-chevron svg{ transition:transform .18s var(--ease); }
+  .collapsed > *:not(.sec-head){ display:none; }
+  .collapsed > .sec-head{ margin-bottom:0; }
+  .collapsed .sec-chevron svg{ transform:rotate(-90deg); }
+
   .card{
     background:var(--surface);
     border:1px solid var(--border);
@@ -427,7 +443,7 @@
   </section>
 
   <section>
-    <div class="sec-head">
+    <div class="sec-head" data-sec="hom-nay">
       <h2>Hôm nay</h2>
       <span class="meta" id="today-label"></span>
     </div>
@@ -444,7 +460,7 @@
   </section>
 
   <section>
-    <div class="sec-head">
+    <div class="sec-head" data-sec="vi-the">
       <h2>Vị thế đang giữ</h2>
       <span class="meta" id="pos-count"></span>
     </div>
@@ -455,7 +471,7 @@
   <section>
     <div class="forms">
       <div class="card">
-        <div class="sec-head"><h2>Ghi giao dịch</h2></div>
+        <div class="sec-head" data-sec="ghi-gd"><h2>Ghi giao dịch</h2></div>
         <form id="tx-form" novalidate>
           <div class="row">
             <div>
@@ -500,7 +516,7 @@
       </div>
 
       <div class="card">
-        <div class="sec-head"><h2>Nạp / rút vốn</h2></div>
+        <div class="sec-head" data-sec="nap-rut"><h2>Nạp / rút vốn</h2></div>
         <form id="cf-form" novalidate>
           <div class="row full">
             <div>
@@ -535,7 +551,7 @@
   </section>
 
   <section>
-    <div class="sec-head">
+    <div class="sec-head" data-sec="nhat-ky">
       <h2>Nhật ký</h2>
       <span class="meta" id="log-count"></span>
     </div>
@@ -547,17 +563,21 @@
   <div class="panel" id="panel-theo-doi" role="tabpanel" aria-labelledby="tab-theo-doi" hidden>
 
   <section>
-    <div class="sec-head">
+    <div class="sec-head" data-sec="watchlist">
       <h2>Mã đang theo dõi</h2>
       <span class="meta" id="wl-count"></span>
     </div>
     <div class="pos-grid" id="wl-grid"></div>
     <div class="card empty" id="wl-empty" hidden>Chưa theo dõi mã nào.</div>
+    <div class="today-actions" style="margin-top:10px;">
+      <button class="btn primary" id="wl-fetch" type="button">Lấy giá thị trường</button>
+    </div>
+    <div class="price-source" id="wl-source" role="status" aria-live="polite"></div>
   </section>
 
   <section>
     <div class="card">
-      <div class="sec-head"><h2>Thêm mã theo dõi</h2></div>
+      <div class="sec-head" data-sec="them-wl"><h2>Thêm mã theo dõi</h2></div>
       <form id="wl-form" novalidate>
         <div class="row">
           <div>
@@ -580,7 +600,7 @@
   <div class="panel" id="panel-chien-luoc" role="tabpanel" aria-labelledby="tab-chien-luoc" hidden>
 
   <section>
-    <div class="sec-head">
+    <div class="sec-head" data-sec="st-hien-tai">
       <h2>Đang áp dụng</h2>
       <span class="meta" id="st-since"></span>
     </div>
@@ -589,7 +609,7 @@
 
   <section>
     <div class="card">
-      <div class="sec-head"><h2>Đổi chiến lược</h2></div>
+      <div class="sec-head" data-sec="st-doi"><h2>Đổi chiến lược</h2></div>
       <form id="st-form" novalidate>
         <div class="row">
           <div>
@@ -624,7 +644,7 @@
   </section>
 
   <section>
-    <div class="sec-head">
+    <div class="sec-head" data-sec="st-lich-su">
       <h2>Lịch sử chiến lược</h2>
       <span class="meta" id="st-count"></span>
     </div>
@@ -634,7 +654,7 @@
 
   <section>
     <div class="card">
-      <div class="sec-head">
+      <div class="sec-head" data-sec="xuat">
         <h2>Xuất dữ liệu đánh giá</h2>
         <span class="meta" id="ex-count"></span>
       </div>
@@ -1004,6 +1024,7 @@ function renderWatchlist(){
   const grid = $("wl-grid"), empty = $("wl-empty");
   const keys = Object.keys(state.watchlist).sort();
   $("wl-count").textContent = keys.length ? keys.length + " mã" : "";
+  $("wl-fetch").disabled = keys.length === 0;
   if(keys.length === 0){
     grid.innerHTML = "";
     empty.hidden = false;
@@ -1138,6 +1159,22 @@ function toggleHold(ticker){
     .catch((e) => { console.error(e); toast("Không lưu được, thử lại."); });
 }
 
+/* Đọc datafeed VPS cho một danh sách mã. Trả { MÃ: {p, ref} } —
+   `ref: true` nghĩa là mã chưa khớp lệnh, đang lấy giá tham chiếu.
+   Dùng chung cho cả 2 nút lấy giá; đừng chép lại phần đọc JSON này lần nữa. */
+async function fetchQuotes(syms){
+  const res = await fetch(PRICE_API + encodeURIComponent(syms.join(",")));
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  const rows = await res.json();
+  const quote = {};
+  rows.forEach((r) => {
+    if(!r || !r.sym) return;
+    if(isFinite(r.lastPrice) && r.lastPrice > 0) quote[r.sym] = { p: r.lastPrice, ref: false };
+    else if(isFinite(r.r) && r.r > 0) quote[r.sym] = { p: r.r, ref: true };
+  });
+  return quote;
+}
+
 /* Điền giá vào ô nhập, KHÔNG tự ghi vào database.
    Owner vẫn phải bấm "Lưu nhật ký hôm nay" — giữ đúng quyết định ban đầu:
    không tự động ghi để tránh dữ liệu rác khi chưa xác nhận giá. */
@@ -1155,16 +1192,7 @@ async function fetchMarketPrices(){
 
   try{
     const syms = inputs.map((i) => i.getAttribute("data-ticker"));
-    const res = await fetch(PRICE_API + encodeURIComponent(syms.join(",")));
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    const rows = await res.json();
-
-    const quote = {};
-    rows.forEach((r) => {
-      if(!r || !r.sym) return;
-      if(isFinite(r.lastPrice) && r.lastPrice > 0) quote[r.sym] = { p: r.lastPrice, ref: false };
-      else if(isFinite(r.r) && r.r > 0) quote[r.sym] = { p: r.r, ref: true };
-    });
+    const quote = await fetchQuotes(syms);
 
     let filled = 0, fromRef = 0;
     const missing = [];
@@ -1185,6 +1213,56 @@ async function fetchMarketPrices(){
     console.error(e);
     src.className = "price-source err";
     src.textContent = "Không lấy được giá từ VPS — nhập tay ở các ô bên trên.";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+/* NGOẠI LỆ CÓ CHỦ Ý so với nút "Lấy giá" của tab Danh mục:
+   ở đây lấy xong ghi thẳng vào `tickers`, không chờ owner bấm Lưu.
+   Owner đã cân nhắc và chọn: mã watchlist không nằm trong danh mục nên
+   giá sai cũng không làm lệch lãi/lỗ hay tổng tài sản. */
+async function fetchWatchPrices(){
+  if(!ready){ toast("Chưa kết nối được dữ liệu."); return; }
+  const syms = Object.keys(state.watchlist).sort();
+  if(syms.length === 0) return;
+
+  const btn = $("wl-fetch"), src = $("wl-source");
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Đang lấy…";
+  src.className = "price-source";
+  src.textContent = "";
+
+  try{
+    const quote = await fetchQuotes(syms);
+    const today = todayStr();
+    const missing = [];
+    let fromRef = 0;
+    const writes = [];
+    syms.forEach((tk) => {
+      const q = quote[tk];
+      if(!q){ missing.push(tk); return; }
+      if(q.ref) fromRef++;
+      const cur = state.tickers[tk] || {};
+      writes.push(setDoc(doc(fs, "tickers", tk),
+        { ...cur, lastPrice: q.p, lastPriceDate: today, updatedAt: nowISO() }));
+    });
+    if(writes.length === 0) throw new Error("không mã nào có giá");
+    await Promise.all(writes);
+
+    const at = new Date().toLocaleTimeString("vi-VN", { hour:"2-digit", minute:"2-digit" });
+    let text = "Đã lưu giá " + writes.length + "/" + syms.length + " mã · nguồn VPS · " + at;
+    if(fromRef) text += " · " + fromRef + " mã lấy giá tham chiếu (chưa khớp lệnh)";
+    if(missing.length) text += " · không có giá: " + missing.join(", ");
+    src.className = "price-source" + (missing.length ? " err" : "");
+    src.textContent = text;
+    toast("Đã cập nhật giá mã theo dõi.");
+  } catch(e){
+    console.error(e);
+    src.className = "price-source err";
+    src.textContent = "Không lấy được giá từ VPS — thử lại sau.";
   } finally {
     btn.disabled = false;
     btn.textContent = label;
@@ -1582,6 +1660,7 @@ function initForms(){
   });
 
   $("ex-btn").addEventListener("click", downloadExport);
+  $("wl-fetch").addEventListener("click", fetchWatchPrices);
 
   $("theme-btn").addEventListener("click", () => {
     const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
@@ -1618,6 +1697,54 @@ function initTabs(){
   showTab(saved || TABS[0]);
   TABS.forEach((t) => {
     $("tab-" + t).addEventListener("click", () => showTab(t));
+  });
+}
+
+/* ================= thu gọn section ================= */
+/* Section nào đang gập thuộc về MÁY, không phải dữ liệu → localStorage.
+   Đầu đề nào có data-sec thì gập được; thân là mọi thứ còn lại trong thẻ cha. */
+const CHEVRON =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+  'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
+function readCollapsed(){
+  try {
+    const raw = localStorage.getItem("fin2-collapsed");
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+function writeCollapsed(list){
+  try { localStorage.setItem("fin2-collapsed", JSON.stringify(list)); } catch (e) {}
+}
+
+function setCollapsed(head, on){
+  const box = head.parentElement;
+  const btn = head.querySelector(".sec-chevron");
+  box.classList.toggle("collapsed", on);
+  btn.setAttribute("aria-expanded", on ? "false" : "true");
+  const name = head.querySelector("h2").textContent;
+  btn.setAttribute("aria-label", (on ? "Mở " : "Thu gọn ") + name);
+}
+
+function initCollapse(){
+  const saved = readCollapsed();
+  document.querySelectorAll(".sec-head[data-sec]").forEach((head) => {
+    const key = head.getAttribute("data-sec");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "sec-chevron";
+    btn.innerHTML = CHEVRON;
+    head.appendChild(btn);
+    setCollapsed(head, saved.indexOf(key) >= 0);
+
+    head.addEventListener("click", () => {
+      const on = !head.parentElement.classList.contains("collapsed");
+      setCollapsed(head, on);
+      const list = readCollapsed().filter((k) => k !== key);
+      if(on) list.push(key);
+      writeCollapsed(list);
+    });
   });
 }
 
@@ -1710,6 +1837,7 @@ function initGate(){
 
 /* ================= boot ================= */
 initTabs();
+initCollapse();
 initForms();
 render();
 initGate();

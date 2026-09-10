@@ -57,6 +57,10 @@ signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price,
                             targetBuy, qty, strategyId, buyDrop, sellRise, createdAt, updatedAt
 ```
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
+**Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
+`fin2-tab` (tab đang mở) · `fin2-collapsed` (section nào đang gập). Đây là sở thích hiển thị,
+mất cũng không sao. **Dữ liệu thật luôn nằm ở Firestore** — đừng đẩy thứ gì cần giữ vào đây.
+
 ⚠️ **Hai đơn vị tiền song song:** `price` và `lastPrice` là **nghìn đồng**; `amount`, `cash`, `marketValue` là **VND nguyên**. Quy đổi bằng `×1000`. Nhầm chỗ này là lệch 1000 lần và không có gì báo lỗi.
 
 ---
@@ -75,6 +79,9 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"). **Thêm chỗ dùng mới thì gọi
   `activeStrategy()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
   Phiên bản chiến lược **chỉ thêm, không sửa đè** — sửa đè là tín hiệu cũ mất ngưỡng gốc.
+- **Hai nút lấy giá** (`#fetch-price` tab Danh mục · `#wl-fetch` tab Theo dõi) khác nhau ở
+  chỗ có ghi database hay không, nhưng **phần đọc datafeed chỉ có MỘT chỗ là `fetchQuotes()`**.
+  Thêm nút lấy giá mới thì gọi hàm đó, đừng chép lại phần đọc JSON.
 - **Mỗi doc `signals` chép lại `buyDrop`/`sellRise`/`strategyId` của phiên bản lúc đó.**
   Bản sao có chủ ý, cùng bản chất với `daily_snapshots`: đổi ngưỡng về sau thì tín hiệu cũ
   **vẫn giữ ngưỡng cũ** — đúng ý, vì đó mới là cái đã thực sự sinh ra tín hiệu hôm đó.
@@ -99,6 +106,9 @@ Hiện **chưa có cặp nào** — app 1 người dùng, 1 màn hình. Gặp c�
   đã đo thật ngày 10/09/2026. Đừng thử lại nếu chưa có bằng chứng mới.
 - **Nút "Lấy giá" chỉ ĐIỀN vào ô, không tự ghi database.** Owner vẫn phải bấm Lưu.
   Cố ý — tránh ghi dữ liệu rác khi chưa xác nhận giá.
+  ⚠️ **NGOẠI LỆ: nút "Lấy giá thị trường" ở tab Theo dõi thì GHI THẲNG** vào `tickers`.
+  Owner đã cân nhắc và chọn (10/09/2026): mã watchlist không nằm trong danh mục nên giá sai
+  không làm lệch lãi/lỗ hay tổng tài sản. Đừng "sửa lại cho nhất quán" với nút bên tab Danh mục.
 - **Bỏ Artifact `window.claude.use("db")`**, đã chuyển sang Firestore. Không quay lại.
 - **Không lưu cờ "đã làm theo tín hiệu hay chưa" trong `signals`.** Cái đó suy ra được từ
   `transactions` cùng ngày + cùng mã + cùng chiều, tính lúc xuất dữ liệu. Cố ý không lưu để

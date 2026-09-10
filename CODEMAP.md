@@ -10,9 +10,10 @@ public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                       Google Fonts (Inter 400/500)
                       bgapidatafeed.vps.com.vn   giá thị trường (chỉ đọc,
                         chỉ gửi đi danh sách MÃ — không gửi SL hay số dư)
-                      localStorage               fin2-theme (sáng/tối)
-                                                 fin2-tab   (tab đang mở)
-                        ⚠️ hai khoá này thuộc về MÁY, không đồng bộ giữa thiết bị
+                      localStorage               fin2-theme     (sáng/tối)
+                                                 fin2-tab       (tab đang mở)
+                                                 fin2-collapsed (section nào đang gập)
+                        ⚠️ ba khoá này thuộc về MÁY, không đồng bộ giữa thiết bị
                       tải file .json xuống máy   downloadExport() — không gửi
                         đi đâu cả; owner tự đem file đi hỏi AI
 
@@ -47,7 +48,9 @@ Giao diện chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`):
 | | `renderTickerList(held)` | datalist gợi ý mã — gộp mã đang giữ **+** mã watchlist |
 | | `renderWatchlist()` `renderStrategy()` | bảng tab Theo dõi · danh sách phiên bản chiến lược ở tab Chiến lược |
 | | `renderLog()` | danh sách nhật ký |
-| Giá | `fetchMarketPrices()` | gọi `PRICE_API` (datafeed VPS), **điền vào ô nhập, KHÔNG ghi database**. `lastPrice` không có thì rơi về `r` (giá tham chiếu) và nói rõ trên `#price-source` |
+| Giá | `fetchQuotes(syms)` | **chỗ duy nhất đọc JSON của datafeed VPS.** Trả `{MÃ:{p,ref}}`, `ref:true` = mã chưa khớp lệnh nên đang lấy giá tham chiếu `r`. Cả hai nút lấy giá đều gọi hàm này — thêm nút thứ ba cũng gọi, đừng chép lại |
+| | `fetchMarketPrices()` | nút tab **Danh mục** (`#fetch-price`): **điền vào ô nhập, KHÔNG ghi database**. Nói rõ mã nào là giá tham chiếu / không có giá trên `#price-source` |
+| | `fetchWatchPrices()` | nút tab **Theo dõi** (`#wl-fetch`): lấy giá mã trong `watchlist` rồi **GHI THẲNG vào `tickers`** (`lastPrice`, `lastPriceDate`, `updatedAt`), không chờ bấm Lưu. ⚠️ **Ngoại lệ có chủ ý** — mã theo dõi không nằm trong danh mục nên giá sai không lệch lãi/lỗ. Trạng thái hiện ở `#wl-source` |
 | Ghi | `toggleHold(ticker)` | lật cờ `hold` trên `tickers/{TICKER}` |
 | | `saveTodaySnapshot()` | ghi `tickers.lastPrice` từng mã → gộp vào cache cục bộ → ghi `daily_snapshots/{hôm nay}` → **gọi `writeSignals(hôm nay)`**. Toast báo thêm số tín hiệu đã ghi |
 | | `addWatch(ticker,target)` `removeWatch(ticker)` | thêm / xoá mã theo dõi |
@@ -56,11 +59,12 @@ Giao diện chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`):
 | Xuất | `buildExport(days)` `downloadExport()` `HUONG_DAN_AI` | gom chiến lược + tín hiệu + giao dịch + nạp/rút + nhật ký ngày + watchlist + vị thế thành 1 file JSON tiếng Việt, tải xuống máy. **`daLamTheo` suy ra tại chỗ** từ `transactions` cùng ngày/mã/chiều — không đọc cờ nào cả. `giaSauDo` lấy giá ở 5/10/20 **bản ghi nhật ký kế tiếp** |
 | Form | `setupSeg` `setMsg` `clearOversellAck` `showOversellAck` `initForms` | các form (`tx-form`, `cf-form`, `wl-form`, `st-form`), nút `ex-btn`, chặn bán vượt, nút theme, đăng xuất |
 | Tab | `showTab(name)` `initTabs()` | bật 1 trong 3 panel, nhớ lựa chọn ở localStorage `fin2-tab` |
+| Thu gọn | `initCollapse()` `setCollapsed(head,on)` `readCollapsed()` `writeCollapsed(list)` hằng `CHEVRON` | chèn mũi tên vào mọi `.sec-head[data-sec]`; bấm đầu đề thì gắn class `collapsed` lên **thẻ cha** (section hoặc .card), CSS `.collapsed > *:not(.sec-head)` giấu phần thân — **không bọc thêm thẻ nào**. Phần đang gập nhớ ở localStorage `fin2-collapsed` (mảng khoá). Section mới muốn gập được thì chỉ cần thêm `data-sec` |
 | Dữ liệu | `setSync` `watch(name, apply)` `startData()` | 7 `onSnapshot`, mỗi cái xong thì gọi `render()` |
 | Cổng | `showGate` `initGate()` | `onAuthStateChanged` → 3 nhánh: chưa đăng nhập · sai email · đúng email |
 
-**Boot:** đúng 4 lời gọi ở cấp module, cuối file, theo thứ tự
-`initTabs() → initForms() → render() → initGate()`.
+**Boot:** đúng 5 lời gọi ở cấp module, cuối file, theo thứ tự
+`initTabs() → initCollapse() → initForms() → render() → initGate()`.
 ⚠️ Đừng thêm lời gọi cấp module đọc biến khai phía dưới — cả khối script sẽ chết im lặng (bài học mục 12).
 
 ---
@@ -71,7 +75,7 @@ Giao diện chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`):
 |---|---|---|---|
 | `transactions` | `watch("transactions")` → `computeHoldings`, `computeCashVND`, `renderLog`, `renderTickerList`, `buildExport` (đối chiếu `daLamTheo`) | `tx-form` submit (`addDoc`) | ✅ |
 | `cashflows` | `watch("cashflows")` → `computeCashVND`, `renderLog`, `buildExport` | `cf-form` submit (`addDoc`) | ✅ |
-| `tickers` | `watch("tickers")` → `currentPriceFor`, `renderPositions`, `renderPriceInputs`, `buildSignals` | `toggleHold`, `saveTodaySnapshot`, `tx-form` submit | ✅ |
+| `tickers` | `watch("tickers")` → `currentPriceFor`, `renderPositions`, `renderPriceInputs`, `buildSignals` | `toggleHold`, `saveTodaySnapshot`, `fetchWatchPrices`, `tx-form` submit | ✅ |
 | `daily_snapshots` | `watch("daily_snapshots")` → `renderTodayBanner`, `renderLog`, `buildExport` (`giaSauDo`) | `saveTodaySnapshot` (`setDoc` id = ngày) | ✅ |
 | `watchlist` | `watch("watchlist")` → `renderWatchlist`, `priceTickers`, `renderTickerList`, `buildSignals`, `buildExport` | `addWatch`, `removeWatch` (`setDoc` / `deleteDoc`, id = MÃ) | ✅ |
 | `strategies` | `watch("strategies")` → `activeStrategy`, `renderStrategy`, `buildExport` | `st-form` submit (`addDoc`) | ✅ |
@@ -92,8 +96,10 @@ Giao diện chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`):
 - **`daily_snapshots.prices` chứa cả mã KHÔNG nắm giữ** (mã watchlist). `computeSummary` bỏ qua mã không giữ nên số liệu không đổi — nhưng snapshot ghi trước 10/09/2026 chỉ có mã đang giữ, hai giai đoạn khác phạm vi.
 - **Mọi chuỗi người dùng gõ chèn vào HTML phải qua `esc()`.** Không có ngoại lệ.
 - **Mọi thay đổi dữ liệu chỉ vẽ lại qua `render()`.** Không có đường dựng DOM thứ hai — cố ý, để không dính bug "tính năng chỉ chạy ở một trong hai đường".
+- **Hai nút lấy giá, hai nếp khác nhau — cố ý.** `#fetch-price` (tab Danh mục) chỉ ĐIỀN vào ô, owner phải bấm Lưu. `#wl-fetch` (tab Theo dõi) GHI THẲNG vào `tickers`. Lý do: mã watchlist không nằm trong danh mục nên giá sai không làm lệch lãi/lỗ hay tổng tài sản. **Đừng gộp lại cho "nhất quán".** Phần đọc datafeed thì ngược lại: chỉ được có MỘT chỗ là `fetchQuotes`.
+- **localStorage chỉ giữ thứ thuộc về MÁY.** `fin2-theme` · `fin2-tab` · `fin2-collapsed`. Đây là sở thích hiển thị, không phải dữ liệu — mất cũng không sao, và cố ý KHÔNG đồng bộ giữa thiết bị. Dữ liệu thật luôn nằm ở Firestore.
 - **Nút icon phải có `aria-label`.** Nút bật/tắt trạng thái thêm `aria-pressed`.
 
 ---
 
-_Cập nhật lần cuối: 2026-09-10 — thêm 3 tab, 3 collection mới (`watchlist` / `strategies` / `signals`), nhóm hàm tín hiệu + xuất JSON, ngưỡng chuyển sang đọc qua `activeStrategy`._
+_Cập nhật lần cuối: 2026-09-10 — thêm nút lấy giá cho tab Theo dõi (`fetchWatchPrices`, ghi thẳng `tickers`), tách `fetchQuotes` dùng chung, nhóm hàm thu gọn section + khoá localStorage `fin2-collapsed`, boot lên 5 lời gọi._

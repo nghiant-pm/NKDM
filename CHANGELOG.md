@@ -6,6 +6,40 @@ Ngày mới nhất trên đầu.
 
 ## 2026-09-10
 
+### Nút lấy giá cho tab Theo dõi + thu gọn từng section
+Hai việc nhỏ làm ngay sau gói watchlist: mã theo dõi vẫn phải nhập giá tay, và trang
+một màn quá dài trên điện thoại.
+
+- **Nút "Lấy giá thị trường" ở tab Theo dõi** (`fetchWatchPrices`). Bấm một cái là lấy giá
+  tất cả mã đang theo dõi từ datafeed VPS. Dòng chữ dưới nút nói rõ lưu được mấy mã, mã nào
+  đang lấy giá tham chiếu vì chưa khớp lệnh, mã nào không có giá. Chưa theo dõi mã nào thì
+  nút **tự mờ đi** (`renderWatchlist` bật/tắt `#wl-fetch`).
+- ⚠️ **Nút này GHI THẲNG vào `tickers`, không chờ bấm Lưu** — ngoại lệ có chủ ý so với quy tắc
+  cũ "nút Lấy giá chỉ điền vào ô". Owner cân nhắc và chọn: mã theo dõi không nằm trong danh mục
+  nên giá sai cũng không làm lệch lãi/lỗ hay tổng tài sản. **Nút `#fetch-price` ở tab Danh mục
+  giữ nguyên nếp cũ** — vẫn chỉ điền vào ô. Đừng "sửa lại cho nhất quán" một trong hai bên.
+- **Tách phần đọc datafeed ra dùng chung** (`fetchQuotes(syms)`). Trước đây chỉ có một nút nên
+  phần đọc JSON nằm luôn trong `fetchMarketPrices`; giờ có hai nút thì tách ra một chỗ.
+  `fetchMarketPrices` từ nay gọi `fetchQuotes` thay vì tự đọc. **Có nút lấy giá thứ ba thì cũng
+  gọi hàm này, đừng chép lại lần nữa.**
+- **Thu gọn được từng phần của trang** (`initCollapse`, `setCollapsed`, `readCollapsed`,
+  `writeCollapsed`). 11 đầu đề có thêm mũi tên; bấm vào đầu đề là gập/mở phần thân bên dưới.
+  Phần nào đang gập **nhớ theo máy** (localStorage `fin2-collapsed`), cùng nhóm với `fin2-theme`
+  và `fin2-tab` — đổi máy không kéo theo.
+- **Cách làm cố ý gọn:** JS chỉ gắn class `collapsed` lên thẻ cha, CSS giấu mọi thứ sau đầu đề
+  (`.collapsed > *:not(.sec-head)`). **Không bọc thêm thẻ nào**, nên markup cũ không phải sửa —
+  chỉ thêm `data-sec="<khoá>"` vào 11 đầu đề để có chỗ ghi nhớ. Khoá: hom-nay · vi-the · ghi-gd ·
+  nap-rut · nhat-ky · watchlist · them-wl · st-hien-tai · st-doi · st-lich-su · xuat.
+  Thêm section mới muốn gập được thì chỉ cần đặt thêm `data-sec` mới.
+- **Boot giờ có 5 lời gọi:** `initTabs() → initCollapse() → initForms() → render() → initGate()`.
+
+**Đã kiểm:** chạy lại harness logic 7 nhóm phép thử — đạt hết. Mở trình duyệt khổ 375px:
+11 đầu đề đều có mũi tên, gập/mở ăn, tải lại trang vẫn còn nguyên phần đang gập, `aria-expanded`
+đúng, nút lấy giá watchlist tự tắt khi chưa theo dõi mã nào, không lỗi console.
+**CHƯA thử với dữ liệu Firestore thật, CHƯA deploy, CHƯA commit.**
+
+**File đụng tới:** `public/index.html` · `CLAUDE.md` (ghi ngoại lệ nút lấy giá) · `CODEMAP.md`
+
 ### Watchlist + nhật ký tín hiệu + chiến lược có phiên bản + xuất JSON cho AI
 Owner muốn biết "chiến lược −2/+3 này có thật sự hiệu quả không", và muốn theo dõi cả
 mã chưa mua. Muốn trả lời được thì phải **ghi lại từng gợi ý mua/bán mỗi ngày**, rồi
