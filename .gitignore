@@ -1,0 +1,9 @@
+node_modules/
+.firebase/
+*.log
+
+# Bộ skill dùng chung, không thuộc riêng dự án này — cài lại được, không cần versioning.
+.claude/skills/
+
+# Repo riêng (bộ chuẩn dùng chung) — không nhúng vào repo này.
+Starter-Kit/

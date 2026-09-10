@@ -1,0 +1,810 @@
+<title>Nhật Ký Danh Mục</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#F5F7FB;
+    --surface:#FFFFFF;
+    --surface-2:#EEF1F8;
+    --border:#DFE4EE;
+    --text:#131A2B;
+    --text-muted:#5B6472;
+    --accent:#2E4374;
+    --accent-soft:#E4E9F5;
+    --pos:#0E8F4A;
+    --pos-soft:#E4F6EC;
+    --neg:#D0342C;
+    --neg-soft:#FBEAE9;
+    --warn:#9C6B12;
+    --warn-soft:#FBF0DA;
+    --shadow: 0 1px 2px rgba(19,26,43,0.06), 0 8px 24px -12px rgba(19,26,43,0.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0B1120;
+      --surface:#121B30;
+      --surface-2:#182541;
+      --border:#2A3856;
+      --text:#E8ECF8;
+      --text-muted:#9AA6C2;
+      --accent:#8FA6E8;
+      --accent-soft:#1E2B4C;
+      --pos:#3FD481;
+      --pos-soft:#123424;
+      --neg:#FF7A6E;
+      --neg-soft:#3A1917;
+      --warn:#F2C065;
+      --warn-soft:#3A2C0D;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B1120;
+    --surface:#121B30;
+    --surface-2:#182541;
+    --border:#2A3856;
+    --text:#E8ECF8;
+    --text-muted:#9AA6C2;
+    --accent:#8FA6E8;
+    --accent-soft:#1E2B4C;
+    --pos:#3FD481;
+    --pos-soft:#123424;
+    --neg:#FF7A6E;
+    --neg-soft:#3A1917;
+    --warn:#F2C065;
+    --warn-soft:#3A2C0D;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.6);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    padding:24px 16px 64px;
+    max-width:1120px;
+    margin:0 auto;
+  }
+  h1,h2,h3{ font-family:'Manrope', ui-sans-serif, sans-serif; text-wrap:balance; margin:0; }
+  .mono{ font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  header.top{ display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:24px; }
+  header.top h1{ font-size:1.5rem; font-weight:800; letter-spacing:-0.01em; }
+  header.top p{ margin:4px 0 0; color:var(--text-muted); font-size:0.9rem; }
+  .sync-note{ font-size:0.78rem; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--text-muted); flex:none; }
+  .dot.ok{ background:var(--pos); }
+  .dot.warn{ background:var(--neg); }
+
+  section{ margin-bottom:28px; }
+  .section-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .section-head h2{ font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .section-head .hint{ font-size:0.8rem; color:var(--text-muted); }
+
+  .stat-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  @media (max-width:760px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
+  .stat-card{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; box-shadow:var(--shadow); }
+  .stat-card .label{ font-size:0.76rem; color:var(--text-muted); display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+  .stat-card .value{ font-size:1.32rem; font-weight:700; font-family:'JetBrains Mono', monospace; letter-spacing:-0.01em; }
+  .stat-card .sub{ font-size:0.78rem; margin-top:4px; color:var(--text-muted); }
+  .stat-card .sub.pos{ color:var(--pos); }
+  .stat-card .sub.neg{ color:var(--neg); }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); padding:18px 20px; }
+
+  .banner{ display:flex; align-items:center; gap:10px; background:var(--warn-soft); color:var(--warn); border:1px solid var(--warn); border-radius:12px; padding:10px 14px; font-size:0.86rem; margin-bottom:14px; }
+  .banner svg{ flex:none; }
+  .banner.ok{ background:var(--pos-soft); color:var(--pos); border-color:var(--pos); }
+  .banner.err{ background:var(--neg-soft); color:var(--neg); border-color:var(--neg); }
+
+  table{ width:100%; border-collapse:collapse; font-size:0.88rem; }
+  th,td{ text-align:left; padding:9px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th{ color:var(--text-muted); font-weight:600; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.03em; }
+  td.num, th.num{ text-align:right; font-family:'JetBrains Mono', monospace; }
+  .table-wrap{ overflow-x:auto; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover td{ background:var(--surface-2); }
+
+  .pill{ display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; font-size:0.76rem; font-weight:600; font-family:'JetBrains Mono', monospace; }
+  .pill.buy{ background:var(--accent-soft); color:var(--accent); }
+  .pill.sell{ background:var(--pos-soft); color:var(--pos); }
+  .pill.hold{ background:var(--warn-soft); color:var(--warn); }
+  .pill.neg{ background:var(--neg-soft); color:var(--neg); }
+
+  button{ font-family:inherit; cursor:pointer; }
+  .btn{ display:inline-flex; align-items:center; gap:7px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); padding:8px 14px; font-size:0.85rem; font-weight:600; }
+  .btn:hover{ background:var(--surface-2); }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.primary:hover{ filter:brightness(1.08); }
+  .btn.ghost{ background:transparent; border-color:transparent; color:var(--text-muted); padding:6px 10px; }
+  .btn.ghost:hover{ background:var(--surface-2); color:var(--text); }
+  .btn.small{ padding:5px 10px; font-size:0.76rem; border-radius:8px; }
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .toggle-hold{ border-radius:999px; border:1px solid var(--border); padding:4px 10px; font-size:0.74rem; font-weight:600; background:var(--surface); color:var(--text-muted); }
+  .toggle-hold.on{ background:var(--warn-soft); border-color:var(--warn); color:var(--warn); }
+
+  .form-grid{ display:grid; grid-template-columns:2fr 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px){ .form-grid{ grid-template-columns:1fr; } }
+  form .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  form .row.full{ grid-template-columns:1fr; }
+  @media (max-width:480px){ form .row{ grid-template-columns:1fr; } }
+  label{ display:block; font-size:0.76rem; color:var(--text-muted); margin-bottom:4px; font-weight:600; }
+  input, select{
+    width:100%; background:var(--bg); border:1px solid var(--border); border-radius:9px;
+    padding:8px 10px; font-size:0.88rem; color:var(--text); font-family:inherit;
+  }
+  input:focus, select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .radio-group{ display:flex; gap:8px; }
+  .radio-opt{ flex:1; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--border); border-radius:9px; padding:8px; font-size:0.84rem; font-weight:600; color:var(--text-muted); cursor:pointer; }
+  .radio-opt input{ display:none; width:auto; }
+  .radio-opt.checked-buy{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+  .radio-opt.checked-sell{ background:var(--pos-soft); border-color:var(--pos); color:var(--pos); }
+  .radio-opt.checked-dep{ background:var(--pos-soft); border-color:var(--pos); color:var(--pos); }
+  .radio-opt.checked-wd{ background:var(--neg-soft); border-color:var(--neg); color:var(--neg); }
+
+  #price-inputs{ display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+  .price-row{ display:flex; align-items:center; gap:10px; }
+  .price-row .price-ticker{ width:66px; font-family:'JetBrains Mono', monospace; font-weight:700; flex:none; }
+  .price-row input{ flex:1; }
+  .price-row .last-known{ font-size:0.74rem; color:var(--text-muted); flex:none; width:130px; }
+
+  .muted{ color:var(--text-muted); }
+  .empty{ padding:24px; text-align:center; color:var(--text-muted); font-size:0.88rem; }
+  .chips{ display:flex; flex-wrap:wrap; gap:4px; }
+  .chip{ font-size:0.72rem; padding:2px 7px; border-radius:999px; background:var(--surface-2); color:var(--text-muted); font-family:'JetBrains Mono', monospace; }
+  .chip.buy{ background:var(--accent-soft); color:var(--accent); }
+  .chip.sell{ background:var(--pos-soft); color:var(--pos); }
+</style>
+
+<header class="top">
+  <div>
+    <h1>Nhật Ký Danh Mục</h1>
+    <p>Theo dõi vốn &amp; giá đặt lệnh đề xuất theo chiến thuật trung bình giá</p>
+  </div>
+  <div class="sync-note"><span class="dot" id="sync-dot"></span><span id="sync-text">Đang kết nối dữ liệu…</span></div>
+</header>
+
+<section>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Tổng tài sản
+      </div>
+      <div class="value" id="stat-total">—</div>
+      <div class="sub" id="stat-total-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+        Đang đầu tư (giá TT)
+      </div>
+      <div class="value" id="stat-invested">—</div>
+      <div class="sub" id="stat-invested-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Tiền mặt còn lại
+      </div>
+      <div class="value" id="stat-cash">—</div>
+      <div class="sub" id="stat-cash-sub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Lãi/lỗ tạm tính
+      </div>
+      <div class="value" id="stat-pnl">—</div>
+      <div class="sub" id="stat-pnl-sub"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><path d="M21 3v6h-6"/></svg>
+      Cập nhật giá hôm nay
+    </h2>
+    <span class="hint" id="today-label"></span>
+  </div>
+  <div class="card">
+    <div id="today-banner"></div>
+    <div id="price-inputs"></div>
+    <div id="price-empty" class="muted" style="font-size:0.86rem;"></div>
+    <button class="btn primary" id="save-snapshot-btn" type="button">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      Lưu nhật ký hôm nay
+    </button>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16"/></svg>
+      Vị thế đang giữ
+    </h2>
+    <span class="hint">Mua thêm = giá vốn − 2 · Bán = giá vốn + 3 (theo phiên, 100 cổ)</span>
+  </div>
+  <div class="card" style="padding:0;">
+    <div class="table-wrap">
+      <table id="holdings-table">
+        <thead>
+          <tr>
+            <th>Mã</th>
+            <th class="num">SL</th>
+            <th class="num">Giá vốn TB</th>
+            <th class="num">Giá TT</th>
+            <th class="num">Giá trị (TT)</th>
+            <th class="num">Lãi/lỗ</th>
+            <th>Mua thêm nếu ≤</th>
+            <th>Bán nếu ≥</th>
+            <th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody id="holdings-body"></tbody>
+      </table>
+    </div>
+    <div id="holdings-empty" class="empty" style="display:none;">Chưa có vị thế nào — ghi nhận giao dịch mua đầu tiên bên dưới.</div>
+  </div>
+</section>
+
+<section>
+  <div class="form-grid">
+    <div class="card">
+      <div class="section-head" style="margin-bottom:14px;">
+        <h2>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Ghi nhận giao dịch khớp lệnh
+        </h2>
+      </div>
+      <form id="tx-form">
+        <div class="row">
+          <div>
+            <label for="tx-ticker">Mã cổ phiếu</label>
+            <input id="tx-ticker" list="ticker-list" placeholder="VD: FPT" required autocomplete="off">
+            <datalist id="ticker-list"></datalist>
+          </div>
+          <div>
+            <label for="tx-date">Ngày khớp lệnh</label>
+            <input id="tx-date" type="date" required>
+          </div>
+        </div>
+        <div class="row full">
+          <div>
+            <label>Loại lệnh</label>
+            <div class="radio-group" id="tx-side-group">
+              <label class="radio-opt" data-side="buy"><input type="radio" name="tx-side" value="buy" checked>Mua</label>
+              <label class="radio-opt" data-side="sell"><input type="radio" name="tx-side" value="sell">Bán</label>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="tx-qty">Số lượng (CP)</label>
+            <input id="tx-qty" type="number" min="1" step="1" value="100" required>
+          </div>
+          <div>
+            <label for="tx-price">Giá khớp (nghìn đ/CP)</label>
+            <input id="tx-price" type="number" min="0" step="0.01" placeholder="VD: 45.60" required>
+          </div>
+        </div>
+        <div class="row full">
+          <div>
+            <label for="tx-note">Ghi chú (không bắt buộc)</label>
+            <input id="tx-note" placeholder="VD: mua thêm theo tín hiệu giảm 2 điểm">
+          </div>
+        </div>
+        <button class="btn primary" type="submit" style="width:100%; justify-content:center;">Lưu giao dịch</button>
+        <div id="tx-msg" style="font-size:0.78rem; margin-top:8px;"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="section-head" style="margin-bottom:14px;">
+        <h2>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/></svg>
+          Nạp / rút vốn
+        </h2>
+      </div>
+      <form id="cf-form">
+        <div class="row full">
+          <div>
+            <label>Loại</label>
+            <div class="radio-group" id="cf-type-group">
+              <label class="radio-opt" data-type="deposit"><input type="radio" name="cf-type" value="deposit" checked>Nạp</label>
+              <label class="radio-opt" data-type="withdraw"><input type="radio" name="cf-type" value="withdraw">Rút</label>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="cf-amount">Số tiền (triệu đồng)</label>
+            <input id="cf-amount" type="number" min="0" step="0.1" placeholder="VD: 50" required>
+          </div>
+          <div>
+            <label for="cf-date">Ngày</label>
+            <input id="cf-date" type="date" required>
+          </div>
+        </div>
+        <div class="row full">
+          <div>
+            <label for="cf-note">Ghi chú (không bắt buộc)</label>
+            <input id="cf-note" placeholder="VD: nạp lương tháng 9">
+          </div>
+        </div>
+        <button class="btn primary" type="submit" style="width:100%; justify-content:center;">Lưu giao dịch vốn</button>
+        <div id="cf-msg" style="font-size:0.78rem; margin-top:8px;"></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+      Nhật ký theo ngày
+    </h2>
+    <span class="hint" id="log-count"></span>
+  </div>
+  <div class="card" style="padding:0;">
+    <div class="table-wrap" style="max-height:420px; overflow-y:auto;">
+      <table id="log-table">
+        <thead>
+          <tr>
+            <th>Ngày</th>
+            <th class="num">Tổng tài sản</th>
+            <th class="num">Đang đầu tư</th>
+            <th class="num">Tiền mặt</th>
+            <th class="num">Lãi/lỗ tạm tính</th>
+            <th>Giao dịch trong ngày</th>
+          </tr>
+        </thead>
+        <tbody id="log-body"></tbody>
+      </table>
+    </div>
+    <div id="log-empty" class="empty" style="display:none;">Chưa có nhật ký ngày nào — lưu nhật ký hôm nay ở phần trên để bắt đầu.</div>
+  </div>
+</section>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- state ----------
+  var db = null;
+  var state = { transactions: [], cashflows: [], snapshots: [], tickers: {} };
+  var lastHeldKey = "";
+
+  function todayStr(){
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+  function fmtDateVN(s){
+    if(!s) return "—";
+    var p = s.split("-");
+    return p.length===3 ? (p[2]+"/"+p[1]+"/"+p[0]) : s;
+  }
+  function fmtPrice(n){ return (n===null||n===undefined||!isFinite(n)) ? "—" : n.toFixed(2); }
+  function fmtVND(n){
+    if(n===null||n===undefined||!isFinite(n)) return "—";
+    var sign = n<0 ? "-" : "";
+    return sign + Math.round(Math.abs(n)).toLocaleString("vi-VN") + " đ";
+  }
+  function fmtPct(n){
+    if(n===null||n===undefined||!isFinite(n)) return "";
+    return (n>=0?"+":"") + n.toFixed(1) + "%";
+  }
+  function nowISO(){ return new Date().toISOString(); }
+
+  // ---------- derived computations ----------
+  function computeHoldings(transactions){
+    var sorted = transactions.slice().sort(function(a,b){
+      var ka = (a.date||"")+"_"+(a.createdAt||""), kb = (b.date||"")+"_"+(b.createdAt||"");
+      return ka < kb ? -1 : (ka > kb ? 1 : 0);
+    });
+    var holdings = {};
+    sorted.forEach(function(t){
+      var tk = t.ticker;
+      var h = holdings[tk] || { qty:0, avgCost:0, realizedPnl:0 };
+      if(t.side === "buy"){
+        var newQty = h.qty + t.qty;
+        h.avgCost = newQty > 0 ? ((h.qty*h.avgCost) + (t.qty*t.price)) / newQty : 0;
+        h.qty = newQty;
+      } else {
+        h.realizedPnl += t.qty * (t.price - h.avgCost);
+        h.qty -= t.qty;
+        if(h.qty <= 0.0001){ h.qty = 0; h.avgCost = 0; }
+      }
+      holdings[tk] = h;
+    });
+    return holdings;
+  }
+
+  function computeCashVND(transactions, cashflows){
+    var cash = 0;
+    cashflows.forEach(function(c){ cash += (c.type === "deposit" ? c.amount : -c.amount); });
+    transactions.forEach(function(t){
+      var value = t.qty * t.price * 1000;
+      cash += (t.side === "sell" ? value : -value);
+    });
+    return cash;
+  }
+
+  function currentPriceFor(ticker, avgCost){
+    var meta = state.tickers[ticker];
+    if(meta && isFinite(meta.lastPrice)) return meta.lastPrice;
+    return avgCost;
+  }
+
+  function computeSummary(){
+    var holdings = computeHoldings(state.transactions);
+    var cash = computeCashVND(state.transactions, state.cashflows);
+    var investedCost = 0, marketValue = 0;
+    var heldList = [];
+    Object.keys(holdings).forEach(function(tk){
+      var h = holdings[tk];
+      if(h.qty > 0){
+        var price = currentPriceFor(tk, h.avgCost);
+        investedCost += h.qty * h.avgCost * 1000;
+        marketValue += h.qty * price * 1000;
+        heldList.push({ ticker: tk, qty: h.qty, avgCost: h.avgCost, price: price, hasPrice: !!(state.tickers[tk] && isFinite(state.tickers[tk].lastPrice)) });
+      }
+    });
+    heldList.sort(function(a,b){ return a.ticker < b.ticker ? -1 : 1; });
+    return {
+      cash: cash, investedCost: investedCost, marketValue: marketValue,
+      total: cash + marketValue, unrealizedPnl: marketValue - investedCost,
+      heldList: heldList
+    };
+  }
+
+  // ---------- render ----------
+  function render(){
+    var s = computeSummary();
+
+    document.getElementById("stat-total").textContent = fmtVND(s.total);
+    document.getElementById("stat-total-sub").textContent = "Tiền mặt + giá trị đầu tư theo giá thị trường";
+
+    document.getElementById("stat-invested").textContent = fmtVND(s.marketValue);
+    document.getElementById("stat-invested-sub").textContent = "Theo giá vốn: " + fmtVND(s.investedCost);
+
+    document.getElementById("stat-cash").textContent = fmtVND(s.cash);
+    document.getElementById("stat-cash-sub").textContent = s.cash < 0 ? "Âm — kiểm tra lại giao dịch đã nhập" : "Sẵn sàng giải ngân";
+    if(s.cash < 0){ document.getElementById("stat-cash-sub").className = "sub neg"; } else { document.getElementById("stat-cash-sub").className = "sub"; }
+
+    var pnlEl = document.getElementById("stat-pnl");
+    var pnlSub = document.getElementById("stat-pnl-sub");
+    pnlEl.textContent = (s.investedCost>0 || s.marketValue>0) ? fmtVND(s.unrealizedPnl) : "—";
+    pnlEl.style.color = s.unrealizedPnl > 0 ? "var(--pos)" : (s.unrealizedPnl < 0 ? "var(--neg)" : "var(--text)");
+    var pnlPct = s.investedCost > 0 ? (s.unrealizedPnl / s.investedCost * 100) : null;
+    pnlSub.textContent = pnlPct===null ? "Chưa có vị thế" : fmtPct(pnlPct) + " so với giá vốn";
+    pnlSub.className = "sub " + (s.unrealizedPnl > 0 ? "pos" : (s.unrealizedPnl < 0 ? "neg" : ""));
+
+    renderHoldingsTable(s.heldList);
+    renderPriceInputs(s.heldList);
+    renderTodayBanner(s.heldList);
+    renderTickerDatalist(s.heldList);
+    renderLogTable();
+  }
+
+  function renderHoldingsTable(heldList){
+    var body = document.getElementById("holdings-body");
+    var empty = document.getElementById("holdings-empty");
+    if(heldList.length === 0){
+      body.innerHTML = "";
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    body.innerHTML = heldList.map(function(h){
+      var meta = state.tickers[h.ticker] || {};
+      var pnl = (h.price - h.avgCost) * h.qty * 1000;
+      var pnlPct = h.avgCost > 0 ? ((h.price - h.avgCost) / h.avgCost * 100) : 0;
+      var buyTrigger = h.avgCost - 2;
+      var sellTrigger = h.avgCost + 3;
+      var sellCell = meta.hold
+        ? '<span class="pill hold"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="11" width="14" height="9" rx="1"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Giữ — không bán</span>'
+        : '<span class="pill sell">≥ ' + fmtPrice(sellTrigger) + '</span>';
+      return '<tr>' +
+        '<td><strong>' + h.ticker + '</strong></td>' +
+        '<td class="num">' + h.qty.toLocaleString("vi-VN") + '</td>' +
+        '<td class="num">' + fmtPrice(h.avgCost) + '</td>' +
+        '<td class="num">' + fmtPrice(h.price) + (h.hasPrice ? "" : '<div class="muted" style="font-size:0.68rem;">chưa cập nhật</div>') + '</td>' +
+        '<td class="num">' + fmtVND(h.qty * h.price * 1000) + '</td>' +
+        '<td class="num" style="color:' + (pnl>0?'var(--pos)':pnl<0?'var(--neg)':'inherit') + '">' + fmtVND(pnl) + '<div style="font-size:0.7rem;">' + fmtPct(pnlPct) + '</div></td>' +
+        '<td><span class="pill buy">≤ ' + fmtPrice(buyTrigger) + '</span></td>' +
+        '<td>' + sellCell + '</td>' +
+        '<td><button class="toggle-hold' + (meta.hold ? ' on' : '') + '" data-toggle-hold="' + h.ticker + '">' + (meta.hold ? "Đang giữ" : "Theo lệnh") + '</button></td>' +
+      '</tr>';
+    }).join("");
+
+    Array.prototype.forEach.call(body.querySelectorAll("[data-toggle-hold]"), function(btn){
+      btn.addEventListener("click", function(){
+        var tk = btn.getAttribute("data-toggle-hold");
+        toggleHold(tk);
+      });
+    });
+  }
+
+  function renderPriceInputs(heldList){
+    var container = document.getElementById("price-inputs");
+    var emptyMsg = document.getElementById("price-empty");
+    var key = heldList.map(function(h){ return h.ticker; }).join(",");
+    if(heldList.length === 0){
+      container.innerHTML = "";
+      emptyMsg.textContent = "Chưa có vị thế nào cần cập nhật giá.";
+      lastHeldKey = key;
+      return;
+    }
+    emptyMsg.textContent = "";
+    if(key === lastHeldKey) return; // avoid wiping in-progress typing
+    lastHeldKey = key;
+
+    container.innerHTML = heldList.map(function(h){
+      var meta = state.tickers[h.ticker] || {};
+      var lastKnown = meta.lastPrice ? ("gần nhất: " + fmtPrice(meta.lastPrice) + " (" + fmtDateVN(meta.lastPriceDate) + ")") : "chưa có dữ liệu";
+      return '<div class="price-row">' +
+        '<span class="price-ticker">' + h.ticker + '</span>' +
+        '<input type="number" step="0.01" min="0" inputmode="decimal" data-ticker="' + h.ticker + '" value="' + (meta.lastPrice || "") + '" placeholder="Giá hiện tại (nghìn đ)">' +
+        '<span class="last-known">' + lastKnown + '</span>' +
+      '</div>';
+    }).join("");
+  }
+
+  function renderTodayBanner(heldList){
+    var el = document.getElementById("today-banner");
+    var today = todayStr();
+    document.getElementById("today-label").textContent = fmtDateVN(today);
+    var todaySnap = state.snapshots.find(function(s){ return s.date === today; });
+    if(heldList.length === 0){
+      el.innerHTML = "";
+      return;
+    }
+    if(todaySnap){
+      el.innerHTML = '<div class="banner ok"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Đã lưu nhật ký hôm nay lúc ' + new Date(todaySnap.updatedAt || todaySnap.createdAt).toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}) + ' — có thể cập nhật lại giá và lưu đè.</div>';
+    } else {
+      el.innerHTML = '<div class="banner"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>Chưa có nhật ký cho hôm nay — nhập giá thị trường bên dưới rồi lưu.</div>';
+    }
+  }
+
+  function renderTickerDatalist(heldList){
+    var dl = document.getElementById("ticker-list");
+    var all = {};
+    heldList.forEach(function(h){ all[h.ticker] = true; });
+    state.transactions.forEach(function(t){ all[t.ticker] = true; });
+    dl.innerHTML = Object.keys(all).sort().map(function(tk){ return '<option value="' + tk + '">'; }).join("");
+  }
+
+  function renderLogTable(){
+    var body = document.getElementById("log-body");
+    var empty = document.getElementById("log-empty");
+    var countEl = document.getElementById("log-count");
+    var rows = state.snapshots.slice().sort(function(a,b){ return a.date < b.date ? 1 : -1; });
+    countEl.textContent = rows.length ? (rows.length + " ngày ghi nhận") : "";
+    if(rows.length === 0){
+      body.innerHTML = "";
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    body.innerHTML = rows.map(function(r){
+      var dayTx = state.transactions.filter(function(t){ return t.date === r.date; });
+      var dayCf = state.cashflows.filter(function(c){ return c.date === r.date; });
+      var chips = dayTx.map(function(t){
+        return '<span class="chip ' + t.side + '">' + (t.side==="buy"?"Mua":"Bán") + ' ' + t.qty + ' ' + t.ticker + ' @' + fmtPrice(t.price) + '</span>';
+      }).concat(dayCf.map(function(c){
+        return '<span class="chip">' + (c.type==="deposit"?"Nạp":"Rút") + ' ' + fmtVND(c.amount) + '</span>';
+      })).join(" ");
+      var pnl = r.marketValue - r.investedCost;
+      return '<tr>' +
+        '<td>' + fmtDateVN(r.date) + '</td>' +
+        '<td class="num">' + fmtVND(r.totalAssets) + '</td>' +
+        '<td class="num">' + fmtVND(r.marketValue) + '</td>' +
+        '<td class="num">' + fmtVND(r.cash) + '</td>' +
+        '<td class="num" style="color:' + (pnl>0?'var(--pos)':pnl<0?'var(--neg)':'inherit') + '">' + fmtVND(pnl) + '</td>' +
+        '<td><div class="chips">' + (chips || '<span class="muted">—</span>') + '</div></td>' +
+      '</tr>';
+    }).join("");
+  }
+
+  // ---------- db actions ----------
+  function toggleHold(ticker){
+    if(!db) return;
+    var current = state.tickers[ticker] || {};
+    var next = Object.assign({}, current, { hold: !current.hold, updatedAt: nowISO() });
+    db.doc("tickers/" + ticker).set(next).catch(function(e){ console.error(e); });
+  }
+
+  function saveTodaySnapshot(){
+    if(!db){ flashMsgEl(document.getElementById("today-banner"), "err", "Chưa kết nối được dữ liệu — thử lại sau giây lát."); return; }
+    var inputs = document.querySelectorAll("#price-inputs input[data-ticker]");
+    if(inputs.length === 0) return;
+    var today = todayStr();
+    var writes = [];
+    var priceMap = {};
+    Array.prototype.forEach.call(inputs, function(inp){
+      var tk = inp.getAttribute("data-ticker");
+      var val = parseFloat(inp.value);
+      if(isFinite(val) && val > 0){
+        priceMap[tk] = val;
+        var current = state.tickers[tk] || {};
+        writes.push(db.doc("tickers/" + tk).set(Object.assign({}, current, { lastPrice: val, lastPriceDate: today, updatedAt: nowISO() })));
+      }
+    });
+    if(writes.length === 0){ flashMsgEl(document.getElementById("today-banner"), "err", "Nhập ít nhất một giá hợp lệ trước khi lưu."); return; }
+    Promise.all(writes).then(function(){
+      // recompute using the just-written prices merged into local cache immediately
+      Object.keys(priceMap).forEach(function(tk){
+        state.tickers[tk] = Object.assign({}, state.tickers[tk], { lastPrice: priceMap[tk], lastPriceDate: today });
+      });
+      var s = computeSummary();
+      var existing = state.snapshots.find(function(x){ return x.date === today; });
+      return db.doc("daily_snapshots/" + today).set({
+        date: today,
+        cash: s.cash,
+        investedCost: s.investedCost,
+        marketValue: s.marketValue,
+        totalAssets: s.total,
+        prices: priceMap,
+        createdAt: existing ? existing.createdAt : nowISO(),
+        updatedAt: nowISO()
+      });
+    }).then(function(){
+      render();
+    }).catch(function(e){ console.error(e); flashMsgEl(document.getElementById("today-banner"), "err", "Lưu thất bại, thử lại."); });
+  }
+
+  function flashMsgEl(el, kind, text){
+    if(!el) return;
+    el.innerHTML = '<div class="banner ' + (kind||"") + '">' + text + '</div>';
+  }
+
+  // ---------- forms ----------
+  function setupRadioGroup(groupId, onClass){
+    var group = document.getElementById(groupId);
+    var opts = group.querySelectorAll(".radio-opt");
+    function refresh(){
+      Array.prototype.forEach.call(opts, function(opt){
+        var input = opt.querySelector("input");
+        opt.className = "radio-opt" + (input.checked ? " " + onClass(input.value) : "");
+      });
+    }
+    Array.prototype.forEach.call(opts, function(opt){
+      opt.addEventListener("click", function(){
+        opt.querySelector("input").checked = true;
+        refresh();
+      });
+    });
+    refresh();
+  }
+
+  function initForms(){
+    document.getElementById("tx-date").value = todayStr();
+    document.getElementById("cf-date").value = todayStr();
+
+    setupRadioGroup("tx-side-group", function(v){ return v === "buy" ? "checked-buy" : "checked-sell"; });
+    setupRadioGroup("cf-type-group", function(v){ return v === "deposit" ? "checked-dep" : "checked-wd"; });
+
+    document.getElementById("tx-form").addEventListener("submit", function(e){
+      e.preventDefault();
+      if(!db){ document.getElementById("tx-msg").textContent = "Chưa kết nối được dữ liệu."; return; }
+      var ticker = document.getElementById("tx-ticker").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      var side = document.querySelector('input[name="tx-side"]:checked').value;
+      var qty = parseFloat(document.getElementById("tx-qty").value);
+      var price = parseFloat(document.getElementById("tx-price").value);
+      var date = document.getElementById("tx-date").value;
+      var note = document.getElementById("tx-note").value.trim();
+      if(!ticker || !(qty>0) || !(price>0) || !date){
+        document.getElementById("tx-msg").textContent = "Điền đầy đủ mã, số lượng, giá và ngày.";
+        return;
+      }
+      db.collection("transactions").add({
+        ticker: ticker, side: side, qty: qty, price: price, date: date, note: note, createdAt: nowISO()
+      }).then(function(){
+        var current = state.tickers[ticker] || {};
+        return db.doc("tickers/" + ticker).set(Object.assign({}, current, { lastPrice: price, lastPriceDate: date, updatedAt: nowISO() }));
+      }).then(function(){
+        document.getElementById("tx-msg").style.color = "var(--pos)";
+        document.getElementById("tx-msg").textContent = "Đã lưu giao dịch.";
+        document.getElementById("tx-qty").value = 100;
+        document.getElementById("tx-price").value = "";
+        document.getElementById("tx-note").value = "";
+        document.getElementById("tx-ticker").value = "";
+        setTimeout(function(){ document.getElementById("tx-msg").textContent = ""; }, 2500);
+      }).catch(function(err){
+        console.error(err);
+        document.getElementById("tx-msg").style.color = "var(--neg)";
+        document.getElementById("tx-msg").textContent = "Lưu thất bại, thử lại.";
+      });
+    });
+
+    document.getElementById("cf-form").addEventListener("submit", function(e){
+      e.preventDefault();
+      if(!db){ document.getElementById("cf-msg").textContent = "Chưa kết nối được dữ liệu."; return; }
+      var type = document.querySelector('input[name="cf-type"]:checked').value;
+      var amountM = parseFloat(document.getElementById("cf-amount").value);
+      var date = document.getElementById("cf-date").value;
+      var note = document.getElementById("cf-note").value.trim();
+      if(!(amountM>0) || !date){
+        document.getElementById("cf-msg").textContent = "Điền số tiền và ngày hợp lệ.";
+        return;
+      }
+      db.collection("cashflows").add({
+        type: type, amount: amountM * 1000000, date: date, note: note, createdAt: nowISO()
+      }).then(function(){
+        document.getElementById("cf-msg").style.color = "var(--pos)";
+        document.getElementById("cf-msg").textContent = "Đã lưu.";
+        document.getElementById("cf-amount").value = "";
+        document.getElementById("cf-note").value = "";
+        setTimeout(function(){ document.getElementById("cf-msg").textContent = ""; }, 2500);
+      }).catch(function(err){
+        console.error(err);
+        document.getElementById("cf-msg").style.color = "var(--neg)";
+        document.getElementById("cf-msg").textContent = "Lưu thất bại, thử lại.";
+      });
+    });
+
+    document.getElementById("save-snapshot-btn").addEventListener("click", saveTodaySnapshot);
+  }
+
+  // ---------- boot ----------
+  function setSync(ok, text){
+    document.getElementById("sync-dot").className = "dot " + (ok===true ? "ok" : ok===false ? "warn" : "");
+    document.getElementById("sync-text").textContent = text;
+  }
+
+  function toArr(snap){
+    return snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
+  }
+
+  function boot(){
+    initForms();
+    render();
+    if(!window.claude || !window.claude.use){
+      setSync(false, "Không tìm thấy môi trường đồng bộ — dữ liệu sẽ không được lưu.");
+      return;
+    }
+    window.claude.use("db").then(function(handle){
+      if(!handle){
+        setSync(false, "Không thể đồng bộ trên thiết bị này — dữ liệu sẽ không được lưu.");
+        return;
+      }
+      db = handle;
+      setSync(true, "Đã kết nối — dữ liệu đồng bộ mọi thiết bị");
+
+      db.collection("transactions").onSnapshot(function(snap){
+        state.transactions = toArr(snap);
+        render();
+      }, function(err){ console.error(err); setSync(false, "Mất kết nối dữ liệu giao dịch."); });
+
+      db.collection("cashflows").onSnapshot(function(snap){
+        state.cashflows = toArr(snap);
+        render();
+      }, function(err){ console.error(err); });
+
+      db.collection("daily_snapshots").onSnapshot(function(snap){
+        state.snapshots = toArr(snap);
+        render();
+      }, function(err){ console.error(err); });
+
+      db.collection("tickers").onSnapshot(function(snap){
+        var map = {};
+        toArr(snap).forEach(function(t){ map[t.id] = t; });
+        state.tickers = map;
+        render();
+      }, function(err){ console.error(err); });
+    });
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>

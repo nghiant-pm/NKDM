@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// Fin2 — Nhật Ký Danh Mục.
+// App một người dùng: chỉ đúng một email được đọc/ghi. Mọi thứ khác đóng.
+// ⚠️ Thêm collection mới thì thêm nhánh Ở ĐÂY NGAY, không để sau.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email == 'nghiant@youmed.vn'
+        && request.auth.token.email_verified == true;
+    }
+
+    match /transactions/{id}    { allow read, write: if isOwner(); }
+    match /cashflows/{id}       { allow read, write: if isOwner(); }
+    match /tickers/{id}         { allow read, write: if isOwner(); }
+    match /daily_snapshots/{id} { allow read, write: if isOwner(); }
+    match /watchlist/{id}       { allow read, write: if isOwner(); }
+    match /strategies/{id}      { allow read, write: if isOwner(); }
+    match /signals/{id}         { allow read, write: if isOwner(); }
+
+    // Chốt chặn cuối: không collection nào khác được chạm tới.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
