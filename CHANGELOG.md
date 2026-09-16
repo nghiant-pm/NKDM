@@ -4,7 +4,119 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-16 (Ẩn lãi/lỗ, forecast chốt lời và xuất Nhật ký cho AI)
+
+- **Ẩn/hiện lãi lỗ:** nút hình con mắt ở đầu trang che toàn bộ số lãi/lỗ, tỷ suất và giá vốn sau lướt trong cả Gọn lẫn Đầy đủ; vẫn giữ giá, tiền mặt và tổng tài sản. Lựa chọn được nhớ riêng trên máy.
+- **Forecast chốt lời:** dashboard Đầy đủ mô phỏng bán 30% / 50% / 100% tất cả vị thế đang lãi theo giá thị trường hiện tại. Số lượng làm tròn xuống theo CP nguyên; tiền về và lãi dự kiến đã trừ thuế TNCN 0,1%; không tạo giao dịch thật.
+- **Biến động mã theo dõi:** bỏ dòng biến động khỏi thẻ và bảng Theo dõi. Mỗi lần ghi giá vẫn được giữ trong Nhật ký theo ngày, gồm giá, thay đổi điểm và % so với lần ghi trước.
+- **Xuất Nhật ký cho AI:** chuyển nút xuất về ngay khu vực Nhật ký, bổ sung lịch sử giá theo dõi và lãi/lỗ đã chốt sau thuế. Có thể xuất dù kỳ đó chưa sinh tín hiệu; tên file là `fin2-nhat-ky-AI-YYYY-MM-DD.json`.
+- Đã kiểm bằng dữ liệu mô phỏng: forecast, ẩn/hiện ở hai view, Nhật ký biến động 0 và xuất file khi không có tín hiệu. Không ghi Firebase thật và không đổi collection/rules.
+- Đã deploy thành công Hosting + Firestore rules ngày 16/09/2026: https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md` · `AGENTS.md`
+
+## 2026-09-16 (Dashboard dòng tiền và lãi/lỗ)
+
+- **Hai view cùng một số liệu:** Đầy đủ có dashboard chi tiết; Gọn giữ 4 chỉ số chính gồm lãi/lỗ đã chốt, lãi/lỗ chưa bán, tiền mặt và tỷ lệ tiền mặt.
+- **Đổi kỳ xem nhanh:** chọn Tuần / Tháng / Quý / Tất cả; lựa chọn được nhớ riêng trên từng máy. Lãi/lỗ đã chốt cộng từ các lệnh bán trong kỳ và đã trừ thuế TNCN đã lưu.
+- **Phân nhóm vị thế:** dùng cờ sẵn có để chia “Giữ dài hạn” và “Giao dịch”, hiện giá trị, lãi/lỗ và tỷ trọng trên tổng tài sản.
+- **Giá vốn sau lướt:** tính theo lãi/lỗ đã chốt trong chu kỳ nắm giữ liên tục hiện tại; bán hết rồi mua lại sẽ bắt đầu chu kỳ mới.
+- **Mục tiêu tiền mặt:** thêm khoảng tối thiểu/tối đa vào từng phiên bản Chiến lược, mặc định 20–30%; dashboard báo Thấp / Đạt / Cao bằng cả chữ và màu.
+- Không thêm collection và không đổi Firestore rules. Đã đối chiếu hai view, sáng/tối và các mốc 375/430/768/1120px bằng dữ liệu mô phỏng; không ghi Firebase thật.
+- Đã deploy thành công Hosting + Firestore rules ngày 16/09/2026: https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md` · `AGENTS.md`
+
+## 2026-09-16 (Biến động theo dõi, thời gian nắm giữ và cảnh báo gần ngưỡng)
+
+- **Biến động trong thời gian theo dõi:** thẻ và bảng watchlist hiện số ngày theo dõi, mức thay đổi theo điểm và %. Giá được ghi tối đa một lần/mã/ngày vào `watch_prices`; ghi lại trong ngày sẽ cập nhật đúng bản đó. Lịch sử cũ trong `daily_snapshots` vẫn được tận dụng, mã chưa có mốc được ghi rõ từ lần bắt đầu có dữ liệu.
+- **Thời gian nắm giữ:** mỗi vị thế hiện số ngày của chu kỳ nắm giữ liên tục hiện tại. Ngày bắt đầu được suy ra từ giao dịch; bán hết rồi mua lại tạo chu kỳ mới, không lưu thêm bản sao vào Firestore.
+- **Cảnh báo gần điểm mua/bán:** phiên bản chiến lược thêm `nearRange`, mặc định 0,5 điểm với bản cũ. Mã chưa chạm ngưỡng nhưng còn cách không quá khoảng này được highlight và báo số điểm còn lại; cờ Giữ tiếp tục chặn toàn bộ cảnh báo bán.
+- **Cả Gọn và Đầy đủ:** Đầy đủ thêm thông tin vào thẻ; Gọn dùng dòng phụ và viền nhấn nhẹ, không thêm cột. Đã thử bằng dữ liệu mô phỏng ở 375/430/768/1120px, không tràn ngang; không ghi Firebase thật.
+- **Bảo mật:** collection `watch_prices` có nhánh rules riêng cho đúng email owner; chốt chặn mặc định vẫn từ chối mọi collection khác.
+- Đã deploy thành công Hosting + Firestore rules ngày 16/09/2026: https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `firestore.rules` · `CHANGELOG.md` · `CODEMAP.md`
+
+## 2026-09-15c (Nhật ký: xóa giao dịch nhập sai)
+
+Owner chọn phương án xóa đúng một giao dịch mua/bán đã nhập sai, thay vì xóa sạch toàn bộ dữ liệu của mã.
+
+- **Xóa ngay tại Nhật ký:** mỗi giao dịch có nút Xóa; app hiện lại mã, số lượng, giá và ngày để xác nhận trước khi xóa đúng `transactions/{id}` (`removeTransaction`).
+- **Luôn tìm thấy giao dịch vừa nhập:** Nhật ký nay hiện cả ngày chỉ có giao dịch hoặc nạp/rút, kể cả ngày đó chưa bấm Lưu để tạo `daily_snapshots` (`renderLog`).
+- **Phạm vi đã chốt:** chỉ xóa giao dịch được chọn. Không xóa cả mã, giá, mã theo dõi, nạp/rút hay bản Nhật ký ngày đã lưu; dữ liệu còn lại tự đồng bộ và tính lại như trước.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md`
+
+## 2026-09-15 (T+2 và thuế TNCN khi bán)
+
+- Form giao dịch dùng chung ở Gọn và Đầy đủ báo số cổ phiếu có thể bán tại thời điểm hiện tại; cổ phiếu mua mở bán từ 11:35 ngày làm việc thứ hai kế tiếp. Chỉ loại thứ Bảy và Chủ nhật theo phạm vi đã chốt.
+- Dòng báo tự cập nhật khi đổi mã, đổi Mua/Bán, dữ liệu đồng bộ thay đổi hoặc thời gian đi qua 11:35. Đây là thông tin tham khảo; không chặn lưu. Cơ chế xác nhận bán vượt tổng số đang giữ vẫn giữ nguyên.
+- Lệnh bán mới âm thầm lưu và trừ thuế TNCN 0,1% giá trị bán. Tiền mặt và lãi/lỗ đã bán đều dùng số sau thuế; lệnh bán cũ không có dữ liệu thuế giữ nguyên, không tính hồi tố.
+- File xuất dữ liệu thêm thuế cho từng lệnh bán và tổng thuế trong phần giao dịch khớp tín hiệu. Không thêm collection hay thay đổi Firestore rules.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md` · `AGENTS.md`
+
+## 2026-09-15 (View Gọn: sort, filter và thao tác nhanh)
+
+- Hai bảng có tìm mã, lọc trạng thái và sort tăng/giảm khi bấm tiêu đề cột. Sort lưu riêng từng máy; filter tự về Tất cả khi tải lại. Có nút về thứ tự kéo thả đã xếp.
+- Bảng nắm giữ thêm Giá hiện tại. Giá cao/thấp hơn giá vốn và lãi/lỗ dùng xanh/đỏ; bảng theo dõi dùng xanh khi đạt giá kỳ vọng, đỏ khi còn cao hơn.
+- Thêm mã theo dõi ngay từ view Gọn bằng form có sẵn. Form giữ bản nhập khi đóng/mở và không tạo luồng ghi riêng.
+- Nút Lấy giá của bảng nắm giữ lấy toàn bộ mã đang giữ dù đang lọc và ghi thẳng vào `tickers`; không tạo nhật ký hay tín hiệu. Tab Danh mục ở Đầy đủ giữ cách điền ô rồi chờ Lưu.
+- Đã thử bằng dữ liệu mẫu: sort số và mã, giá thiếu luôn cuối; tìm + lọc, trạng thái không có kết quả; nhớ sort nhưng không nhớ filter; thêm mã chỉ ghi `watchlist`; lấy giá nắm giữ chỉ ghi `tickers`; màu tăng/giảm và bảng 5 cột ở 375/430/768/1120px không tràn ngang. Đã deploy Firebase thành công ngày 15/09/2026.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md` · `AGENTS.md`
+
+## 2026-09-14 (Giao diện: thêm view Gọn)
+
+Owner muốn xem nhanh vốn, cổ phiếu đang giữ và mã đang theo dõi trên cùng một màn hình, giữ cách đồng bộ và lưu dữ liệu hiện có.
+
+- **Chuyển Gọn / Đầy đủ:** nhớ lựa chọn riêng từng máy bằng `fin2-view`; lần đầu mở Đầy đủ. Quay lại Đầy đủ vẫn ở tab trước đó (`initCompact`).
+- **Ba khối chính:** tổng quan gồm vốn nạp ròng (nạp − rút), tiền mặt, giá trị cổ phiếu và lãi/lỗ chưa bán kèm %. Hai bảng hiện mã đang giữ và mã theo dõi; chênh lệch điểm = giá thị trường − giá kỳ vọng (`renderCompact`). Điện thoại xếp tổng quan 2×2.
+- **Cùng số liệu và thứ tự mã:** dùng `computeSummary`, `sortTickers` và luồng đồng bộ sẵn có. Mã thiếu giá hiện rõ “Chưa có giá”; tổng có dùng giá vốn thay thế được ghi “Tạm tính · thiếu giá”. Không thêm collection hay kết nối đồng bộ.
+- **Thao tác ngay trong view Gọn:** bấm mã hoặc Giao dịch mở form cũ trong hộp; Cập nhật giá mở khối nhập giá cũ (`openCompactForm`). Đóng hộp giữ nội dung đang nhập, không tự lưu. Bấm giá kỳ vọng dùng lại `editWatch`; nút `tx-submit` chặn gửi lặp khi đang lưu.
+- **Giữ đúng hai cách lấy giá:** Danh mục chỉ điền ô rồi chờ Lưu nhật ký; Theo dõi ghi ngay như trước. Nút và thông báo được chuyển qua lại giữa hai view, không tạo bản sao xử lý. Nạp/rút, quản lý watchlist, chiến lược và lịch sử vẫn ở Đầy đủ; không thêm gợi ý mua/bán vào bảng Gọn.
+- **Nhắc trước khi rời trang có nội dung chưa lưu:** `pendingDrafts` ghi nhận form giao dịch và ô giá đang sửa; `beforeunload` yêu cầu trình duyệt cảnh báo trước khi tải lại hoặc đóng trang. Lưu xong xoá cờ. Bản nháp chỉ ở bộ nhớ phiên mở trang, không lưu vào localStorage.
+- **Đã kiểm bằng trình duyệt với dữ liệu mẫu:** đối chiếu tổng, thiếu giá, danh sách rỗng; đo 375/430/768/1120px không tràn ngang và xem sáng/tối. View Gọn được nhớ qua tải lại; quay về Đầy đủ khôi phục đúng tab Theo dõi. Giữ form khi đóng/mở và nhận cập nhật dữ liệu; thử lưu giao dịch, sửa giá kỳ vọng, lấy giá danh mục chỉ điền ô, lấy giá watchlist ghi ngay và lưu nhật ký tạo snapshot + tín hiệu. Các thao tác ghi dùng bản mô phỏng, không ghi Firebase thật. Đã deploy Firebase thành công (`firebase deploy --project fin2-danh-muc`, exit 0): https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md`
+
 ## 2026-09-10
+
+### Kéo đổi thứ tự mã và giảm chữ phụ
+- Bỏ “(nghìn đ)” ở nhãn giá và dòng lấy giá thành công kèm số mã/nguồn/giờ.
+- Giữ thông báo ngắn khi lỗi, thiếu giá hoặc dùng giá tham chiếu.
+- Thêm tay nắm kéo thả trên thẻ Danh mục và Theo dõi, hỗ trợ chuột/chạm, cuộn khi kéo sát mép và phím mũi tên.
+- Thứ tự lưu riêng từng danh sách trong localStorage trên mỗi máy; không thay đổi dữ liệu đầu tư.
+
+### Cài ứng dụng Danh Mục trên Android
+- Đổi title và tiêu đề giao diện thành “Danh Mục”.
+- Thêm manifest, icon PNG 192/512 và icon maskable, mở ở chế độ standalone.
+- Nút Cài đặt chỉ hiện khi Chrome phát sự kiện cho phép cài; ẩn sau khi cài hoặc đang mở app riêng.
+- Không thêm cache offline; dữ liệu và cách đăng nhập giữ nguyên. Cần deploy rồi kiểm tra cài thực tế trên Android.
+
+### Lấy giá trước khi thêm mã theo dõi
+- Form Thêm mã: nhập mã → Lấy giá → xem giá thị trường → nhập giá muốn mua → Lưu.
+- Dùng chung nguồn VPS; hiện riêng giá tham chiếu khi chưa khớp lệnh. Đổi mã bỏ kết quả cũ.
+- Lấy giá chỉ xem trước; bấm Lưu mới ghi mã theo dõi và giá đã lấy trong cùng batch.
+- Vẫn cho nhập giá muốn mua thủ công khi nguồn giá không khả dụng.
+
+### Sửa giá muốn mua trong Theo dõi
+- Thêm nút “Sửa” cạnh giá muốn mua, mở ô giá có sẵn và nút Lưu/Huỷ.
+- Chỉ cập nhật giá mục tiêu và thời gian sửa; giữ ngày thêm mã. Chặn giá không hợp lệ và lưu lặp.
+- Khoảng cách, % cần giảm và trạng thái đạt giá tự cập nhật qua đồng bộ Firestore.
+
+### Tinh gọn giao diện và bổ sung khoảng giảm giá
+- Bỏ nút đăng xuất và placeholder “Giá (nghìn đ)” trong ô cập nhật giá.
+- Theo dõi: giá thị trường trước, giá muốn mua sau; thêm “Cần giảm” theo % giá thị trường.
+- Giá đã bằng hoặc thấp hơn giá muốn mua hiện 0%; thiếu giá hiện “—”.
+
+### Rút gọn câu chữ, dùng nhãn dễ hiểu
+- Rút ngắn nút bấm, thông báo và trạng thái trống; bỏ ví dụ dài trong ô ghi chú.
+- Nhãn owner chốt: “Danh mục”, “Giá TB”, “Tỷ suất”, “CP/lệnh”,
+  “Theo / Giữ”, “Tải”, “Lấy giá”, “Lưu”.
+- Giữ đơn vị, cảnh báo cần thiết, logic và cấu trúc dữ liệu hiện tại.
+- Kiểm tra: cú pháp JavaScript hợp lệ; ID giao diện và nội dung xuất dữ liệu giữ nguyên.
 
 ### Gập được cả khối tài sản
 Owner báo: 11 phần gập được nhưng đúng khối 4 ô tài sản trên cùng thì không, vì nó là khối

@@ -19,6 +19,7 @@ service cloud.firestore {
     match /watchlist/{id}       { allow read, write: if isOwner(); }
     match /strategies/{id}      { allow read, write: if isOwner(); }
     match /signals/{id}         { allow read, write: if isOwner(); }
+    match /watch_prices/{id}    { allow read, write: if isOwner(); }
 
     // Chốt chặn cuối: không collection nào khác được chạm tới.
     match /{document=**} { allow read, write: if false; }
