@@ -49,4 +49,24 @@ const ranked = selectResults(Array.from({ length: 8 }, (_, index) => ({
 assert.equal(ranked.selected.length, 5, "Hai nhóm cộng lại chỉ được tối đa 5 mã");
 assert.equal(ranked.fresh.length + ranked.watched.length, 5, "Tách nhóm không được làm phát sinh thêm mã");
 
-console.log("Smoke scoring: OK");
+// Khung giờ: giờ Việt Nam = UTC+7, Scheduler có thể trễ vài giây.
+const { slotAt, slotEnabled, marketDateFor, telegramHeader } = require("./index")._private;
+const vnTime = (hhmmss) => new Date(`2026-09-24T${hhmmss}+07:00`);
+assert.equal(slotAt(vnTime("16:00:04"))?.id, "1600", "Trễ vài giây vẫn đúng khung 16:00");
+assert.equal(slotAt(vnTime("08:30:00"))?.phase, "pre", "8:30 là trước phiên");
+assert.equal(slotAt(vnTime("13:30:10"))?.phase, "intraday", "13:30 là trong phiên");
+assert.equal(slotAt(vnTime("20:00:00"))?.phase, "post", "20:00 là sau phiên");
+assert.equal(slotAt(vnTime("09:00:00")), null, "Giờ không có khung thì không chạy");
+assert.equal(slotEnabled(undefined, "1600"), true, "Chưa cấu hình thì mặc định bật 16:00");
+assert.equal(slotEnabled(undefined, "2000"), false, "Chưa cấu hình thì các khung khác tắt");
+assert.equal(slotEnabled({ slots: { "1600": false, "0830": true } }, "1600"), false, "Owner tắt 16:00 thì phải tắt");
+assert.equal(slotEnabled({ slots: { "1600": false, "0830": true } }, "0830"), true, "Owner bật 8:30 thì phải bật");
+
+const vn = [{ date: "2026-09-22" }, { date: "2026-09-23" }, { date: "2026-09-24" }];
+assert.equal(marketDateFor("pre", "2026-09-24", vn), "2026-09-23", "Trước phiên không dùng nến hôm nay");
+assert.equal(marketDateFor("post", "2026-09-24", vn), "2026-09-24", "Sau phiên dùng nến hôm nay");
+assert.equal(marketDateFor("intraday", "2026-09-25", vn), null, "Không có nến hôm nay = ngày nghỉ");
+assert.match(telegramHeader({ phase: "intraday", time: "10:30" }, "2026-09-24", "2026-09-24", null)[1], /Tạm tính/, "Trong phiên phải ghi tạm tính");
+assert.match(telegramHeader({ phase: "pre", time: "08:30" }, "2026-09-24", "2026-09-23", null)[1], /23\/09\/2026/, "Trước phiên ghi rõ phiên được chấm");
+
+console.log("Smoke scoring + khung giờ: OK");

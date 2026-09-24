@@ -19,6 +19,13 @@ giao dịch có `orderId`, hoặc xoá thì hoàn lại trạng thái lệnh).
 **File:** `public/index.html` — `removeTransaction`, `fillOrder`.
 
 ### 🔴 #012 — Cloud Function hết thời gian chờ khi lấy lịch sử VPS
+**Cập nhật 24/09/2026 — đã đổi nguồn, chờ xác nhận bằng một lượt production thật:** hàm thử
+chạy trên Cloud Function (asia-southeast1) đo 4 nguồn: VPS timeout, SSI 403, **VNDirect 200
+(0,23 giây)**, DNSE 200. Bot và nút Quét ngay chuyển sang VNDirect (`dchart-api.vndirect.com.vn`);
+đối chiếu 15/15 mã đạt chuẩn cùng điểm với VPS. Lưu ý: VNDirect trả 406 nếu header `accept` chỉ là
+`application/json` — phải gửi `*/*`. Khi một lượt khung giờ thật gửi Telegram thành công thì
+chuyển issue này sang Đã fix.
+
 **Triệu chứng:** lần chạy thủ công production lúc 14:44 ngày 24/09/2026 dừng ngay khi lấy
 VN-Index vì kết nối tới `histdatafeed.vps.com.vn` bị timeout. Cùng API vẫn hoạt động từ máy
 owner nên bot chưa sinh đề cử cho lần chạy này.

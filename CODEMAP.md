@@ -6,7 +6,7 @@
 public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                         ├── firebase-app.js       initializeApp
                         ├── firebase-auth.js      Google Sign-In
-                        └── firebase-firestore.js đọc 12 collection;
+                        └── firebase-firestore.js đọc 13 collection;
                             2 collection screening chỉ đọc
                       Google Fonts (Inter 400/500)
                       bgapidatafeed.vps.com.vn   giá thị trường (chỉ đọc,
@@ -29,11 +29,12 @@ public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                         đi đâu cả; owner tự đem file đi hỏi AI
 
 functions/index.js ──> Firebase Functions v2 · Node.js 22
-                        ├── lịch 16:10 T2–T6, Asia/Ho_Chi_Minh
+                        ├── lịch mỗi 30 phút 8:00–20:30 T2–T6, Asia/Ho_Chi_Minh;
+                        │   chỉ chạy thật ở khung giờ owner bật (settings/screening)
                         ├── functions/scoring.js  chấm điểm + đánh giá 20 phiên
                         ├── functions/universe.js khoảng 100 mã ứng viên
-                        ├── histdatafeed.vps.com.vn  OHLCV + VN-Index
-                        ├── Firestore Admin SDK   ghi screening_runs/results
+                        ├── dchart-api.vndirect.com.vn  OHLCV + VN-Index (VPS chặn Google Cloud)
+                        ├── Firestore Admin SDK   đọc settings; ghi screening_slots/runs/results
                         └── Telegram Bot API      token/chat ID ở Secret Manager
 
 firestore.rules   ──  hàng rào thật. Không file nào import, nhưng
@@ -116,12 +117,13 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | Form | `setupSeg` `setMsg` `clearOversellAck` `showOversellAck` `refreshSellAvailability` `initForms` | các form (`tx-form`, `cf-form`, `wl-form`, `st-form`), nút `ex-btn`, chặn bán vượt, báo số CP có thể bán theo T+2, tự gắn thuế cho lệnh bán mới, nút theme, đăng xuất |
 | Tab | `showTab(name)` `initTabs()` `initDashboard()` `renderPrivacyControl()` `renderPnlScopeControls()` | bật 1 trong 3 panel, nhớ tab; dashboard nhớ kỳ xem, trạng thái ẩn/hiện số và tuỳ chọn không tính mã dài hạn vào riêng tổng lãi/lỗ chưa bán. Bảng/thẻ vị thế và Nhật ký không bị che |
 | View | `initCompact()` `openCompactForm(kind,ticker)` `renderCompactToday(s)` `readSkippedHighlights()` `writeSkippedHighlights(keys)` `compactRowMenu(ticker,watch)` | chuyển Gọn / Đầy đủ; dải **Highlight hôm nay** chỉ tổng hợp tín hiệu đã/sắp đạt (`strategyAlert`), lệnh chờ và watchlist gần mục tiêu, không lưu gì vào Firestore. Mỗi mục có khoá ổn định (`signal_loại_MÃ`, `order_id`, `near_loại_MÃ`, `watch_MÃ`) và nút **Bỏ qua** ẩn mục tới hết ngày trên máy đó (`fin2-skip-highlight`), nút **Hiện lại** xoá danh sách; không ảnh hưởng khối Quyết định; thao tác ít dùng của từng mã (luận điểm, sửa giá kỳ vọng, bỏ theo dõi) nằm trong menu ba chấm. Mobile ≤768px bảng chuyển thành dòng thẻ hai tầng, desktop giữ dạng cột; sort/filter 2 bảng; chuyển form giao dịch hoặc thêm mã vào dialog và trả về khi đóng, giữ bản nháp. Bấm giá kỳ vọng dùng `editWatch`; `tx-submit` bị khoá trong lúc ghi để tránh gửi lặp |
-| Sàng lọc | `runManualScreening()` `screenFetchHistory(ticker,maxAttempts)` `screenMapWithConcurrency(items,limit,worker,onProgress)` | nút “Quét ngay” lấy OHLCV VPS trên thiết bị với concurrency 5, chấm tối đa 5 mã theo công thức v1.0.0 và chỉ giữ kết quả trong `state.manualScreening`; không ghi Firestore, không gửi Telegram |
+| Sàng lọc | `runManualScreening()` `screenFetchHistory(ticker,maxAttempts)` `screenMapWithConcurrency(items,limit,worker,onProgress)` | nút “Quét ngay” lấy OHLCV VNDirect trên thiết bị với concurrency 5, chấm tối đa 5 mã theo công thức v1.0.0 và chỉ giữ kết quả trong `state.manualScreening`; không ghi Firestore, không gửi Telegram |
 | | `screenScoreTicker(ticker,bars,benchmarkBars)` và nhóm hàm `screen*Score` | bản công thức chấm điểm phía client cho Quét ngay; phải cho cùng kết quả với `functions/scoring.js` khi cùng dữ liệu và `SCREENING_SCORE_VERSION` |
+| | `renderScreeningSlots()` `screeningSlotOn(id)` `toggleScreeningSlot(id,btn)` | hàng công tắc khung giờ nhận Telegram trong khối sàng lọc (dùng chung hai view); ghi cả bộ `slots` vào `settings/screening` |
 | | `initScreening()` `openScreeningWatch(ticker,price)` | bắt sự kiện một lần trên khối dùng chung; “Đưa vào theo dõi” chỉ điền mã và hiện giá lúc đề cử, còn giá muốn mua do owner nhập rồi tự Lưu |
 | | `pendingDrafts` trong `initCompact` | ghi cờ form giao dịch / giá chưa lưu để `beforeunload` yêu cầu cảnh báo khi rời trang. `refreshAllPrices` cũng đặt cờ khi điền giá; lưu giao dịch hoặc `saveTodaySnapshot` thành công xoá cờ tương ứng. Không lưu bản nháp vào localStorage |
 | Thu gọn | `initCollapse()` `setCollapsed(head,on)` `readCollapsed()` `writeCollapsed(list)` hằng `CHEVRON` | chèn mũi tên vào mọi `.sec-head[data-sec]`; bấm đầu đề thì gắn class `collapsed` lên **thẻ cha** (section hoặc .card), CSS `.collapsed > *:not(.sec-head)` giấu phần thân — **không bọc thêm thẻ nào**. Phần đang gập nhớ ở localStorage `fin2-collapsed` (mảng khoá). Section mới muốn gập được thì chỉ cần thêm `data-sec`. Muốn hiện số tóm tắt lúc gập thì đặt `class="only-collapsed"` lên ô đó — thuần CSS, `render()` không cần biết đang gập hay mở |
-| Dữ liệu | `setSync` `watch(name, apply)` `watchRef(ref,name,apply)` `startData()` | 10 listener collection cũ và 2 query screening; mỗi lần có dữ liệu đều gọi `render()` |
+| Dữ liệu | `setSync` `watch(name, apply)` `watchRef(ref,name,apply)` `startData()` | 11 listener collection (gồm `settings`) và 2 query screening; mỗi lần có dữ liệu đều gọi `render()` |
 | Cổng | `showGate` `initGate()` | `onAuthStateChanged` → 3 nhánh: chưa đăng nhập · sai email · đúng email |
 
 **Boot:** đúng 11 lời gọi ở cấp module, cuối file, theo thứ tự
@@ -134,9 +136,13 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 
 | File | Hàm | Việc |
 |---|---|---|
-| `index.js` | `screenShortTermOpportunities` | lịch chính 16:10 T2–T6; tải dữ liệu, loại mã đang giữ, lấy tối đa 5 mã tổng cộng, ghi Firestore, cập nhật đánh giá và gửi Telegram |
-| | `fetchHistory(ticker,historyDays,maxAttempts)` `parseHistory(payload)` `mapWithConcurrency(items,limit,worker)` | đọc OHLCV lịch sử VPS với header JSON/user-agent, timeout 9 giây/lần và backoff; VN-Index thử tối đa 3 lần, mã thường 2 lần. Vẫn giới hạn 5 request đồng thời; thiếu trên 20% mã thì dừng toàn bộ lần chạy |
-| | `acquireRun(db,date)` `claimNotification(db,runRef,type)` `markFailure(...)` | khóa theo ngày, không cho gửi Telegram trùng kể cả khi retry, lưu trạng thái lỗi và thử gửi một cảnh báo riêng |
+| `index.js` | `screenShortTermOpportunities` | chạy mỗi 30 phút T2–T6; `slotAt` ra khung giờ, `slotEnabled` đọc `settings/screening` (thiếu doc = chỉ 16:00). Khung tắt thì thoát ngay |
+| | `runSlot(db,slot,date,…)` `acquireSlot(db,date,slot)` | khoá `screening_slots/{ngày}_{khung}` — mỗi khung gửi Telegram đúng một lần; ngày nghỉ ghi `holiday`, không nhắn |
+| | `scanMarket({phase,date,held,watchlist,extraTickers})` `marketDateFor(phase,date,bars)` | tải + chấm, KHÔNG ghi gì. `pre` chấm theo phiên gần nhất đã đóng; `intraday`/`post` cần nến hôm nay (nến trong phiên chưa đóng → tin ghi “tạm tính”) |
+| | `recordOfficialRun(db,date,scan,oldResultsSnap)` | chỉ lượt `post` đầu tiên thành công trong ngày ghi `screening_runs`/`screening_results` + chấm tiếp đánh giá; lượt `post` sau chỉ đọc số thử nghiệm |
+| | `telegramHeader(slot,date,marketDate,trial)` `telegramText(header,fresh,watched)` | tiêu đề riêng cho Trước phiên / Trong phiên (tạm tính) / Sau phiên |
+| | `fetchHistory(ticker,historyDays,maxAttempts)` `parseHistory(payload)` `mapWithConcurrency(items,limit,worker)` | đọc OHLCV lịch sử VNDirect (header `accept: */*`), timeout 9 giây/lần và backoff; VN-Index thử tối đa 3 lần, mã thường 2 lần. Vẫn giới hạn 5 request đồng thời; thiếu trên 20% mã thì dừng toàn bộ lần chạy |
+| | `claimNotification(db,ref,type)` `markFailure(...)` | không gửi Telegram trùng; lỗi thì đánh dấu khung (và ngày, nếu là lượt `post` chưa ghi xong) rồi gửi một cảnh báo riêng cho khung đó |
 | | `updateEvaluations(db,historyByTicker,benchmarkBars)` | chấm tiếp các đề cử cũ chưa đủ 20 phiên và ghi `evaluation` vào đúng document cũ |
 | `scoring.js` | `scoreTicker(ticker,bars,benchmarkBars)` | lọc tối thiểu 60 phiên + 20 tỷ đồng/ngày; chấm 100 điểm và lưu riêng xu hướng, sức mạnh tương đối, bứt phá, điều chỉnh, thanh khoản/rủi ro, vùng giá |
 | | `evaluateCandidate(result,bars,benchmarkBars)` | xác định +6% trước −3% trong 20 phiên; cùng một nến chạm hai mức là `indeterminate`; ghi thêm lợi nhuận phiên 20 và phần vượt/trượt VN-Index |
@@ -147,10 +153,8 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 **Trạng thái production:** `screenShortTermOpportunities` v2 đã deploy tại
 `asia-southeast1`, Node.js 22, 512 MB. Hai secret Telegram đang ở Secret Manager phiên bản 1;
 Artifact Registry xoá image cũ hơn 1 ngày. Firestore rules và Hosting đã phát hành cùng đợt.
-Bản retry VPS đã deploy nhưng production vẫn timeout đủ 3 lần ở VN-Index: VPS không nhận
-kết nối từ Cloud Function/Google Cloud. Vì vậy lịch 16:10 chưa vận hành được cho tới khi có
-nguồn dữ liệu server thay thế hoặc proxy phù hợp. Round thủ công từ máy owner chỉ gửi
-Telegram, có nhãn rõ và không ghi `screening_runs` / `screening_results`.
+Từ 24/09/2026 bot đọc lịch sử giá từ VNDirect (VPS không nhận kết nối từ Google Cloud — #012)
+và chạy theo khung giờ owner bật trong app, không còn lịch cố định 16:10. retryCount = 0.
 
 ---
 
@@ -169,7 +173,9 @@ Telegram, có nhãn rõ và không ghi `screening_runs` / `screening_results`.
 | `orders` | `watch("orders")` → `renderDecisionHub`, `renderLog`, `buildExport`, giữ chỗ CP bán | `createOrder`, `fillOrder`, nút Hủy (`setDoc` / `updateDoc`) | ✅ |
 | `theses` | `watch("theses")` → badge và form luận điểm, `buildExport` | `thesis-form` (`setDoc`, id = MÃ) | ✅ |
 | `screening_runs` | `watchRef` query 40 lần gần nhất → `renderScreeningHub` | Cloud Function `screenShortTermOpportunities`; client không được ghi | ✅ chỉ owner đọc |
-| `screening_results` | `watchRef` query 250 kết quả gần nhất → `renderScreeningHub` | Cloud Function `screenShortTermOpportunities`, `updateEvaluations`; client không được ghi | ✅ chỉ owner đọc |
+| `screening_results` | `watchRef` query 250 kết quả gần nhất → `renderScreeningHub` | Cloud Function `recordOfficialRun`, `updateEvaluations`; client không được ghi | ✅ chỉ owner đọc |
+| `screening_slots` | (client chưa đọc) | Cloud Function `acquireSlot`, `runSlot`, `markFailure` | ✅ chỉ owner đọc |
+| `settings` | `watch("settings")` → `screeningSlotOn`, `renderScreeningSlots` | `toggleScreeningSlot` (`setDoc settings/screening`) | ✅ |
 
 ⚠️ **Thêm collection mới = thêm 1 dòng bảng này + 1 nhánh trong `firestore.rules` NGAY.**
 

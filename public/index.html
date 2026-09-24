@@ -323,6 +323,17 @@
   .screening-status.loss{ background:var(--neg-soft); color:var(--neg); }
   .screening-status.trial{ background:var(--warn-soft); color:var(--warn); }
   .screening-run-error{ color:var(--neg); }
+  .screening-slots{ display:flex; align-items:center; flex-wrap:wrap; gap:8px 16px; margin-bottom:10px; }
+  .screening-slots-label{ display:inline-flex; align-items:center; gap:6px; color:var(--text-muted); font-size:var(--fs-label); }
+  .screening-slot-group{ display:inline-flex; align-items:center; gap:6px; }
+  .screening-slot-group > span{ color:var(--text-muted); font-size:var(--fs-label); }
+  .screening-slot{
+    min-width:56px; min-height:44px; padding:6px 10px; border:1px solid var(--border); border-radius:var(--r-pill);
+    background:var(--surface); color:var(--text-muted); font-size:var(--fs-label); font-variant-numeric:tabular-nums;
+  }
+  .screening-slot[aria-pressed="true"]{ background:var(--brand-soft); border-color:var(--brand); color:var(--brand); font-weight:500; }
+  .screening-slot:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; }
+  .screening-slot:disabled{ opacity:.5; }
   .screening-tools{ display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
   .screening-tools .btn{ min-height:44px; white-space:nowrap; }
   #screening-hub .sec-chevron, #decision-hub .sec-chevron{ width:44px; height:44px; }
@@ -1072,6 +1083,7 @@
           <button class="btn primary" id="screening-scan" type="button">Quét ngay</button>
         </div>
       </div>
+      <div class="screening-slots" id="screening-slots" role="group" aria-label="Giờ nhận tin Telegram"></div>
       <div class="screening-groups">
         <div class="card decision-card">
           <h3>Cơ hội mới</h3>
@@ -1327,6 +1339,19 @@ const OWNER_EMAIL = "nghiant@youmed.vn";
    Chỉ gửi đi danh sách mã, không gửi số lượng hay số dư. */
 const PRICE_API = "https://bgapidatafeed.vps.com.vn/getliststockdata/";
 const PRICE_HISTORY_API = "https://histdatafeed.vps.com.vn/tradingview/history";
+/* Nguồn OHLCV để CHẤM ĐIỂM — phải trùng HISTORY_API trong functions/index.js để điểm Quét ngay
+   khớp bot. Biểu đồ (PRICE_HISTORY_API) vẫn dùng VPS. */
+const SCREENING_HISTORY_API = "https://dchart-api.vndirect.com.vn/dchart/history";
+/* Bản sao có chủ ý của SLOTS trong functions/index.js — thêm/bớt khung phải sửa cả hai. */
+const SCREENING_SLOTS = [
+  { id:"0830", time:"8:30", phase:"pre" },
+  { id:"1030", time:"10:30", phase:"intraday" },
+  { id:"1330", time:"13:30", phase:"intraday" },
+  { id:"1530", time:"15:30", phase:"post" },
+  { id:"1600", time:"16:00", phase:"post" },
+  { id:"2000", time:"20:00", phase:"post" }
+];
+const SCREENING_DEFAULT_SLOTS = { "1600": true };
 const SCREENING_SCORE_VERSION = "v1.0.0";
 const SCREENING_MIN_BARS = 60;
 const SCREENING_MIN_AVG_VALUE_20 = 20_000_000_000;
@@ -1380,6 +1405,7 @@ const state = {
   theses: {},       // { MÃ: { thesis, invalidation, reviewDate } }
   screeningRuns: [],
   screeningResults: [],
+  screeningSettings: null, // settings/screening — khung giờ gửi Telegram
   manualScreening: null // kết quả xem nhanh trên máy; không lưu Firestore
 };
 let priceKey = "";        // khoá tập mã đang hiện ở ô nhập giá
@@ -2055,7 +2081,7 @@ function screenDateInVietnam(timestamp){
 }
 async function screenFetchHistory(ticker, maxAttempts = 2){
   const to = Math.floor(Date.now() / 1000), from = to - 240 * 86400;
-  const url = PRICE_HISTORY_API + "?symbol=" + encodeURIComponent(ticker) + "&resolution=D&from=" + from + "&to=" + to;
+  const url = SCREENING_HISTORY_API + "?symbol=" + encodeURIComponent(ticker) + "&resolution=D&from=" + from + "&to=" + to;
   let lastError;
   for(let attempt = 1; attempt <= maxAttempts; attempt += 1){
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
@@ -2172,7 +2198,35 @@ function screeningRowHtml(row, canAdd){
     '<div class="decision-actions">' + action + '</div></div>';
 }
 
+function screeningSlotOn(id){
+  const slots = state.screeningSettings && state.screeningSettings.slots;
+  return slots && typeof slots === "object" ? slots[id] === true : SCREENING_DEFAULT_SLOTS[id] === true;
+}
+function renderScreeningSlots(){
+  const groups = [["pre","Trước phiên"],["intraday","Trong phiên"],["post","Sau phiên"]];
+  $("screening-slots").innerHTML = '<span class="screening-slots-label">' + UI_ICON.bell + 'Telegram</span>' +
+    groups.map(([phase, label]) => '<div class="screening-slot-group"><span>' + label + '</span>' +
+      SCREENING_SLOTS.filter((slot) => slot.phase === phase).map((slot) => {
+        const on = screeningSlotOn(slot.id);
+        return '<button type="button" class="screening-slot" data-screening-slot="' + slot.id + '" aria-pressed="' + on + '" ' +
+          'aria-label="' + (on ? "Tắt" : "Bật") + ' tin Telegram lúc ' + slot.time + '">' + slot.time + '</button>';
+      }).join("") + '</div>').join("");
+}
+async function toggleScreeningSlot(id, button){
+  if(!ready){ toast("Chưa kết nối"); return; }
+  const slots = {};
+  SCREENING_SLOTS.forEach((slot) => { slots[slot.id] = screeningSlotOn(slot.id); });
+  slots[id] = !slots[id];
+  button.disabled = true;
+  try {
+    await setDoc(doc(fs, "settings", "screening"), { slots, updatedAt:nowISO() });
+    const slot = SCREENING_SLOTS.find((x) => x.id === id);
+    toast((slots[id] ? "Bật" : "Tắt") + " tin " + slot.time);
+  } catch(e){ console.error(e); toast("Chưa lưu được · Thử lại"); }
+  finally { if(button.isConnected) button.disabled = false; }
+}
 function renderScreeningHub(){
+  renderScreeningSlots();
   const runs = state.screeningRuns.slice().sort((a,b) => (a.date || "") < (b.date || "") ? 1 : -1);
   const latestRun = runs[0] || null;
   const manual = state.manualScreening;
@@ -2660,6 +2714,8 @@ function initScreening(){
     runManualScreening();
   });
   $("screening-hub").addEventListener("click", (event) => {
+    const slot = event.target.closest("[data-screening-slot]");
+    if(slot){ toggleScreeningSlot(slot.dataset.screeningSlot, slot); return; }
     const button = event.target.closest("[data-screening-watch]");
     if(!button) return;
     openScreeningWatch(button.dataset.screeningWatch, Number(button.dataset.screeningPrice));
@@ -2880,6 +2936,7 @@ const UI_ICON = {
   note:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>',
   edit:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16zM13.5 6.5l4 4"/></svg>',
   more:'<svg class="ui-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
+  bell:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.3 20a2 2 0 0 0 3.4 0"/></svg>',
   trash:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 3h6l1 4H8zM7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>'
 };
 const ICON = {
@@ -4291,6 +4348,7 @@ function startData(){
     rows.forEach((t) => { map[t.id] = t; });
     state.theses = map;
   });
+  watch("settings",        (rows) => { state.screeningSettings = rows.find((r) => r.id === "screening") || null; });
   watchRef(query(collection(fs, "screening_runs"), orderBy("date", "desc"), limit(40)), "screening_runs", (rows) => { state.screeningRuns = rows; });
   watchRef(query(collection(fs, "screening_results"), orderBy("date", "desc"), limit(250)), "screening_results", (rows) => { state.screeningResults = rows; });
 }

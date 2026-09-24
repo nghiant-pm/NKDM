@@ -25,6 +25,10 @@ service cloud.firestore {
     // Kết quả bot do Cloud Function (Admin SDK) ghi; trình duyệt chỉ được đọc.
     match /screening_runs/{id}    { allow read: if isOwner(); allow write: if false; }
     match /screening_results/{id} { allow read: if isOwner(); allow write: if false; }
+    // Khoá theo khung giờ gửi Telegram — chỉ Cloud Function ghi.
+    match /screening_slots/{id}   { allow read: if isOwner(); allow write: if false; }
+    // Cấu hình owner chỉnh trong app (khung giờ nhận tin sàng lọc).
+    match /settings/{id}          { allow read, write: if isOwner(); }
 
     // Chốt chặn cuối: không collection nào khác được chạm tới.
     match /{document=**} { allow read, write: if false; }

@@ -4,6 +4,20 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-24h (Bot sàng lọc chạy lại được + owner chọn khung giờ nhận Telegram)
+
+Owner muốn tự chọn giờ nhận tin quét mã tiềm năng, có khung trước/trong/sau phiên và bật tắt được. Điều kiện tiên quyết: bot phải lấy được dữ liệu từ máy chủ (#012).
+
+- **Đổi nguồn lịch sử giá để chấm điểm sang VNDirect.** Đo thật từ Cloud Function bằng một hàm thử tạm (đã xoá ngay sau khi đo): VPS timeout, SSI 403, VNDirect và DNSE trả dữ liệu. VNDirect cùng định dạng với VPS, giá lệch tối đa 0,001; chạy thử toàn bộ 104 mã: thiếu 0, 8,2 giây, **15/15 mã đạt chuẩn cùng điểm với VPS**. Nút Quét ngay cũng chuyển sang VNDirect (cho gọi từ trình duyệt) để điểm hai bên luôn khớp; biểu đồ và giá hiện tại vẫn dùng VPS.
+- **6 khung giờ bật/tắt được trong khối Cơ hội ngắn hạn** (cả Gọn và Đầy đủ): Trước phiên 8:30 · Trong phiên 10:30, 13:30 · Sau phiên 15:30, 16:00, 20:00. Mặc định chỉ bật 16:00. Lưu ở `settings/screening` nên đồng bộ mọi máy.
+- **Bot chạy mỗi 30 phút ngày làm việc**, chỉ quét + gửi khi khung đang bật; khung tắt thoát ngay (gần như không tốn phí). Mỗi khung có khoá `screening_slots/{ngày}_{giờ}` nên không bao giờ gửi trùng; ngày nghỉ không nhắn.
+- **Tin nhắn ghi rõ loại:** Trước phiên chấm theo phiên gần nhất đã đóng; Trong phiên ghi “tạm tính, nến hôm nay chưa đóng”; Sau phiên kèm số buổi thử nghiệm.
+- **Chỉ lượt sau đóng cửa đầu tiên trong ngày ghi lịch sử** (`screening_runs`/`screening_results`) và chấm tiếp đánh giá 20 phiên, theo lựa chọn của owner; các lượt khác chỉ gửi Telegram.
+- **Bảo mật:** thêm nhánh rules `settings` (owner đọc/ghi) và `screening_slots` (owner chỉ đọc, bot ghi).
+- **Đã kiểm:** smoke test thêm 14 ca khung giờ/phiên (đều đạt); chạy thử quét thật lượt sau phiên và trước phiên không ghi dữ liệu; bấm thử công tắc và Quét ngay trên bản dữ liệu giả ở 375px (lưu đúng, 105 lần gọi VNDirect, 0 lần VPS, cùng top 5 với bot, không tràn, nút 44px).
+
+· `functions/index.js` · `functions/smoke.js` · `public/index.html` · `firestore.rules` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `ISSUES.md` · `CHANGELOG.md`
+
 ## 2026-09-24g (View Gọn: dải Highlight hôm nay + nút Bỏ qua)
 
 Owner muốn đổi tên dải “Việc cần làm hôm nay” và có cách gạt những mục đã xem xong khỏi tầm mắt.
