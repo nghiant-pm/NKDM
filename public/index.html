@@ -569,9 +569,6 @@
   .compact-actions{ display:flex; gap:8px; flex-wrap:wrap; }
   .compact-main-grid{ display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
   .compact-panel{ min-width:0; margin-bottom:0; }
-  @media(min-width:900px){
-    .compact-main-grid{ grid-template-columns:minmax(0,3fr) minmax(340px,2fr); align-items:start; }
-  }
   .compact-today{ margin:0 0 16px; padding:12px 14px; }
   .compact-today-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
   .compact-today-head h2{ font-size:var(--fs-section); }
@@ -586,6 +583,17 @@
   .compact-task.sell{ background:var(--pos-soft); color:var(--pos); }
   .compact-task.order{ background:var(--warn-soft); color:var(--warn); }
   .compact-task-empty{ color:var(--text-muted); font-size:var(--fs-meta); }
+  .compact-task.skippable{ padding-right:0; }
+  .compact-task-skip{
+    min-height:44px; margin:-6px 0; padding:0 12px 0 9px; border:0; border-left:1px solid currentColor;
+    background:transparent; color:inherit; font:inherit; opacity:.8; cursor:pointer;
+  }
+  .compact-task-skip:hover{ opacity:1; }
+  .compact-task-skip:focus-visible, .compact-task-restore:focus-visible{ outline:2px solid var(--brand); outline-offset:-2px; }
+  .compact-task-restore{
+    min-height:44px; padding:0 4px; border:0; background:transparent; color:var(--text-muted);
+    font-size:var(--fs-label); text-decoration:underline; text-underline-offset:3px; cursor:pointer;
+  }
   .compact-table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:var(--fs-body); }
   .compact-table th{ color:var(--text-muted); font-size:var(--fs-label); font-weight:400; }
   .compact-table th, .compact-table td{ padding:8px; text-align:right; border-bottom:1px solid var(--border); overflow-wrap:anywhere; }
@@ -611,9 +619,7 @@
   .compact-reset[hidden]{ display:none; }
   .compact-sort{ border:0; background:transparent; padding:0; min-height:40px; color:inherit; font:inherit; text-align:inherit; width:100%; }
   .compact-sort span{ color:var(--brand); }
-  .compact-table.holdings th:first-child{ width:20%; }
-  .compact-table:not(.holdings) th:first-child{ width:34%; }
-  .compact-table.holdings th:last-child{ width:24%; }
+  .compact-table.holdings th:first-child{ width:20%; }  .compact-table.holdings th:last-child{ width:24%; }
   .compact-dialog{ width:min(560px,calc(100% - 24px)); max-height:calc(100dvh - 32px); overflow:auto; }
   .compact-dialog .card{ padding:0; border:0; box-shadow:none; background:transparent; }
   .mobile-label{ display:none; }
@@ -695,6 +701,7 @@
   @media(max-width:768px){
     .compact-today-list{ flex-direction:column; }
     .compact-task{ width:100%; border-radius:var(--r-input); }
+    .compact-task-skip{ margin-left:auto; }
     .compact-table thead{ display:none; }
     .compact-table, .compact-table tbody{ display:block; width:100%; }
     .compact-table tr{
@@ -792,7 +799,7 @@
       <div><div class="k">Tỷ lệ tiền mặt</div><div class="v num" id="c-cash-ratio">—</div></div>
     </section>
     <section class="card compact-today" aria-labelledby="compact-today-title">
-      <div class="compact-today-head"><h2 id="compact-today-title">Việc cần làm hôm nay</h2><span class="compact-today-count" id="compact-today-count"></span></div>
+      <div class="compact-today-head"><h2 id="compact-today-title">Highlight hôm nay</h2><span class="compact-today-count" id="compact-today-count"></span></div>
       <div class="compact-today-list" id="compact-today-list"></div>
     </section>
     <div class="compact-main-grid">
@@ -2342,6 +2349,18 @@ function compactRows(rows, group){
   });
   return result;
 }
+/* Mục đã "Bỏ qua" ở dải Highlight: sở thích hiển thị theo MÁY, tự hết hạn khi sang ngày mới.
+   Chỉ ẩn khỏi dải này — không đụng signals, lệnh hay khối Quyết định. */
+const SKIP_HIGHLIGHT_KEY = "fin2-skip-highlight";
+function readSkippedHighlights(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(SKIP_HIGHLIGHT_KEY) || "null");
+    return saved && saved.date === todayStr() && Array.isArray(saved.keys) ? saved.keys : [];
+  } catch(e){ return []; }
+}
+function writeSkippedHighlights(keys){
+  try { localStorage.setItem(SKIP_HIGHLIGHT_KEY, JSON.stringify({ date:todayStr(), keys })); } catch(e) {}
+}
 function renderCompactToday(s){
   const tasks = [];
   const todaySignals = buildSignals(todayStr(), s).filter((signal) => {
@@ -2350,11 +2369,13 @@ function renderCompactToday(s){
     return matched < signal.qty && !linked;
   });
   todaySignals.forEach((signal) => tasks.push({
+    key:"signal_" + signal.kind + "_" + signal.ticker,
     kind:signal.kind === "sell" ? "sell" : "buy",
     text:(signal.kind === "sell" ? "Bán " : "Mua ") + signal.ticker + " · " +
       signal.qty.toLocaleString("vi-VN") + " CP @" + fmtPrice(signal.price)
   }));
   openOrders().forEach((order) => tasks.push({
+    key:"order_" + order.id,
     kind:"order",
     text:"Lệnh chờ " + orderSideLabel(order.side).toLowerCase() + " " + order.ticker + " · còn " +
       remainingOrderQty(order).toLocaleString("vi-VN") + " CP"
@@ -2363,19 +2384,25 @@ function renderCompactToday(s){
   s.held.forEach((holding) => {
     const alert = strategyAlert(holding, strategy, state.tickers[holding.ticker] || {});
     if(alert && !alert.reached) tasks.push({
+      key:"near_" + alert.kind + "_" + holding.ticker,
       kind:alert.kind === "sell" ? "sell" : "buy",
       text:"Sắp " + (alert.kind === "sell" ? "bán " : "mua ") + holding.ticker + " · còn " + fmtPrice(alert.remaining) + " điểm"
     });
   });
   Object.keys(state.watchlist).sort().forEach((ticker) => {
     const near = watchProximity(ticker, state.watchlist[ticker], state.tickers[ticker] || {}, strategy);
-    if(near) tasks.push({ kind:"buy", text:"Theo dõi " + ticker + " · còn " + fmtPrice(near.remaining) + " điểm" });
+    if(near) tasks.push({ key:"watch_" + ticker, kind:"buy", text:"Theo dõi " + ticker + " · còn " + fmtPrice(near.remaining) + " điểm" });
   });
-  $("compact-today-count").textContent = tasks.length ? tasks.length + " việc" : "";
-  $("compact-today-list").innerHTML = tasks.length
-    ? tasks.slice(0, 6).map((task) => '<span class="compact-task ' + task.kind + '">' + esc(task.text) + '</span>').join("") +
-      (tasks.length > 6 ? '<span class="compact-task">+' + (tasks.length - 6) + ' việc khác</span>' : '')
-    : '<span class="compact-task-empty">Không có việc cần xử lý</span>';
+  const skipped = readSkippedHighlights();
+  const visible = tasks.filter((task) => !skipped.includes(task.key));
+  const hidden = tasks.length - visible.length;
+  $("compact-today-count").textContent = visible.length ? visible.length + " mục" : "";
+  $("compact-today-list").innerHTML = (visible.length
+    ? visible.slice(0, 6).map((task) => '<span class="compact-task skippable ' + task.kind + '">' + esc(task.text) +
+        '<button class="compact-task-skip" type="button" data-skip-highlight="' + esc(task.key) + '" aria-label="Bỏ qua ' + esc(task.text) + ' hôm nay">Bỏ qua</button></span>').join("") +
+      (visible.length > 6 ? '<span class="compact-task">+' + (visible.length - 6) + ' mục khác</span>' : '')
+    : '<span class="compact-task-empty">Không có gì cần chú ý</span>') +
+    (hidden ? '<button class="compact-task-restore" type="button" data-restore-highlight>Hiện lại ' + hidden + ' mục đã bỏ qua</button>' : '');
 }
 function compactRowMenu(ticker, watch){
   return '<details class="row-menu"><summary class="icon-action" aria-label="Thao tác với ' + esc(ticker) + '" title="Thao tác">' + UI_ICON.more + '</summary>' +
@@ -2586,6 +2613,16 @@ function initCompact(){
     if(watch) editWatch(watch.dataset.compactWatch);
     const unwatch = e.target.closest("[data-unwatch]");
     if(unwatch) removeWatch(unwatch.dataset.unwatch);
+    const skip = e.target.closest("[data-skip-highlight]");
+    if(skip){
+      writeSkippedHighlights(readSkippedHighlights().concat(skip.dataset.skipHighlight));
+      renderCompactToday(computeSummary());
+      ($("compact-today-list").querySelector("[data-skip-highlight], [data-restore-highlight]") || $("compact-today-title")).focus?.();
+    }
+    if(e.target.closest("[data-restore-highlight]")){
+      writeSkippedHighlights([]);
+      renderCompactToday(computeSummary());
+    }
   });
   $("compact-close").addEventListener("click", () => $("compact-dialog").close());
   $("compact-dialog").addEventListener("close", () => {

@@ -4,6 +4,27 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-24g (View Gọn: dải Highlight hôm nay + nút Bỏ qua)
+
+Owner muốn đổi tên dải “Việc cần làm hôm nay” và có cách gạt những mục đã xem xong khỏi tầm mắt.
+
+- **Đổi tên** thành “Highlight hôm nay”; bộ đếm ghi “N mục”, không có gì thì hiện “Không có gì cần chú ý”.
+- **Nút “Bỏ qua” trên từng mục:** ẩn mục đó tới hết ngày. Ngày mai nếu mã vẫn đạt/sắp đạt ngưỡng thì hiện lại. Có nút “Hiện lại N mục đã bỏ qua” khi lỡ bấm nhầm.
+- **Chỉ lưu trên máy đang dùng** (localStorage `fin2-skip-highlight`, tự hết hạn khi sang ngày) theo lựa chọn của owner. Không ghi Firestore, không thêm collection, không đổi rules; tín hiệu, lệnh và khối Quyết định giữ nguyên. Đây không phải nút “đã làm / bỏ qua” tín hiệu đã chốt là không làm — đã ghi rõ trong `CLAUDE.md` / `AGENTS.md`.
+- **Đã kiểm với dữ liệu giả:** bỏ qua 2 mục → còn 11/13, 0 lần ghi database, khối Quyết định vẫn 13 tín hiệu; tải lại trang vẫn giữ; dữ liệu của ngày hôm trước tự bị bỏ; Hiện lại trả đủ 13 mục. Nút Bỏ qua 44px, không tràn ở 375 và 1120px.
+
+· `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-24f (View Gọn: trả Nắm giữ / Theo dõi về một cột)
+
+Owner thấy bố cục hai cột trên desktop lạ mắt và khó theo dõi.
+
+- **Một cột ở mọi kích thước màn hình:** bỏ quy tắc chia Nắm giữ (cột chính) / Theo dõi (cột phụ) từ 900px; Theo dõi nằm dưới Nắm giữ, cả hai dùng hết chiều ngang. Mobile vốn đã một cột nên không đổi.
+- Bỏ luôn quy tắc nới cột Mã của bảng Theo dõi (thêm ở 24e) vì chỉ cần khi bảng bị ép hẹp trong cột phụ.
+- Đã kiểm ở 800 và 1120px: không cuộn ngang, tên mã và nút ba chấm cùng một dòng ở cả hai bảng.
+
+· `public/index.html` · `CHANGELOG.md`
+
 ## 2026-09-24e (View Gọn thành màn hình dùng hằng ngày + một nút lấy giá chung)
 
 Owner chốt tối ưu giao diện, ưu tiên view Gọn trên điện thoại: danh mục đang bị đẩy xuống quá sâu và bảng 5 cột làm số liệu xuống dòng khó đọc.

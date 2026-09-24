@@ -58,7 +58,8 @@ signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price,
 ```
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
-`fin2-tab` (tab đang mở) · `fin2-collapsed` (section nào đang gập). Đây là sở thích hiển thị,
+`fin2-tab` (tab đang mở) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight`
+(mục đã Bỏ qua ở dải Highlight, tự hết hạn khi sang ngày). Đây là sở thích hiển thị,
 mất cũng không sao. **Dữ liệu thật luôn nằm ở Firestore** — đừng đẩy thứ gì cần giữ vào đây.
 
 ⚠️ **Hai đơn vị tiền song song:** `price` và `lastPrice` là **nghìn đồng**; `amount`, `cash`, `marketValue` là **VND nguyên**. Quy đổi bằng `×1000`. Nhầm chỗ này là lệch 1000 lần và không có gì báo lỗi.
@@ -114,6 +115,9 @@ Hiện **chưa có cặp nào** — app 1 người dùng, 1 màn hình. Gặp c�
   tránh bản sao dễ lệch. Đừng thêm cột `followed`.
 - **Log tín hiệu ghi tự động khi bấm "Lưu nhật ký hôm nay"**, không có nút "đã làm / bỏ qua"
   cho owner bấm tay. Owner đã cân nhắc và chọn phương án không thêm thao tác.
+  Nút **“Bỏ qua”** ở dải *Highlight hôm nay* (view Gọn, từ 24/09/2026) KHÔNG phải nút này: nó chỉ
+  ẩn mục khỏi dải trên đúng máy đó tới hết ngày (localStorage `fin2-skip-highlight`), không ghi
+  Firestore, không đụng `signals`, lệnh hay khối Quyết định. Đừng biến nó thành cờ lưu vào tín hiệu.
 - **Không có mô phỏng ngược** (tính lại "nếu dùng ngưỡng khác từ đầu thì sao"). Owner chọn
   cách so sánh theo giai đoạn hiệu lực thật. Đừng tự thêm.
 - **Không có test runner, không unit test.** Kiểm bằng bấm thử thật.

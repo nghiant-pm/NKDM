@@ -74,7 +74,8 @@ screening_results/{YYYY-MM-DD_TICKER}  date, ticker, group, rank, close, totalSc
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
 `fin2-tab` (tab đang mở) · `fin2-view` (Gọn/Đầy đủ) · `fin2-sort-positions` / `fin2-sort-watchlist`
-(cột và chiều sort view Gọn) · `fin2-collapsed` (section nào đang gập) · `fin2-pnl-range`
+(cột và chiều sort view Gọn) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (mục đã Bỏ qua ở dải Highlight,
+tự hết hạn khi sang ngày) · `fin2-pnl-range`
 (Tuần/Tháng/Quý/Tất cả) · `fin2-hide-pnl` (ẩn/hiện lãi lỗ) · `fin2-exclude-hold-pnl`
 (có/không tính mã dài hạn vào tổng lãi/lỗ chưa bán). Đây là sở thích hiển thị,
 mất cũng không sao. **Dữ liệu thật luôn nằm ở Firestore** — đừng đẩy thứ gì cần giữ vào đây.
@@ -161,6 +162,9 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   tránh bản sao dễ lệch. Đừng thêm cột `followed`.
 - **Log tín hiệu ghi tự động khi bấm "Lưu nhật ký hôm nay"**, không có nút "đã làm / bỏ qua"
   cho owner bấm tay. Owner đã cân nhắc và chọn phương án không thêm thao tác.
+  Nút **“Bỏ qua”** ở dải *Highlight hôm nay* (view Gọn, từ 24/09/2026) KHÔNG phải nút này: nó chỉ
+  ẩn mục khỏi dải trên đúng máy đó tới hết ngày (localStorage `fin2-skip-highlight`), không ghi
+  Firestore, không đụng `signals`, lệnh hay khối Quyết định. Đừng biến nó thành cờ lưu vào tín hiệu.
 - **Không có mô phỏng ngược** (tính lại "nếu dùng ngưỡng khác từ đầu thì sao"). Owner chọn
   cách so sánh theo giai đoạn hiệu lực thật. Đừng tự thêm.
 - **Không có test runner, không unit test.** Kiểm bằng bấm thử thật.
