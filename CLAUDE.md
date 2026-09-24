@@ -79,9 +79,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"). **Thêm chỗ dùng mới thì gọi
   `activeStrategy()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
   Phiên bản chiến lược **chỉ thêm, không sửa đè** — sửa đè là tín hiệu cũ mất ngưỡng gốc.
-- **Hai nút lấy giá** (`#fetch-price` tab Danh mục · `#wl-fetch` tab Theo dõi) khác nhau ở
-  chỗ có ghi database hay không, nhưng **phần đọc datafeed chỉ có MỘT chỗ là `fetchQuotes()`**.
-  Thêm nút lấy giá mới thì gọi hàm đó, đừng chép lại phần đọc JSON.
+- **Phần đọc datafeed giá chỉ có MỘT chỗ là `fetchQuotes()`** (gọi từ nút lấy giá chung và nút
+  xem giá trong form thêm mã). Thêm chỗ lấy giá mới thì gọi hàm đó, đừng chép lại phần đọc JSON.
 - **Mỗi doc `signals` chép lại `buyDrop`/`sellRise`/`strategyId` của phiên bản lúc đó.**
   Bản sao có chủ ý, cùng bản chất với `daily_snapshots`: đổi ngưỡng về sau thì tín hiệu cũ
   **vẫn giữ ngưỡng cũ** — đúng ý, vì đó mới là cái đã thực sự sinh ra tín hiệu hôm đó.
@@ -104,11 +103,11 @@ Hiện **chưa có cặp nào** — app 1 người dùng, 1 màn hình. Gặp c�
 - **Giá lấy từ datafeed VPS** (`bgapidatafeed.vps.com.vn`) — nguồn duy nhất kiểm chứng được
   là cho gọi cross-origin. TCBS, SSI, VNDirect, CafeF, DNSE, Yahoo **đều bị CORS chặn**,
   đã đo thật ngày 10/09/2026. Đừng thử lại nếu chưa có bằng chứng mới.
-- **Nút "Lấy giá" chỉ ĐIỀN vào ô, không tự ghi database.** Owner vẫn phải bấm Lưu.
-  Cố ý — tránh ghi dữ liệu rác khi chưa xác nhận giá.
-  ⚠️ **NGOẠI LỆ: nút "Lấy giá thị trường" ở tab Theo dõi thì GHI THẲNG** vào `tickers`.
-  Owner đã cân nhắc và chọn (10/09/2026): mã watchlist không nằm trong danh mục nên giá sai
-  không làm lệch lãi/lỗ hay tổng tài sản. Đừng "sửa lại cho nhất quán" với nút bên tab Danh mục.
+- **Một nút lấy giá chung ở header** (`#global-price-refresh` → `refreshAllPrices()`), owner chốt 24/09/2026.
+  Ghi THẲNG giá hiện tại vào `tickers` cho mọi mã nắm giữ + theo dõi, ghi `watch_prices` cho mã
+  watchlist và điền sẵn ô giá ở tab Danh mục. **Không tạo `daily_snapshots` hay `signals`** — hai
+  thứ này vẫn chỉ sinh khi owner bấm **Lưu** nhật ký. Các nút cũ `#fetch-price`, `#wl-fetch`,
+  `#compact-prices` đã bỏ; đừng dựng lại nút lấy giá riêng từng khu vực.
 - **Bỏ Artifact `window.claude.use("db")`**, đã chuyển sang Firestore. Không quay lại.
 - **Không lưu cờ "đã làm theo tín hiệu hay chưa" trong `signals`.** Cái đó suy ra được từ
   `transactions` cùng ngày + cùng mã + cùng chiều, tính lúc xuất dữ liệu. Cố ý không lưu để

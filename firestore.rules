@@ -20,6 +20,11 @@ service cloud.firestore {
     match /strategies/{id}      { allow read, write: if isOwner(); }
     match /signals/{id}         { allow read, write: if isOwner(); }
     match /watch_prices/{id}    { allow read, write: if isOwner(); }
+    match /orders/{id}          { allow read, write: if isOwner(); }
+    match /theses/{id}          { allow read, write: if isOwner(); }
+    // Kết quả bot do Cloud Function (Admin SDK) ghi; trình duyệt chỉ được đọc.
+    match /screening_runs/{id}    { allow read: if isOwner(); allow write: if false; }
+    match /screening_results/{id} { allow read: if isOwner(); allow write: if false; }
 
     // Chốt chặn cuối: không collection nào khác được chạm tới.
     match /{document=**} { allow read, write: if false; }

@@ -40,7 +40,8 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
   đổi tạo một phiên bản mới trong `strategies` có ngày hiệu lực. Code phải đọc qua
   `activeStrategy(ngày)`, **không nơi nào được gõ số**.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán**, hiện badge "Giữ"
-- **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.
+- **"Điểm" = giá tuyệt đối (nghìn đ), tách biệt với %.** Mỗi chiều có ngưỡng điểm bắt buộc
+  và ngưỡng % tuỳ chọn; hai ngưỡng chạy song song, chạm cái nào trước thì kích hoạt.
 - Broker TCBS miễn phí môi giới. Lệnh bán ghi từ 15/09/2026 lưu `taxRate: 0.001` và
   `taxAmount` để trừ thuế TNCN khỏi tiền mặt và lãi/lỗ đã bán; lệnh cũ thiếu hai trường
   này giữ thuế bằng 0, không hồi tố.
@@ -55,16 +56,27 @@ cashflows/{autoId}          type "deposit"|"withdraw", amount (VND nguyên), dat
 tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, hold?, updatedAt
 daily_snapshots/{YYYY-MM-DD}  date, cash, investedCost, marketValue, totalAssets, prices{}, createdAt, updatedAt
 watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
-strategies/{autoId}         buyDrop, sellRise, nearRange, lotSize, minCashRatio, maxCashRatio,
+strategies/{autoId}         buyDrop, sellRise, buyDropPct?, sellRisePct?, nearRange, watchNearRange, lotSize,
+                            minCashRatio, maxCashRatio,
                             effectiveFrom (YYYY-MM-DD), reason, createdAt
 signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price, avgCost,
-                            targetBuy, qty, strategyId, buyDrop, sellRise, createdAt, updatedAt
+                            targetBuy, qty, strategyId, buyDrop, sellRise,
+                            buyDropPct?, sellRisePct?, createdAt, updatedAt
+screening_runs/{YYYY-MM-DD}  date, status, trialSession, isTrial, universeCount, scannedCount,
+                            missingCount, qualifiedCount, newCount, watchlistCount, scoreVersion,
+                            startedAt, completedAt?, latestMarketDate?, notificationType?,
+                            notificationAttemptedAt?, notificationSentAt?, error?, updatedAt
+screening_results/{YYYY-MM-DD_TICKER}  date, ticker, group, rank, close, totalScore, trendScore,
+                            relativeStrengthScore, breakoutScore, pullbackScore, liquidityRiskScore,
+                            priceFitScore, avgValue20, atr14Pct, excess20Pct, reasons[], riskFlags[],
+                            scoreVersion, trialSession, isTrial, evaluation{}, createdAt, updatedAt
 ```
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
 `fin2-tab` (tab đang mở) · `fin2-view` (Gọn/Đầy đủ) · `fin2-sort-positions` / `fin2-sort-watchlist`
 (cột và chiều sort view Gọn) · `fin2-collapsed` (section nào đang gập) · `fin2-pnl-range`
-(Tuần/Tháng/Quý/Tất cả) · `fin2-hide-pnl` (ẩn/hiện lãi lỗ). Đây là sở thích hiển thị,
+(Tuần/Tháng/Quý/Tất cả) · `fin2-hide-pnl` (ẩn/hiện lãi lỗ) · `fin2-exclude-hold-pnl`
+(có/không tính mã dài hạn vào tổng lãi/lỗ chưa bán). Đây là sở thích hiển thị,
 mất cũng không sao. **Dữ liệu thật luôn nằm ở Firestore** — đừng đẩy thứ gì cần giữ vào đây.
 
 ⚠️ **Hai đơn vị tiền song song:** `price` và `lastPrice` là **nghìn đồng**; `amount`, `cash`, `marketValue` là **VND nguyên**. Quy đổi bằng `×1000`. Nhầm chỗ này là lệch 1000 lần và không có gì báo lỗi.
@@ -79,20 +91,32 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 ---
 
 ## ⚠️ Những chỗ NHÂN BẢN CÓ CHỦ Ý — sửa 1 chỗ phải sửa mấy chỗ
-- **Ngưỡng mua/bán có 3 tầng:** hằng số mặc định `RULE_BUY_DROP`/`RULE_SELL_RISE`/`RULE_LOT`
-  → phiên bản trong `strategies` → nơi dùng gọi `activeStrategy(ngày)`. Ba nơi dùng phải
+- **Ngưỡng mua/bán có 3 tầng:** hằng số mặc định → phiên bản trong `strategies` → nơi dùng
+  gọi `activeStrategy(ngày)`. `buyDropPct` / `sellRisePct` thiếu hoặc null nghĩa là chỉ dùng điểm.
+  `strategyLevels()` quy đổi điểm + % theo luật mức nào đến trước; `strategyAlert()` là nguồn
+  chung cho highlight và tín hiệu. Ba nơi dùng phải
   ra cùng một số cho cùng một ngày: `renderPositions` (chip gợi ý), `buildSignals` (ghi log
   tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"). **Thêm chỗ dùng mới thì gọi
   `activeStrategy()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
   Phiên bản chiến lược **chỉ thêm, không sửa đè** — sửa đè là tín hiệu cũ mất ngưỡng gốc.
-- **Ba nút lấy giá** (`#fetch-price` tab Danh mục · `#wl-fetch` tab Theo dõi ·
-  `#compact-prices` bảng nắm giữ ở Gọn) khác nhau ở chỗ có ghi database hay không,
-  nhưng **phần đọc datafeed chỉ có MỘT chỗ là `fetchQuotes()`**.
-  Thêm nút lấy giá mới thì gọi hàm đó, đừng chép lại phần đọc JSON.
+- **Phần đọc datafeed giá chỉ có MỘT chỗ là `fetchQuotes()`** (gọi từ nút lấy giá chung và nút
+  xem giá trong form thêm mã). Thêm chỗ lấy giá mới thì gọi hàm đó, đừng chép lại phần đọc JSON.
+- **API lịch sử VPS** (`histdatafeed.vps.com.vn/tradingview/history`) có ba nơi gọi có chủ ý:
+  `fetchPriceHistory()` ở client chỉ lấy giá đóng cửa để vẽ biểu đồ; `fetchHistory()` trong
+  Cloud Functions và `screenFetchHistory()` ở client lấy đủ OHLCV để chấm điểm. Công thức
+  `screenScoreTicker()` trong `public/index.html` phải giữ cùng kết quả và `scoreVersion` với
+  `scoreTicker()` trong `functions/scoring.js`; danh sách `SCREENING_UNIVERSE` phải khớp
+  `functions/universe.js`. Quét client chỉ hiển thị tạm, không ghi Firestore hay gửi Telegram.
+  Cả ba nơi phải giữ cùng endpoint, quy ước mã và đơn vị; đây không phải luồng giá hiện tại
+  của `fetchQuotes()`.
 - **Mỗi doc `signals` chép lại `buyDrop`/`sellRise`/`strategyId` của phiên bản lúc đó.**
   Bản sao có chủ ý, cùng bản chất với `daily_snapshots`: đổi ngưỡng về sau thì tín hiệu cũ
   **vẫn giữ ngưỡng cũ** — đúng ý, vì đó mới là cái đã thực sự sinh ra tín hiệu hôm đó.
   Đừng "vá lại cho nhất quán".
+- **Cảnh báo watchlist đọc `watchNearRange` qua `activeStrategy(ngày)`**, mặc định 0,5 điểm
+  với phiên bản cũ. Chỉ highlight "Chuẩn bị mua" khi giá hiện tại còn CAO HƠN mục tiêu
+  không quá ngưỡng và thấp hơn lần ghi giá liền trước. Không có giá trước thì không highlight;
+  giá ≤ mục tiêu luôn ưu tiên "Đạt giá mua". Đây chỉ là hiển thị, không tạo `signals` sớm.
 - **`daily_snapshots.prices` từ nay chứa CẢ MÃ KHÔNG NẮM GIỮ** (mã trong watchlist), vì
   watchlist cũng cần lịch sử giá để đánh giá "chờ có đáng không". `computeSummary` bỏ qua
   mã không giữ nên vô hại — nhưng ai đọc snapshot phải biết, đừng suy ra danh mục từ `prices`.
@@ -104,14 +128,19 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 - **Gọn ↔ Đầy đủ:** cùng dữ liệu Firestore, `computeSummary()` và thứ tự mã qua `sortTickers()`.
   `renderCompact()` phải giữ công thức lãi/lỗ và % tương ứng `renderPositions()`, chênh lệch điểm tương ứng `renderWatchlist()`.
   Gọn dùng vốn nạp ròng (tổng nạp − tổng rút); Đầy đủ giữ Tổng tài sản. Đây là khác biệt đã chốt.
-  Gọn không có gợi ý mua/bán; thiếu giá phải hiện rõ, tổng dùng giá vốn thay thế có nhãn tạm tính.
-  Form giao dịch, form thêm mã theo dõi và nút lấy giá theo dõi được di chuyển DOM để dùng chung handler; không sao chép form hoặc tạo thêm kết nối.
+  Gọn có highlight mua/bán khi sắp đạt hoặc đã đạt ngưỡng, dùng chung `strategyAlert()` với
+  Đầy đủ; thiếu giá phải hiện rõ, tổng dùng giá vốn thay thế có nhãn tạm tính.
+  Form giao dịch và form thêm mã theo dõi được di chuyển DOM để dùng chung handler; không sao chép form hoặc tạo thêm kết nối.
+  Highlight "Chuẩn bị mua" của watchlist phải có ở cả Gọn và Đầy đủ, cùng gọi
+  `watchProximity()`; không sao chép công thức theo từng view.
   Thay đổi nội dung/luồng ở một view cần hỏi phạm vi áp dụng trước khi code.
 - **Dashboard dòng tiền:** hai view dùng chung `dashboardData()`. Gọn chỉ có 4 chỉ số chính;
   Đầy đủ thêm phân nhóm vị thế và lãi/lỗ đã chốt theo mã. Kỳ xem là sở thích localStorage.
   Mục tiêu tiền mặt phải đọc qua `activeStrategy()`, bản cũ thiếu trường dùng 20–30%.
-  Forecast 30/50/100% chỉ mô phỏng vị thế đang lãi theo giá hiện tại, trừ thuế và không ghi Firestore.
-  Ẩn lãi/lỗ phải áp dụng đồng thời ở dashboard, vị thế, forecast và Nhật ký của cả hai view.
+  Forecast 30/50/100% chỉ mô phỏng vị thế đang lãi theo giá hiện tại, làm tròn xuống bội số
+  100 CP của từng mã, trừ thuế và không ghi Firestore.
+  Ẩn lãi/lỗ chỉ áp dụng trong khối dashboard (tổng quan, phân nhóm, đã chốt theo mã, forecast)
+  ở cả hai view. Lãi/lỗ tại Đang nắm giữ và Nhật ký luôn hiện.
 
 ---
 
@@ -121,14 +150,11 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 - **Giá lấy từ datafeed VPS** (`bgapidatafeed.vps.com.vn`) — nguồn duy nhất kiểm chứng được
   là cho gọi cross-origin. TCBS, SSI, VNDirect, CafeF, DNSE, Yahoo **đều bị CORS chặn**,
   đã đo thật ngày 10/09/2026. Đừng thử lại nếu chưa có bằng chứng mới.
-- **Nút "Lấy giá" chỉ ĐIỀN vào ô, không tự ghi database.** Owner vẫn phải bấm Lưu.
-  Cố ý — tránh ghi dữ liệu rác khi chưa xác nhận giá.
-  ⚠️ **NGOẠI LỆ: nút "Lấy giá thị trường" ở tab Theo dõi thì GHI THẲNG** vào `tickers`.
-  Owner đã cân nhắc và chọn (10/09/2026): mã watchlist không nằm trong danh mục nên giá sai
-  không làm lệch lãi/lỗ hay tổng tài sản. Đừng "sửa lại cho nhất quán" với nút bên tab Danh mục.
-- **NGOẠI LỆ thứ hai: nút "Lấy giá" của bảng nắm giữ ở view Gọn cũng GHI THẲNG** vào
-  `tickers`, nhưng không tạo `daily_snapshots` hay `signals`. Owner chọn để cập nhật nhanh;
-  nhật ký và tín hiệu vẫn chỉ ghi khi bấm Lưu ở tab Danh mục của view Đầy đủ.
+- **Một nút lấy giá chung ở header** (`#global-price-refresh` → `refreshAllPrices()`), owner chốt 24/09/2026.
+  Ghi THẲNG giá hiện tại vào `tickers` cho mọi mã nắm giữ + theo dõi, ghi `watch_prices` cho mã
+  watchlist và điền sẵn ô giá ở tab Danh mục. **Không tạo `daily_snapshots` hay `signals`** — hai
+  thứ này vẫn chỉ sinh khi owner bấm **Lưu** nhật ký. Các nút cũ `#fetch-price`, `#wl-fetch`,
+  `#compact-prices` đã bỏ; đừng dựng lại nút lấy giá riêng từng khu vực.
 - **Bỏ Artifact `window.Codex.use("db")`**, đã chuyển sang Firestore. Không quay lại.
 - **Không lưu cờ "đã làm theo tín hiệu hay chưa" trong `signals`.** Cái đó suy ra được từ
   `transactions` cùng ngày + cùng mã + cùng chiều, tính lúc xuất dữ liệu. Cố ý không lưu để

@@ -4,6 +4,157 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-24e (View Gọn thành màn hình dùng hằng ngày + một nút lấy giá chung)
+
+Owner chốt tối ưu giao diện, ưu tiên view Gọn trên điện thoại: danh mục đang bị đẩy xuống quá sâu và bảng 5 cột làm số liệu xuống dòng khó đọc.
+
+- **Một nút lấy giá cho cả app:** icon làm mới ở header, dùng cho cả Gọn và Đầy đủ; bỏ các nút lấy giá riêng ở Danh mục, Theo dõi và bảng nắm giữ. `refreshAllPrices()` gộp mã nắm giữ + theo dõi, gọi VPS đúng một lần, ghi giá vào `tickers` (mã trùng chỉ ghi một lần), ghi lịch sử cho mã theo dõi và điền sẵn ô giá nhật ký. **Không tạo nhật ký ngày hay tín hiệu** — vẫn phải bấm Lưu. Báo đang tải, số mã cập nhật, mã thiếu giá và giờ cập nhật.
+- **Bố cục Gọn:** Tổng quan → Việc cần làm hôm nay → Nắm giữ → Theo dõi → Phân tích chi tiết (mặc định gập). Dải Việc cần làm chỉ tổng hợp tín hiệu đã/sắp đạt ngưỡng, lệnh chờ và mã theo dõi gần mục tiêu; không có việc thì thu về một dòng.
+- **Mobile:** bảng Nắm giữ/Theo dõi thành dòng thẻ hai tầng (mã + cảnh báo + lãi/lỗ ở trên; số lượng, giá vốn, giá hiện tại ở dưới). Tìm/lọc/sắp xếp nằm sau icon, nút đặt lại chỉ hiện khi đang lọc. Thao tác ít dùng (luận điểm, sửa giá kỳ vọng, bỏ theo dõi) vào menu ba chấm.
+- **Desktop:** hai cột — Nắm giữ cột chính, Theo dõi cột phụ; bảng giữ dạng cột.
+- **Icon đồng nhất, vùng bấm tối thiểu 44px**, icon-only có nhãn trợ năng. Không thêm collection, không đổi Firestore rules.
+- **Sửa khi bấm thử trước deploy:** số tiền và % dính liền rồi tràn mép phải ở mã lỗ; chữ “Danh Mục” bị xuống dòng; nút “không tính mã dài hạn” chiếm riêng một hàng; menu ba chấm mở lệch ra ngoài mép trái màn hình; cột Mã ở Theo dõi (desktop) quá hẹp; nút Gọn/Đầy đủ, chọn kỳ, tên mã, mục menu và nút gập Quyết định dưới 44px.
+- **Đã kiểm bằng trình duyệt thật với dữ liệu giả (không chạm Firestore thật), giá lấy thật từ VPS:** 344/375/430/768/1120px, sáng và tối, không cuộn ngang ở cả hai view. Bấm lấy giá: 1 lần gọi VPS cho 14 mã, mã vừa giữ vừa theo dõi ghi 1 lần + có lịch sử theo dõi, 0 nhật ký/tín hiệu trước khi Lưu; thiếu 2 mã vẫn lưu 12 mã và báo đúng mã thiếu; mất mạng báo lỗi, không ghi gì. Bấm Lưu sinh đúng 1 nhật ký ngày và tín hiệu. Trạng thái rỗng, lọc/đặt lại đều đúng.
+- Cập nhật quy tắc nút lấy giá trong `CLAUDE.md` / `AGENTS.md` để AI sau không dựng lại nút cũ.
+- Đã deploy Hosting ngày 24/09/2026 (rules và Cloud Function không đổi nên không deploy lại); trang public trả `200 OK`, `Cache-Control: no-cache`, nội dung trùng khớp bản local: https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-24d (Cơ hội ngắn hạn: thêm nút Quét ngay trên thiết bị)
+
+Do lịch Cloud Function chưa lấy được dữ liệu VPS, owner cần một cách tự quét ngay trong app mà vẫn giữ nguyên quy trình tự xem xét trước khi đưa mã vào watchlist.
+
+- **Một nút dùng chung hai view:** thêm “Quét ngay” trong khối `screening-hub`; vì khối này được di chuyển thật giữa Gọn và Đầy đủ nên không tạo hai luồng riêng.
+- **Chấm ngay trên thiết bị:** `runManualScreening()` lấy OHLCV trực tiếp từ VPS với tối đa 5 request cùng lúc, áp dụng đúng công thức `v1.0.0`, loại mã đang nắm giữ ngoài watchlist và lấy tối đa 5 mã tổng cộng.
+- **Hiện tạm, không tạo lịch sử giả:** kết quả mang nhãn “Xem nhanh · không lưu”, chỉ sống trong bộ nhớ của tab hiện tại; không ghi `screening_runs`, `screening_results` và không gửi Telegram. Tải lại trang thì kết quả tạm mất.
+- **Giữ luồng duyệt thủ công:** mỗi cơ hội mới vẫn có nút “Đưa vào theo dõi”, mở đúng form watchlist dùng chung và để owner tự nhập giá muốn mua rồi bấm Lưu.
+- **Không coi là đã sửa lịch tự động:** đây là workaround khi owner chủ động mở app và bấm quét. Issue kết nối VPS từ Cloud Functions vẫn mở; lịch 16:10 vẫn chưa vận hành được.
+- **Đã deploy và bấm thử production:** quét 107 mã thành công trên app thật, trả đúng 5 kết quả và giữ nguyên khi chuyển Gọn ↔ Đầy đủ; đã kiểm tra giao diện 375 px ở cả sáng và tối.
+
+· `public/index.html` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-24c (Bot sàng lọc: xác nhận VPS chặn đường chạy trên Google Cloud)
+
+Bản retry đã deploy nhưng lần Force run production khoảng 14:53 vẫn không lấy được VN-Index sau đủ 3 lần thử; trong cùng thời điểm máy owner gọi API VPS bình thường.
+
+- **Xác nhận điểm nghẽn hạ tầng:** `histdatafeed.vps.com.vn` không nhận kết nối từ Cloud Function/Google Cloud. Retry giúp bot chờ và báo lỗi đúng hơn nhưng không mở được đường kết nối, nên không được coi là đã sửa xong.
+- **Lịch 16:10 chưa vận hành được:** Function vẫn giữ nguyên nguyên tắc dừng an toàn, không phát đề cử khi thiếu VN-Index. Muốn tự động chạy cần một nguồn dữ liệu server khác hoặc proxy phù hợp; chưa tự chọn giải pháp thay owner.
+- **Có kết quả kiểm tra thủ công:** chạy từ máy owner quét 107 mã, thiếu 0, có 15 mã đạt từ 70 điểm. Top 5 gồm mã đang theo dõi `MSR` 97 điểm, `MSN` 84 điểm; cơ hội mới `VPI` 92 điểm, `HAH` 84 điểm, `BVH` 81 điểm. Telegram đã gửi thành công.
+- **Không lẫn với dữ liệu chính thức:** round thủ công có nhãn rõ và không ghi `screening_runs`, `screening_results` hay giao diện app. Đây là kiểm tra đường chấm điểm + Telegram, không thay cho lịch tự động production.
+
+· `functions/index.js` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-24b (Bot sàng lọc: chịu lỗi khi VPS phản hồi chậm)
+
+Lần chạy thủ công trên production lúc 14:44 thất bại vì Cloud Function hết thời gian chờ khi kết nối tới API lịch sử VPS để lấy VN-Index, dù cùng API vẫn trả dữ liệu bình thường từ máy owner.
+
+- **Thử lại có kiểm soát:** `fetchHistory()` gửi thêm header JSON và user-agent, đặt timeout 9 giây cho mỗi lần thử và chờ giãn dần giữa các lần. VN-Index được thử tối đa 3 lần; mã cổ phiếu thường tối đa 2 lần. Giới hạn này giữ thời gian xấu nhất khoảng 442 giây, còn đủ khoảng trống trong timeout 540 giây để ghi trạng thái lỗi và gửi cảnh báo.
+- **Vẫn dừng an toàn:** nếu VN-Index tiếp tục không tải được hoặc dữ liệu mã thiếu quá giới hạn, bot ghi lỗi và không phát đề cử. Bản vá không dùng dữ liệu thiếu để cố chấm điểm.
+- **Chưa kết luận đã hết lỗi:** nguyên nhân kết nối từ hạ tầng Cloud Functions tới `histdatafeed.vps.com.vn` chưa được xác định chắc chắn. Bản vá đang chờ redeploy và một lần chạy production thành công để xác nhận.
+
+· `functions/index.js` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-24 (Bot sàng lọc cơ hội ngắn hạn 2–4 tuần)
+
+Owner chốt xây bot theo luật minh bạch để tìm tối đa 5 mã đáng xem sau mỗi phiên, chỉ đề xuất để duyệt thủ công và phải thử nghiệm đủ 20 phiên trước khi tin cậy.
+
+- **Tự quét sau giờ đóng cửa:** thêm Cloud Function `screenShortTermOpportunities` chạy lúc 16:10 từ thứ Hai đến thứ Sáu theo giờ Việt Nam. Bot đọc OHLCV lịch sử VPS với tối đa 5 request cùng lúc, bỏ qua ngày không có nến VN-Index mới và dừng nếu thiếu VN-Index hoặc thiếu quá 20% dữ liệu.
+- **Chấm điểm có thể kiểm tra lại:** `scoreTicker()` chấm xu hướng 25 điểm, sức mạnh so với VN-Index 25 điểm, lấy tín hiệu tốt hơn giữa bứt phá/điều chỉnh 25 điểm, thanh khoản và rủi ro 15 điểm, vùng giá 40–70 thêm tối đa 10 điểm. Mã phải có ít nhất 60 phiên, thanh khoản TB20 từ 20 tỷ đồng/ngày và tổng từ 70 điểm; mỗi đề cử lưu 2–3 lý do cùng `scoreVersion`.
+- **Tối đa 5 mã, tách đúng nhóm:** loại mã đang nắm giữ khỏi cơ hội mới, tách “Cơ hội mới” và “Đang theo dõi”, nhưng giới hạn 5 mã là tổng của cả hai nhóm. Kết quả không tạo tín hiệu, lệnh hay giao dịch.
+- **Không gửi trùng trong ngày:** `acquireRun()` khóa lần chạy theo ngày; `claimNotification()` chỉ cho một lần thử gửi Telegram. Token và chat ID đọc từ Secret Manager, không xuất hiện trong HTML hoặc Firestore phía client.
+- **Đo kết quả sau 20 phiên:** `evaluateCandidate()` ghi thắng khi +6% đến trước −3%, thua khi ngược lại, “không xác định” nếu cùng một nến chạm cả hai, đồng thời lưu lợi nhuận phiên 20 và phần vượt/trượt VN-Index. 20 lần chạy đầu đều mang nhãn “Thử nghiệm”.
+- **Một giao diện dùng chung hai view:** `screening-hub` được di chuyển giữa Gọn và Đầy đủ. Owner xem điểm thành phần/lý do rồi bấm “Đưa vào theo dõi” để mở form watchlist có sẵn; app chỉ điền mã và giá tham khảo, owner vẫn tự nhập giá muốn mua rồi bấm Lưu.
+- **Dữ liệu và bảo mật:** thêm `screening_runs` cho trạng thái lần chạy và `screening_results` cho từng đề cử. Client owner chỉ được đọc; mọi ghi dữ liệu bot do Cloud Function thực hiện. Firestore rules đã có nhánh tương ứng.
+- **Kiểm tra trước khi bật:** smoke test, kiểm cú pháp, rules dry-run, dữ liệu thật VPS và giao diện mobile 375/430/768/1120px đều đã kiểm. Backtest walk-forward 80 phiên cho 400 đề cử có 96 thắng, 282 thua, 22 hết 20 phiên chưa chạm ngưỡng; tỷ lệ thắng trên ca đã phân định là 25,4%, lợi nhuận phiên 20 trung bình −2,225% và kém VN-Index trung bình 1,278 điểm %. Vì kết quả chưa tốt, giữ nguyên nhãn “Thử nghiệm” và **không chỉnh công thức theo mẫu ngắn**.
+- **Đã bật chạy thật:** owner đã nâng project lên Blaze; `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID` được lưu ở Secret Manager phiên bản 1. Cloud Function `screenShortTermOpportunities` v2 đã được deploy tại `asia-southeast1` với Node.js 22 và 512 MB; Firestore rules và Hosting cũng đã phát hành thành công.
+- **Hoàn tất vận hành ban đầu:** Artifact Registry được đặt chính sách tự xoá image cũ hơn 1 ngày để tránh tích rác. Tin nhắn thử đã gửi thành công tới bot Telegram `@fin2_watchlist_bot`. `npm audit` vẫn còn 2 cảnh báo mức vừa ở phụ thuộc gián tiếp `gaxios` / `uuid`, chưa có bản sửa tự động không phá vỡ tương thích.
+
+· `functions/index.js` · `functions/scoring.js` · `functions/universe.js` · `functions/smoke.js` · `functions/backtest.js` · `functions/package.json` · `functions/package-lock.json` · `public/index.html` · `firestore.rules` · `firebase.json` · `AGENTS.md` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-23 (View Gọn: bỏ mã khỏi danh sách theo dõi)
+
+Owner muốn có thể bỏ theo dõi ngay tại danh sách Đang theo dõi của view Gọn, không cần chuyển sang view Đầy đủ.
+
+- **Bỏ theo dõi ngay trên từng mã:** thêm nút “Bỏ theo dõi” màu xám nhạt ở mỗi dòng. Nút dùng lại `removeWatch()` và hộp xác nhận sẵn có trước khi xoá mã khỏi `watchlist`.
+
+· `public/index.html` · `CHANGELOG.md`
+
+## 2026-09-22 (Hàng đợi tín hiệu, vòng đời lệnh và phân tích quyết định)
+
+Owner chọn bổ sung hàng đợi tín hiệu, đo chất lượng, biểu đồ quyết định, luận điểm theo mã và phân tích đóng góp; đồng thời yêu cầu tách lệnh mới đặt khỏi giao dịch đã khớp và cho dùng ở cả Gọn lẫn Đầy đủ.
+
+- **Hàng đợi tín hiệu dùng chung hai view:** khối Quyết định được di chuyển thật giữa Gọn và Đầy đủ, gồm tín hiệu hôm nay, lệnh đang chờ, chất lượng tín hiệu và đóng góp lãi/lỗ; không có hai bản logic song song.
+- **Tách “đã đặt” khỏi “đã khớp”:** form Giao dịch có hai hành động riêng. Lệnh đặt lưu vào `orders` và chưa đổi tiền mặt/vị thế; chỉ khi xác nhận khớp mới tạo `transactions`.
+- **Khớp một phần và hủy lệnh:** mỗi lần khớp ghi đúng số lượng/giá thực tế, cập nhật giá khớp trung bình và phần còn lại; lệnh hủy giữ trong Nhật ký và file xuất AI. Các lệnh bán đang chờ giữ chỗ số cổ phiếu để tránh đặt trùng.
+- **Tín hiệu có bối cảnh tiền mặt:** tín hiệu mua trong hàng đợi hiện tỷ lệ tiền mặt dự kiến sau lệnh và cảnh báo khi xuống dưới mức tối thiểu của chiến lược. Tín hiệu bán tự giới hạn số lượng không vượt vị thế.
+- **Đo chất lượng tín hiệu:** hiện số tín hiệu đã đặt/đã khớp, hiệu quả trung bình và tỷ lệ đúng hướng sau 5/10/20 lần lưu Nhật ký; mỗi kết quả luôn kèm số mẫu.
+- **Biểu đồ quyết định:** thêm đường giá vốn, ngưỡng mua/bán, giá kỳ vọng watchlist và điểm mua/bán; giao dịch giá bất thường nằm ngoài khung không kéo méo tỷ lệ biểu đồ.
+- **Nhật ký luận điểm theo mã:** thêm `theses/{MÃ}` cho lý do nắm giữ/theo dõi, điều kiện luận điểm sai và ngày xem lại; mở được từ cả hai view.
+- **Phân tích đóng góp:** tách lãi/lỗ đã chốt, chưa bán và tổng đóng góp theo mã; tuân theo nút ẩn lãi/lỗ dashboard.
+- **Bảo mật:** thêm rules owner-only cho `orders` và `theses`. File xuất AI bổ sung lệnh đặt, trạng thái khớp/hủy và luận điểm.
+- Đã kiểm cú pháp JavaScript, ID trùng, tham chiếu ID và quy tắc font-weight; đã được phát hành cùng đợt deploy toàn bộ ngày 24/09/2026.
+
+· `public/index.html` · `firestore.rules` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-21b (Chiến lược: highlight khi đạt ngưỡng và thêm ngưỡng %)
+
+Owner báo nhiều mã đã giảm đủ 2 điểm nhưng không được highlight, đồng thời chọn áp dụng cho cả Gọn và Đầy đủ và cho ngưỡng điểm/% chạy song song theo phương án A.
+
+- **Hiện hành động khi đã đạt ngưỡng:** mã đang nắm giữ không còn mất highlight lúc vừa chạm mức mua/bán. Cả Gọn và Đầy đủ nay hiện “Mua thêm/Bán … CP”; trước ngưỡng vẫn hiện “Sắp mua/Sắp bán” qua `strategyAlert()`.
+- **Thêm ngưỡng % tuỳ chọn:** mỗi phiên bản Chiến lược có thể đặt thêm mức giảm để mua (%) và tăng để bán (%). `strategyLevels()` cho ngưỡng điểm và % chạy song song; mức nào đến trước sẽ kích hoạt.
+- **Giữ nguyên chiến lược cũ:** ô % không bắt buộc. Bản cũ và bản mới để trống `buyDropPct` / `sellRisePct` tiếp tục chỉ dùng ngưỡng điểm, không đổi kết quả lịch sử.
+- **Một công thức cho hiển thị và Nhật ký:** hai view và `buildSignals()` cùng dùng `strategyAlert()`, tránh tình trạng trên màn hình và tín hiệu cho kết quả khác nhau.
+- **Giữ đúng ngưỡng đã sinh tín hiệu:** tín hiệu mới chép thêm `buyDropPct` / `sellRisePct`; file xuất AI giữ cả ngưỡng điểm và % của đúng phiên bản lúc phát tín hiệu.
+- **Đã kiểm tra:** cú pháp hợp lệ, form local không có lỗi console và 7 ca mô phỏng gồm chỉ điểm, điểm đến trước, % đến trước, sắp mua, đạt mua, đạt bán và mã Giữ chặn bán.
+- Đã deploy thành công Hosting + Firestore rules ngày 21/09/2026; trang public trả `200 OK`, `Cache-Control: no-cache` và đã có đúng form % + logic highlight mới: https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md` · `AGENTS.md`
+
+## 2026-09-21 (Tuỳ chọn không tính mã dài hạn vào lãi/lỗ tổng)
+
+- Thêm công tắc “Không tính mã dài hạn” ở dashboard của cả Gọn và Đầy đủ.
+- Khi bật, tổng “Lãi/lỗ chưa bán” và tỷ suất đi kèm chỉ tính nhóm Giao dịch; lãi/lỗ từng mã vẫn hiện đầy đủ.
+- Tổng tài sản, giá trị cổ phiếu, vốn mua, tiền mặt, tỷ lệ tiền mặt và lãi/lỗ đã chốt giữ nguyên.
+- Lựa chọn được nhớ riêng trên từng máy bằng `fin2-exclude-hold-pnl`; không ghi Firestore, không thêm collection và không đổi rules.
+- Đã kiểm tra cú pháp, đối chiếu hai view và chạy dữ liệu mô phỏng cho hai trạng thái bật/tắt.
+- Đã deploy thành công Firebase Hosting ngày 21/09/2026: https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md` · `AGENTS.md`
+
+## 2026-09-17b (Mở biểu đồ VPS khi bấm vào mã)
+
+Owner muốn xem lịch sử biến động giá ngay trên từng mã, áp dụng cho cả Gọn và Đầy đủ nhưng chỉ hiện khi bấm để màn hình không bị rối.
+
+- **Mở từ đúng mã đang xem:** tên mã trong danh mục và danh sách theo dõi ở cả hai view nay là nút mở biểu đồ kỹ thuật VPS (`data-chart-ticker`).
+- **Biểu đồ gọn, đúng nhu cầu xem nhanh:** `fetchPriceHistory()` chỉ lấy giá đóng cửa theo ngày từ API lịch sử VPS khi owner mở mã; `renderStockChart()` tự vẽ đường giá, giá mới nhất và mức tăng/giảm trong kỳ.
+- **Đổi khoảng xem ngay trong modal:** có 1 tháng / 3 tháng / 1 năm; chạm hoặc rê trên đường giá sẽ hiện giá và ngày tương ứng qua `showChartPoint()`.
+- **Dễ dùng trên điện thoại:** biểu đồ tự co theo màn hình, theo giao diện sáng/tối hiện tại, có trạng thái đang tải, thiếu dữ liệu và lỗi tải; yêu cầu quá 15 giây sẽ tự dừng.
+- **Đóng xong quay lại đúng chỗ:** `initStockChart()` huỷ yêu cầu đang tải, dọn dữ liệu tạm và trả focus về mã vừa bấm.
+- ~~Nhúng nguyên biểu đồ kỹ thuật `web5.vps.com.vn` bằng iframe~~ đã bỏ trước deploy vì giao diện đầy đủ làm khung xem nhanh bị rối; thay bằng biểu đồ đường tối giản từ `histdatafeed.vps.com.vn`.
+- Không thêm collection, không đổi Firestore rules và không lưu dữ liệu biểu đồ vào app.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md`
+
+## 2026-09-17 (Highlight chuẩn bị mua cho mã theo dõi)
+
+- Mã theo dõi được highlight “Chuẩn bị mua” khi giá còn cao hơn mục tiêu không quá 0,5 điểm và giá mới thấp hơn lần ghi liền trước.
+- Khoảng cảnh báo của mã theo dõi được cấu hình riêng trong Chiến lược, có phiên bản theo ngày hiệu lực; chiến lược cũ mặc định 0,5 điểm.
+- “Đạt giá mua” vẫn ưu tiên khi giá đã chạm mục tiêu; mã chưa có giá trước, đang tăng hoặc còn xa không bị highlight.
+- Có ở cả Gọn và Đầy đủ. Đây chỉ là cảnh báo trực quan; tín hiệu Nhật ký vẫn chỉ sinh khi giá thực sự đạt mục tiêu.
+- Không thêm collection và không đổi Firestore rules. Đã kiểm bằng dữ liệu mô phỏng cho đủ 5 trường hợp: gần + giảm, đã đạt, gần + tăng, thiếu giá trước và giảm nhưng còn xa.
+- Đã deploy thành công Hosting + Firestore rules ngày 17/09/2026: https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md` · `AGENTS.md`
+
+## 2026-09-17 (Phạm vi ẩn lãi/lỗ và forecast theo lô 100 CP)
+
+- Nút con mắt chỉ che số liệu trong dashboard Dòng tiền & lãi/lỗ, gồm tổng quan, phân nhóm, đã chốt theo mã và forecast.
+- Lãi/lỗ từng mã trong Đang nắm giữ, Giá vốn sau lướt, Đã chốt chu kỳ và lãi/lỗ trong Nhật ký luôn hiển thị.
+- Forecast bán 30% / 50% / 100% làm tròn xuống theo bội số 100 CP của từng mã; phần dưới 100 CP không được tính vào kịch bản.
+- Đã deploy thành công Hosting + Firestore rules ngày 17/09/2026: https://fin2-danh-muc.web.app.
+
+· `public/index.html` · `CHANGELOG.md` · `CODEMAP.md` · `AGENTS.md`
+
 ## 2026-09-16 (Ẩn lãi/lỗ, forecast chốt lời và xuất Nhật ký cho AI)
 
 - **Ẩn/hiện lãi lỗ:** nút hình con mắt ở đầu trang che toàn bộ số lãi/lỗ, tỷ suất và giá vốn sau lướt trong cả Gọn lẫn Đầy đủ; vẫn giữ giá, tiền mặt và tổng tài sản. Lựa chọn được nhớ riêng trên máy.
