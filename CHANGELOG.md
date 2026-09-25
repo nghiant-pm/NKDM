@@ -4,6 +4,19 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-25a (Tối ưu view Gọn trên iPhone + nút cập nhật giá nổi)
+
+Owner dùng view Gọn trên iPhone 15 Pro và cần giảm thao tác lọc, bớt xuống dòng, đồng thời bấm cập nhật giá mà không phải kéo về đầu trang.
+
+- **Header mobile còn một hàng:** nút chuyển Gọn/Đầy đủ được rút thành icon 44px; nút cập nhật giá duy nhất chuyển thành nút nổi 52px ở góc phải dưới, chừa safe-area và khoảng trống cuối trang. Desktop vẫn giữ nút ở header.
+- **Filter một chạm:** hai bảng có hàng chip cuộn ngang; lựa chọn được nhớ riêng trên máy qua `fin2-filter-positions` / `fin2-filter-watchlist`. Menu filter desktop vẫn dùng cùng trạng thái.
+- **Danh sách gọn hơn:** mobile ≤430px bỏ padding thừa trong ô, giữ lãi/lỗ nổi bật ở dải đầu và ba số lượng/giá ở dải sau; watchlist giữ giá thị trường, giá kỳ vọng và chênh lệch.
+- **Highlight mặc định hiện 2 mục:** `Xem thêm N` / `Thu gọn` chỉ thay cách hiển thị; Bỏ qua theo ngày, signals và khối Quyết định không đổi.
+- **Phản hồi cập nhật tại chỗ:** icon quay và khóa bấm lặp khi đang tải; toast báo thành công, một phần hoặc lỗi ngay tại vị trí đang cuộn. Luồng vẫn gọi duy nhất `refreshAllPrices()` → `fetchQuotes()`, không tạo snapshot hay signals.
+- **Kiểm trước deploy:** JavaScript module qua `node --check`, diff không có lỗi whitespace; bản local tải đúng nhưng Firebase từ chối xác thực trên `127.0.0.1`, nên kiểm dữ liệu thật được thực hiện sau deploy production.
+
+· `public/index.html` · `AGENTS.md` · `CODEMAP.md` · `ISSUES.md` · `CHANGELOG.md`
+
 ## 2026-09-24h (Bot sàng lọc chạy lại được + owner chọn khung giờ nhận Telegram)
 
 Owner muốn tự chọn giờ nhận tin quét mã tiềm năng, có khung trước/trong/sau phiên và bật tắt được. Điều kiện tiên quyết: bot phải lấy được dữ liệu từ máy chủ (#012).

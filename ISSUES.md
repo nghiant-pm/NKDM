@@ -120,6 +120,20 @@ theo ngày lịch thay vì theo số bản ghi. Cần owner chọn.
 
 ## Đã fix
 
+### 🟢 #014 — View Gọn trên iPhone tốn chiều cao và filter cần hai bước `fix 2026-09-25`
+**Triệu chứng:** header xuống hai hàng; mỗi mã chiếm nhiều chiều cao; Highlight đẩy danh sách xuống sâu;
+filter phải mở menu rồi mới chọn; nút cập nhật giá chỉ ở đầu trang nên phải cuộn ngược lên.
+
+**Bug gốc:** bố cục mobile kế thừa padding của bảng desktop; filter dùng select trong suốt phủ lên icon;
+mọi Highlight xếp dọc và nút cập nhật giá nằm trong flow của header.
+
+**Fix:** mobile ≤430px dùng header một hàng, filter chip một chạm có nhớ lựa chọn, Highlight hiện 2 mục
+rồi mở rộng, dòng mã hai tầng gọn hơn và chính `#global-price-refresh` trở thành nút nổi 52px có safe-area.
+Không thêm luồng lấy giá hay dữ liệu Firestore mới.
+
+**File:** `public/index.html` — `initCompact`, `renderCompact`, `renderCompactToday`,
+`refreshAllPrices`; `AGENTS.md`; `CODEMAP.md`.
+
 ### 🟢 #010 — Bot sàng lọc chưa thể chạy thật vì project chưa ở gói Blaze `fix 2026-09-24`
 **Triệu chứng:** code, rules và giao diện đã có nhưng lịch 16:10 chưa chạy; Telegram chưa
 thể nhận kết quả thật.

@@ -78,7 +78,8 @@ screening_slots/{YYYY-MM-DD_HHMM}  khoá mỗi khung giờ: status, phase, marke
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
 `fin2-tab` (tab đang mở) · `fin2-view` (Gọn/Đầy đủ) · `fin2-sort-positions` / `fin2-sort-watchlist`
-(cột và chiều sort view Gọn) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (mục đã Bỏ qua ở dải Highlight,
+(cột và chiều sort view Gọn) · `fin2-filter-positions` / `fin2-filter-watchlist`
+(bộ lọc đang chọn ở hai bảng Gọn) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (mục đã Bỏ qua ở dải Highlight,
 tự hết hạn khi sang ngày) · `fin2-pnl-range`
 (Tuần/Tháng/Quý/Tất cả) · `fin2-hide-pnl` (ẩn/hiện lãi lỗ) · `fin2-exclude-hold-pnl`
 (có/không tính mã dài hạn vào tổng lãi/lỗ chưa bán). Đây là sở thích hiển thị,
@@ -166,7 +167,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   cross-origin (`Access-Control-Allow-Origin: *`) nên nút Quét ngay dùng CÙNG nguồn với bot.
   Gửi header `accept: */*` — chỉ `application/json` thì VNDirect trả 406. DNSE là nguồn dự phòng
   đã đo được nếu VNDirect hỏng. Giá hiện tại và biểu đồ vẫn dùng VPS.
-- **Một nút lấy giá chung ở header** (`#global-price-refresh` → `refreshAllPrices()`), owner chốt 24/09/2026.
+- **Một nút lấy giá chung** (`#global-price-refresh` → `refreshAllPrices()`), owner chốt 24/09/2026;
+  từ 25/09/2026 nút nằm ở header trên màn lớn và nổi góc phải dưới trên mobile ≤430px.
   Ghi THẲNG giá hiện tại vào `tickers` cho mọi mã nắm giữ + theo dõi, ghi `watch_prices` cho mã
   watchlist và điền sẵn ô giá ở tab Danh mục. **Không tạo `daily_snapshots` hay `signals`** — hai
   thứ này vẫn chỉ sinh khi owner bấm **Lưu** nhật ký. Các nút cũ `#fetch-price`, `#wl-fetch`,

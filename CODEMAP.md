@@ -21,6 +21,7 @@ public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                                                  fin2-hide-pnl  (ẩn / hiện số lãi lỗ)
                                                  fin2-exclude-hold-pnl (có / không tính mã dài hạn vào lãi/lỗ tổng)
                                                  fin2-sort-*    (cột / chiều sort 2 bảng Gọn)
+                                                 fin2-filter-*  (bộ lọc 2 bảng Gọn)
                                                  fin2-order-*   (thứ tự mã do owner kéo thả)
                                                  fin2-collapsed (section nào đang gập)
                                                  fin2-skip-highlight (mục Bỏ qua ở Highlight, hết hạn theo ngày)
@@ -52,8 +53,8 @@ và phím mũi tên; `saveTickerOrder` ghi thứ tự. Trong khi kéo, hai grid 
 đồng bộ Firestore không làm mất thẻ đang kéo; thả/huỷ thì render dữ liệu mới nhất.
 
 View Gọn (`compact-view`) và Đầy đủ (`full-view`) dùng cùng dữ liệu. `initCompact` nhớ
-`fin2-view` và sort riêng từng bảng trên từng máy; mặc định Đầy đủ, giữ nguyên tab khi đổi view.
-Filter chỉ giữ trong phiên trang. Form giao dịch, form thêm mã và nút lấy giá watchlist được
+`fin2-view`, sort và filter riêng từng bảng trên từng máy; mặc định Đầy đủ, giữ nguyên tab khi đổi view.
+Form giao dịch, form thêm mã và nút lấy giá watchlist được
 chuyển vị trí thật trong DOM, không sao chép.
 Khối `decision-hub` (tín hiệu, lệnh chờ, chất lượng tín hiệu, đóng góp) cũng được chuyển
 giữa `compact-decision-slot` và `full-decision-slot`; hai view không có bản render riêng.
@@ -100,7 +101,7 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | | `openStockChart(ticker,trigger)` `initStockChart()` | mở modal cho mã được bấm ở cả Gọn và Đầy đủ, đổi kỳ xem, vẽ lại khi màn hình đổi kích thước; đóng thì huỷ yêu cầu, dọn dữ liệu tạm và trả focus về nút vừa bấm |
 | | `renderLog()` | danh sách nhật ký; hợp ngày có snapshot, giao dịch, lệnh đặt, nạp-rút và `watch_prices`. Lệnh giữ trạng thái chờ/khớp một phần/đã khớp/đã hủy |
 | Giá | `fetchQuotes(syms)` | **chỗ duy nhất đọc JSON của datafeed VPS.** Trả `{MÃ:{p,ref}}`, `ref:true` = mã chưa khớp lệnh nên đang lấy giá tham chiếu `r`. Cả hai nút lấy giá đều gọi hàm này — thêm nút thứ ba cũng gọi, đừng chép lại |
-| | `refreshAllPrices()` | **nút lấy giá DUY NHẤT** (`#global-price-refresh`, icon trên header, dùng cho cả Gọn và Đầy đủ). Gộp + loại trùng mã nắm giữ và theo dõi, gọi `fetchQuotes` **đúng 1 lần**, ghi thẳng `tickers` từng mã (mã trùng chỉ ghi 1 lần), ghi `watch_prices` cho mã watchlist, điền giá vào ô nhập nhật ký của Đầy đủ. **Không tạo `daily_snapshots` / `signals`**. Trạng thái (đang tải, số mã cập nhật, mã thiếu/giá tham chiếu, giờ) ở `#global-price-status`; lỗi một phần vẫn lưu các mã còn lại |
+| | `refreshAllPrices()` | **nút lấy giá DUY NHẤT** (`#global-price-refresh`, ở header trên màn lớn và nổi góc phải dưới trên mobile ≤430px, dùng cho cả Gọn và Đầy đủ). Gộp + loại trùng mã nắm giữ và theo dõi, gọi `fetchQuotes` **đúng 1 lần**, ghi thẳng `tickers` từng mã (mã trùng chỉ ghi 1 lần), ghi `watch_prices` cho mã watchlist, điền giá vào ô nhập nhật ký của Đầy đủ. **Không tạo `daily_snapshots` / `signals`**. Trạng thái chi tiết ở `#global-price-status`; toast báo kết quả tại vị trí đang cuộn; lỗi một phần vẫn lưu các mã còn lại |
 | Ghi | `toggleHold(ticker)` | lật cờ `hold` trên `tickers/{TICKER}` |
 | | `removeTransaction(id, btn)` | nút Xóa trên từng giao dịch trong Nhật ký; tìm lại giao dịch theo id, xác nhận đủ mã/số lượng/giá/ngày rồi xóa đúng `transactions/{id}` |
 | | `saveTodaySnapshot()` | ghi `tickers.lastPrice` → `daily_snapshots/{hôm nay}` → `watch_prices` cho mã đang theo dõi → **gọi `writeSignals(hôm nay)`** |
@@ -116,7 +117,7 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | Xuất | `buildExport(days)` `downloadExport()` `HUONG_DAN_AI` | xuất thêm lệnh đặt, trạng thái khớp/hủy và luận điểm. `daDatLenh` suy từ `orders`; **`daLamTheo` suy tại chỗ** từ giao dịch gắn `signalId` hoặc giao dịch cũ cùng ngày/mã/chiều |
 | Form | `setupSeg` `setMsg` `clearOversellAck` `showOversellAck` `refreshSellAvailability` `initForms` | các form (`tx-form`, `cf-form`, `wl-form`, `st-form`), nút `ex-btn`, chặn bán vượt, báo số CP có thể bán theo T+2, tự gắn thuế cho lệnh bán mới, nút theme, đăng xuất |
 | Tab | `showTab(name)` `initTabs()` `initDashboard()` `renderPrivacyControl()` `renderPnlScopeControls()` | bật 1 trong 3 panel, nhớ tab; dashboard nhớ kỳ xem, trạng thái ẩn/hiện số và tuỳ chọn không tính mã dài hạn vào riêng tổng lãi/lỗ chưa bán. Bảng/thẻ vị thế và Nhật ký không bị che |
-| View | `initCompact()` `openCompactForm(kind,ticker)` `renderCompactToday(s)` `readSkippedHighlights()` `writeSkippedHighlights(keys)` `compactRowMenu(ticker,watch)` | chuyển Gọn / Đầy đủ; dải **Highlight hôm nay** chỉ tổng hợp tín hiệu đã/sắp đạt (`strategyAlert`), lệnh chờ và watchlist gần mục tiêu, không lưu gì vào Firestore. Mỗi mục có khoá ổn định (`signal_loại_MÃ`, `order_id`, `near_loại_MÃ`, `watch_MÃ`) và nút **Bỏ qua** ẩn mục tới hết ngày trên máy đó (`fin2-skip-highlight`), nút **Hiện lại** xoá danh sách; không ảnh hưởng khối Quyết định; thao tác ít dùng của từng mã (luận điểm, sửa giá kỳ vọng, bỏ theo dõi) nằm trong menu ba chấm. Mobile ≤768px bảng chuyển thành dòng thẻ hai tầng, desktop giữ dạng cột; sort/filter 2 bảng; chuyển form giao dịch hoặc thêm mã vào dialog và trả về khi đóng, giữ bản nháp. Bấm giá kỳ vọng dùng `editWatch`; `tx-submit` bị khoá trong lúc ghi để tránh gửi lặp |
+| View | `initCompact()` `openCompactForm(kind,ticker)` `renderCompactToday(s)` `readSkippedHighlights()` `writeSkippedHighlights(keys)` `compactRowMenu(ticker,watch)` | chuyển Gọn / Đầy đủ; mobile ≤430px dùng một nút chuyển view, filter chip một chạm và nhớ `fin2-filter-*`. Dải **Highlight hôm nay** chỉ tổng hợp tín hiệu đã/sắp đạt (`strategyAlert`), lệnh chờ và watchlist gần mục tiêu, không lưu Firestore; mobile mặc định hiện 2 mục rồi mở rộng theo yêu cầu. Mỗi mục có khoá ổn định và nút **Bỏ qua** ẩn tới hết ngày (`fin2-skip-highlight`), không ảnh hưởng khối Quyết định. Mobile ≤768px bảng thành dòng thẻ hai tầng; ≤430px giảm khoảng trống nhưng giữ đủ giá/số lượng/lãi lỗ. Thao tác ít dùng nằm trong menu ba chấm; form dùng chung được chuyển vào dialog rồi trả về, giữ bản nháp |
 | Sàng lọc | `runManualScreening()` `screenFetchHistory(ticker,maxAttempts)` `screenMapWithConcurrency(items,limit,worker,onProgress)` | nút “Quét ngay” lấy OHLCV VNDirect trên thiết bị với concurrency 5, chấm tối đa 5 mã theo công thức v1.0.0 và chỉ giữ kết quả trong `state.manualScreening`; không ghi Firestore, không gửi Telegram |
 | | `screenScoreTicker(ticker,bars,benchmarkBars)` và nhóm hàm `screen*Score` | bản công thức chấm điểm phía client cho Quét ngay; phải cho cùng kết quả với `functions/scoring.js` khi cùng dữ liệu và `SCREENING_SCORE_VERSION` |
 | | `renderScreeningSlots()` `screeningSlotOn(id)` `toggleScreeningSlot(id,btn)` | hàng công tắc khung giờ nhận Telegram trong khối sàng lọc (dùng chung hai view); ghi cả bộ `slots` vào `settings/screening` |
@@ -199,7 +200,7 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 - **Mọi chuỗi người dùng gõ chèn vào HTML phải qua `esc()`.** Không có ngoại lệ.
 - **Mọi thay đổi dữ liệu đều đi qua `render()`, gồm cả `renderCompact`.** Chuyển view cũng gọi `renderCompact(computeSummary())` để lấy thứ tự mã mới nhất; không mở listener riêng.
 - **Một nút lấy giá chung (từ 24/09/2026) — owner chốt.** `#global-price-refresh` ghi thẳng giá hiện tại vào `tickers` cho mọi mã, nhưng **không thay bước chốt nhật ký**: `daily_snapshots` và `signals` vẫn chỉ sinh khi bấm Lưu ở tab Danh mục. Các nút cũ `#fetch-price`, `#wl-fetch`, `#compact-prices` đã bỏ. Phần đọc datafeed chỉ được có MỘT chỗ là `fetchQuotes` (hiện 2 nơi gọi: nút chung và nút xem giá trong form thêm mã).
-- **localStorage chỉ giữ thứ thuộc về MÁY.** `fin2-theme` · `fin2-tab` · `fin2-collapsed` · `fin2-skip-highlight` · `fin2-view` · `fin2-pnl-range` · `fin2-hide-pnl` · `fin2-exclude-hold-pnl` · `fin2-order-positions` · `fin2-order-watchlist`. Đây là sở thích hiển thị, không phải dữ liệu — mất cũng không sao, và cố ý KHÔNG đồng bộ giữa thiết bị. Dữ liệu thật luôn nằm ở Firestore.
+- **localStorage chỉ giữ thứ thuộc về MÁY.** `fin2-theme` · `fin2-tab` · `fin2-collapsed` · `fin2-skip-highlight` · `fin2-view` · `fin2-pnl-range` · `fin2-hide-pnl` · `fin2-exclude-hold-pnl` · `fin2-sort-*` · `fin2-filter-*` · `fin2-order-*`. Đây là sở thích hiển thị, không phải dữ liệu — mất cũng không sao, và cố ý KHÔNG đồng bộ giữa thiết bị. Dữ liệu thật luôn nằm ở Firestore.
 - **Nút icon phải có `aria-label`.** Nút bật/tắt trạng thái thêm `aria-pressed`.
 
 ---
