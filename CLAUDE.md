@@ -49,7 +49,8 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
 ```
 transactions/{autoId}       ticker, side "buy"|"sell", qty, price (nghìn đ), date, note, createdAt
 cashflows/{autoId}          type "deposit"|"withdraw", amount (VND nguyên), date, note, createdAt
-tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, hold?, updatedAt
+tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, refPrice? (giá tham chiếu, nghìn đ), refPriceDate?, hold?, updatedAt
+                            (refPrice chỉ ghi ở nút lấy giá chung; % trong ngày chỉ tính khi refPriceDate = lastPriceDate)
 daily_snapshots/{YYYY-MM-DD}  date, cash, investedCost, marketValue, totalAssets, prices{}, createdAt, updatedAt
 watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
 strategies/{autoId}         buyDrop, sellRise, lotSize, effectiveFrom (YYYY-MM-DD), reason, createdAt

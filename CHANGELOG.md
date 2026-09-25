@@ -4,6 +4,19 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-25c (View Gọn mobile theo mẫu bảng tài sản TCBS)
+
+Owner gửi ảnh màn Tài sản › Cổ phiếu của app TCBS làm mẫu: muốn lãi/lỗ hiện ngay trên dòng, và thay dãy chip lọc bằng hàng tiêu đề cột.
+
+- **Dòng mã 4 cột, mỗi cột 2 số:** Mã + ô giá · KL / Giá vốn · Mua / Bán (cách ngưỡng, thay cột GTTT/Vốn của TCBS) · Lãi (tr) / Lãi %. Watchlist: Mã + ô giá · Kỳ vọng · Cách.
+- **Ô giá có ↑↓ và % trong ngày** (xanh tăng, đỏ giảm, vàng đứng giá) so với giá tham chiếu. Nút lấy giá chung giờ ghi thêm `refPrice` / `refPriceDate` vào `tickers`; chỉ hiện % khi giá tham chiếu cùng ngày với giá hiện tại. Mã chưa lấy giá lại thì chỉ hiện giá.
+- **Hàng tiêu đề cột thay chip lọc:** `Mã (5) | KL · Giá vốn | Mua · Bán | Lãi (tr) · Lãi %`, bấm để sắp xếp, bấm lần nữa đảo chiều. Bỏ chip Lãi/Lỗ/Hòa vốn, ô tìm và nút sắp xếp trên điện thoại; máy tính vẫn giữ công cụ cũ.
+- **Bấm dòng** vẫn mở thêm: số ngày nắm giữ/theo dõi + menu ··· (menu bung sang trái để không tràn màn).
+- **Máy tính:** giữ nguyên bảng, chỉ đổi ghi chú tuổi thành "Nắm giữ 30 ngày" / "Theo dõi 12 ngày".
+- **Kiểm:** bản dữ liệu giả ở 393 / 344 / 690 / 1200px — không lỗi JS, không tràn ngang, sắp xếp theo cột, mở dòng, menu ··· đúng.
+
+· `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-25b (View Gọn mobile: mã lên đầu, dòng 1 tầng bấm ra 2 tầng)
 
 Owner mở view Gọn trên iPhone 15 Pro và Z Fold 5 (chủ yếu màn gập 344px) để xem giá từng mã. Trước đây phải cuộn ~720px mới tới mã đầu tiên; trên Fold gập chữ tín hiệu bị cắt còn "Mua t…".
