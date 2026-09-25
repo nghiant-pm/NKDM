@@ -79,8 +79,7 @@ screening_slots/{YYYY-MM-DD_HHMM}  khoá mỗi khung giờ: status, phase, marke
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
 `fin2-tab` (tab đang mở) · `fin2-view` (Gọn/Đầy đủ) · `fin2-sort-positions` / `fin2-sort-watchlist`
-(cột và chiều sort view Gọn) · `fin2-filter-positions` / `fin2-filter-watchlist`
-(bộ lọc đang chọn ở hai bảng Gọn) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (mục đã Bỏ qua ở dải Highlight,
+(cột và chiều sort bảng mã) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (mục đã Bỏ qua ở dải Highlight,
 tự hết hạn khi sang ngày) · `fin2-pnl-range`
 (Tuần/Tháng/Quý/Tất cả) · `fin2-hide-pnl` (ẩn/hiện lãi lỗ) · `fin2-exclude-hold-pnl`
 (có/không tính mã dài hạn vào tổng lãi/lỗ chưa bán). Đây là sở thích hiển thị,
@@ -102,7 +101,7 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   gọi `activeStrategy(ngày)`. `buyDropPct` / `sellRisePct` thiếu hoặc null nghĩa là chỉ dùng điểm.
   `strategyLevels()` quy đổi điểm + % theo luật mức nào đến trước; `strategyAlert()` là nguồn
   chung cho highlight và tín hiệu. Ba nơi dùng phải
-  ra cùng một số cho cùng một ngày: `renderPositions` (chip gợi ý), `buildSignals` (ghi log
+  ra cùng một số cho cùng một ngày: `renderCompact` (cột Mua / Bán + tầng mở của bảng mã), `buildSignals` (ghi log
   tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"). **Thêm chỗ dùng mới thì gọi
   `activeStrategy()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
   Phiên bản chiến lược **chỉ thêm, không sửa đè** — sửa đè là tín hiệu cũ mất ngưỡng gốc.
@@ -138,7 +137,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 
 ## Các cặp VIEW SONG SONG (hỏi phạm vi trước khi code)
 - **Gọn ↔ Đầy đủ:** cùng dữ liệu Firestore, `computeSummary()` và thứ tự mã qua `sortTickers()`.
-  `renderCompact()` phải giữ công thức lãi/lỗ và % tương ứng `renderPositions()`, chênh lệch điểm tương ứng `renderWatchlist()`.
+  Bảng mã nắm giữ / theo dõi là MỘT DOM (`#positions-body`, `#watchlist-body`) do `renderCompact()` dựng, `showView()` chuyển
+  qua lại giữa slot Gọn và slot Đầy đủ — không có bản thứ hai để giữ khớp.
   Gọn dùng vốn nạp ròng (tổng nạp − tổng rút); Đầy đủ giữ Tổng tài sản. Đây là khác biệt đã chốt.
   Gọn có highlight mua/bán khi sắp đạt hoặc đã đạt ngưỡng, dùng chung `strategyAlert()` với
   Đầy đủ; thiếu giá phải hiện rõ, tổng dùng giá vốn thay thế có nhãn tạm tính.

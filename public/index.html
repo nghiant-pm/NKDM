@@ -383,21 +383,8 @@
   }
 
   /* ---------- positions ---------- */
-  .pos-grid{ display:grid; grid-template-columns:1fr; gap:10px; }
-  @media (min-width:640px){ .pos-grid{ grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); } }
-  .pos-card{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:var(--r-card); box-shadow:var(--shadow); padding:14px;
-    transition:box-shadow .18s var(--ease);
-  }
-  .pos-card:hover{ box-shadow:var(--shadow-lift); }
-  .pos-card.near-buy{ border-color:var(--brand); box-shadow:0 0 0 1px var(--brand-soft); }
-  .pos-card.near-sell{ border-color:var(--pos); box-shadow:0 0 0 1px var(--pos-soft); }
   .sort-handle{ border:0; background:transparent; color:var(--text-muted); padding:8px; min-width:36px; min-height:40px; cursor:grab; touch-action:none; user-select:none; font:inherit; }
   .sort-handle:active{ cursor:grabbing; }
-  .pos-card.sorting{ opacity:.45; outline:2px solid var(--brand); }
-  .pos-top{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
-  .pos-top .tk{ font-size:var(--fs-title); font-weight:500; flex:1; letter-spacing:-.01em; }
   .ticker-chart-btn{
     border:0; background:transparent; color:var(--brand); padding:4px 0;
     min-width:44px; min-height:44px; text-align:left; cursor:pointer;
@@ -413,7 +400,6 @@
   .edit-dialog{ width:min(360px,calc(100% - 32px)); border:1px solid var(--border); border-radius:12px; padding:20px; background:var(--bg); color:var(--text); }
   .edit-dialog.workflow-dialog{ width:min(560px,calc(100% - 24px)); max-height:calc(100dvh - 32px); overflow:auto; }
   .edit-dialog::backdrop{ background:rgba(0,0,0,.4); }
-  .triggers{ display:flex; flex-wrap:wrap; gap:6px; }
 
   .chip{
     display:inline-flex; align-items:center; gap:5px;
@@ -606,7 +592,7 @@
     min-height:44px; padding:0 4px; border:0; background:transparent; color:var(--text-muted);
     font-size:var(--fs-label); text-decoration:underline; text-underline-offset:3px; cursor:pointer;
   }
-  .compact-today-chevron, .compact-summary-toggle, .compact-gap-cell, .compact-narrow, .compact-mhead{ display:none; }
+  .compact-today-chevron, .compact-summary-toggle{ display:none; }
   .compact-summary-toggle{
     width:100%; min-height:44px; align-items:center; gap:8px; margin-bottom:12px; padding:8px 14px;
     border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface);
@@ -618,21 +604,67 @@
   .compact-summary-toggle .analysis-chevron, .compact-today-chevron .ui-icon{ margin-left:auto; transition:transform .18s var(--ease); }
   .compact-summary-toggle[aria-expanded="true"] .analysis-chevron,
   .compact-today-chevron[aria-expanded="true"] .ui-icon{ transform:rotate(180deg); }
-  .compact-gap-cell{ white-space:nowrap; color:var(--text-muted); }
-  .compact-gap-cell .buy{ color:var(--neg); } .compact-gap-cell .sell{ color:var(--pos); }
-  .compact-table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:var(--fs-body); }
-  .compact-table th{ color:var(--text-muted); font-size:var(--fs-label); font-weight:400; }
-  .compact-table th, .compact-table td{ padding:8px; text-align:right; border-bottom:1px solid var(--border); overflow-wrap:anywhere; }
-  .compact-table th:first-child, .compact-table td:first-child{ text-align:left; width:20%; }
-  .compact-table tr:last-child td{ border-bottom:0; }
-  .compact-table td[colspan]{ text-align:center; color:var(--text-muted); padding:20px 8px; }
+  /* ---------- bảng mã (Gọn + Đầy đủ), kiểu bảng tài sản TCBS ----------
+     Mỗi dòng là lưới đặt ô theo vùng (a-tk, a-px, a-qty…); ô 2 số dùng subgrid để thẳng hàng.
+     Hàng 3 (a-more, a-drag trên điện thoại) chỉ hiện khi bấm mở dòng. Vạch trái: đậm = đã tới ngưỡng, mảnh = sắp tới. */
+  .compact-table, .compact-table tbody{ display:block; width:100%; }
+  .compact-mhead, .compact-table tr{
+    display:grid; gap:2px 8px; align-items:center; padding:6px 4px 6px 12px;
+    grid-template-columns:minmax(0,1.45fr) repeat(3,minmax(0,1fr));
+    grid-template-areas:"tk qty edge pnl" "px qty edge pnl" "more more more more";
+  }
+  .compact-mhead{ grid-template-areas:"tk qty edge pnl"; padding-block:4px; border-bottom:1px solid var(--border); }
+  .compact-mhead:not(.holdings), .compact-table:not(.holdings) tr{ grid-template-columns:minmax(0,1.45fr) repeat(2,minmax(0,1fr)); grid-template-areas:"tk tgt gap" "px tgt gap" "more more more"; }
+  .compact-mhead:not(.holdings){ grid-template-areas:"tk tgt gap"; }
+  .a-tk{ grid-area:tk; } .a-px{ grid-area:px; } .a-qty{ grid-area:qty; } .a-val{ grid-area:val; } .a-edge{ grid-area:edge; }
+  .a-pnl{ grid-area:pnl; } .a-tgt{ grid-area:tgt; } .a-gap{ grid-area:gap; } .a-drag{ grid-area:drag; } .a-more{ grid-area:more; }
+  .c-wide{ display:none !important; }
+  .compact-mhead button{
+    display:flex; flex-direction:column; align-items:flex-end; justify-content:center; min-height:40px; padding:0;
+    border:0; background:transparent; color:var(--text-muted); font-size:11px; line-height:1.35; text-align:right;
+  }
+  .compact-mhead button.a-tk{ align-items:flex-start; text-align:left; }
+  .compact-mhead button[aria-pressed="true"]{ color:var(--brand); }
+  .compact-mhead b{ display:inline-block; min-width:18px; margin-left:2px; padding:0 4px; border:1px solid var(--border); border-radius:4px; font-weight:400; text-align:center; }
+  .compact-table tr{ border-bottom:1px solid var(--border); cursor:pointer; }
+  .compact-table tr.open{ background:var(--surface-2); }
+  .compact-table tr:focus-visible{ outline:2px solid var(--brand); outline-offset:-2px; }
+  .compact-table tr.near-buy{ box-shadow:inset 2px 0 var(--brand); }
+  .compact-table tr.near-sell{ box-shadow:inset 2px 0 var(--pos); }
+  .compact-table tr.near-buy.reached{ box-shadow:inset 5px 0 var(--brand); }
+  .compact-table tr.near-sell.reached{ box-shadow:inset 5px 0 var(--pos); }
+  .compact-table tr.sorting{ opacity:.45; outline:2px solid var(--brand); }
+  .compact-table td{ display:block; padding:0; min-width:0; text-align:right; white-space:nowrap; }
+  .compact-table td.a-tk, .compact-table td.a-px{ text-align:left; }
+  .compact-table .c-two{ display:grid; grid-template-rows:subgrid; grid-row:span 2; align-items:center; }
+  .compact-table .a-edge, .compact-table .a-tgt, .compact-table .a-gap{ align-self:center; }
+  .compact-table .a-more, .compact-table .a-drag{ display:none; }
+  .compact-table tr.open .a-more{ display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:6px 8px; padding-top:6px; white-space:normal; }
+  /* Điện thoại: tay nắm nằm đầu hàng mở (cùng vùng "more"), phần chữ chừa chỗ bên trái. */
+  .compact-table tr.open .a-drag{ display:block; grid-area:more; justify-self:start; align-self:start; padding-top:6px; }
+  .compact-table tr.open .a-drag:not(:empty) ~ .a-more{ padding-left:32px; }
+  .compact-table .a-more .compact-facts{ flex:1 1 100%; color:var(--text-muted); font-size:var(--fs-label); text-align:left; }
+  .compact-table .a-more .hold-btn{ min-height:44px; }
+  .compact-table .sort-handle{ min-width:28px; padding:4px 0; }
+  .compact-table td.compact-empty{ grid-column:1 / -1; grid-row:1; text-align:center; color:var(--text-muted); padding:16px 0; white-space:normal; }
   .compact-link{ border:0; padding:4px 0; min-width:44px; min-height:44px; background:transparent; color:var(--brand); font-weight:500; text-decoration:underline; text-underline-offset:3px; }
-  .compact-unwatch{ color:var(--text-muted); }
-  .compact-table .compact-note{ color:inherit; }
+  .compact-table .a-tk .compact-link{ min-height:30px; padding:0; text-align:left; font-size:var(--fs-body); }
+  .compact-table .a-tgt .compact-link{ min-height:44px; }
+  .compact-table .compact-note{ color:var(--text-muted); font-size:var(--fs-label); }
   .compact-table .pos{ color:var(--pos); }
   .compact-table .neg{ color:var(--neg); }
-  .compact-table tr.near-buy td:first-child{ box-shadow:inset 3px 0 var(--brand); }
-  .compact-table tr.near-sell td:first-child{ box-shadow:inset 3px 0 var(--pos); }
+  .compact-table .a-edge{ color:var(--text-muted); }
+  .compact-table .a-edge .buy{ color:var(--neg); } .compact-table .a-edge .sell{ color:var(--pos); }
+  .compact-quote{
+    display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border-radius:6px;
+    background:var(--surface-2); color:var(--text); font-size:12px;
+  }
+  .compact-quote i{ font-style:normal; opacity:.45; }
+  .compact-quote.up{ background:var(--pos-soft); color:var(--pos); }
+  .compact-quote.down{ background:var(--neg-soft); color:var(--neg); }
+  .compact-quote.ref{ background:var(--warn-soft); color:var(--warn); }
+  .compact-table tr.open .compact-quote:not(.up):not(.down):not(.ref){ background:var(--surface); }
+  .compact-table .row-menu-popover{ left:auto; right:0; }
   .compact-alert{ font-size:var(--fs-label); font-weight:500; }
   .compact-alert.near-buy{ color:var(--brand); }
   .compact-alert.near-sell{ color:var(--pos); }
@@ -640,12 +672,24 @@
   .compact-search-wrap{ display:flex; align-items:center; gap:8px; min-width:0; margin-right:auto; }
   .compact-search-wrap input{ width:0; min-width:0; padding-inline:0; border-color:transparent; opacity:0; pointer-events:none; transition:width .2s var(--ease), opacity .15s var(--ease), padding .2s var(--ease); }
   .compact-tools.searching .compact-search-wrap input{ width:min(220px,48vw); padding-inline:12px; border-color:var(--border); opacity:1; pointer-events:auto; }
-  .compact-icon-select{ position:relative; }
-  .compact-icon-select select{ position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
-  .compact-reset[hidden]{ display:none; }
-  .compact-sort{ border:0; background:transparent; padding:0; min-height:40px; color:inherit; font:inherit; text-align:inherit; width:100%; }
-  .compact-sort span{ color:var(--brand); }
-  .compact-table.holdings th:first-child{ width:20%; }  .compact-table.holdings th:last-child{ width:24%; }
+  /* Màn rộng: thêm cột tay nắm kéo thả (luôn hiện) và GTTT / Vốn như TCBS. */
+  @media(min-width:769px){
+    .compact-table td.c-wide{ display:grid !important; }
+    .compact-mhead button.c-wide{ display:flex !important; }
+    .compact-mhead, .compact-table tr{
+      grid-template-columns:28px minmax(0,1.3fr) repeat(4,minmax(0,1fr)); padding-left:8px;
+      grid-template-areas:"drag tk qty val edge pnl" "drag px qty val edge pnl" ". more more more more more";
+    }
+    .compact-mhead{ grid-template-areas:". tk qty val edge pnl"; }
+    .compact-mhead:not(.holdings), .compact-table:not(.holdings) tr{
+      grid-template-columns:28px minmax(0,1.3fr) repeat(2,minmax(0,1fr));
+      grid-template-areas:"drag tk tgt gap" "drag px tgt gap" ". more more more";
+    }
+    .compact-mhead:not(.holdings){ grid-template-areas:". tk tgt gap"; }
+    .compact-table .a-drag, .compact-table tr.open .a-drag{ display:block; grid-area:drag; align-self:center; padding-top:0; }
+    .compact-table tr.open .a-drag:not(:empty) ~ .a-more{ padding-left:0; }
+    .compact-table tr.open .a-more .compact-facts{ flex:1 1 auto; }
+  }
   .compact-dialog{ width:min(560px,calc(100% - 24px)); max-height:calc(100dvh - 32px); overflow:auto; }
   .compact-dialog .card{ padding:0; border:0; box-shadow:none; background:transparent; }
   .row-menu{ position:relative; display:inline-block; vertical-align:middle; }
@@ -736,62 +780,7 @@
     .compact-today-list{ flex-direction:column; }
     .compact-task{ width:100%; border-radius:var(--r-input); }
     .compact-task-skip{ margin-left:auto; }
-    /* Dòng mã kiểu bảng tài sản TCBS: mỗi cột 2 dòng số; bấm dòng mở tầng 3 (số ngày + menu ···).
-       Vạch trái: đậm = đã tới ngưỡng, mảnh = sắp tới. Hàng .compact-mhead dùng cùng lưới để thẳng cột. */
-    .compact-tools, .compact-table thead, .compact-wide{ display:none; }
-    .compact-narrow{ display:block; }
-    .compact-table, .compact-table tbody{ display:block; width:100%; }
-    .compact-mhead, .compact-table tr{
-      display:grid; grid-template-columns:minmax(0,1.45fr) repeat(3,minmax(0,1fr));
-      align-items:center; gap:2px 8px; padding:6px 4px 6px 12px;
-    }
-    .compact-mhead:not(.holdings), .compact-table:not(.holdings) tr{ grid-template-columns:minmax(0,1.45fr) repeat(2,minmax(0,1fr)); }
-    .compact-mhead{ padding-block:4px; border-bottom:1px solid var(--border); }
-    .compact-mhead button{
-      display:flex; flex-direction:column; align-items:flex-end; min-height:40px; justify-content:center; padding:0;
-      border:0; background:transparent; color:var(--text-muted); font-size:11px; line-height:1.35; text-align:right;
-    }
-    .compact-mhead button:first-child{ align-items:flex-start; text-align:left; }
-    .compact-mhead button[aria-pressed="true"]{ color:var(--brand); }
-    .compact-mhead b{ display:inline-block; min-width:18px; margin-left:2px; padding:0 4px; border:1px solid var(--border); border-radius:4px; font-weight:400; text-align:center; }
-    .compact-table tr{ border-bottom:1px solid var(--border); cursor:pointer; }
-    .compact-table tr.open{ background:var(--surface-2); }
-    .compact-table tr:focus-visible{ outline:2px solid var(--brand); outline-offset:-2px; }
-    .compact-table tr.near-buy{ box-shadow:inset 2px 0 var(--brand); }
-    .compact-table tr.near-sell{ box-shadow:inset 2px 0 var(--pos); }
-    .compact-table tr.near-buy.reached{ box-shadow:inset 5px 0 var(--brand); }
-    .compact-table tr.near-sell.reached{ box-shadow:inset 5px 0 var(--pos); }
-    .compact-table tr[class] td:first-child{ box-shadow:none; }
-    .compact-table td, .compact-table th{ display:block; padding:0; border:0; overflow-wrap:normal; white-space:nowrap; }
-    .compact-table td:first-child{ display:contents; }
-    .compact-table .compact-link{ grid-column:1; grid-row:1; justify-self:start; min-height:30px; padding:0; text-align:left; font-size:var(--fs-body); }
-    .compact-table .row-menu, .compact-table td:first-child .compact-note, .compact-table .compact-alert{ display:none; }
-    .compact-table tr.open .row-menu{ display:block; grid-column:-2; grid-row:3; justify-self:end; }
-    .compact-table tr.open td:first-child .compact-note{ display:block; grid-column:1 / -2; grid-row:3; color:var(--text-muted); }
-    .compact-table.holdings td:nth-child(4), .compact-table:not(.holdings) td:nth-child(2){ grid-column:1; grid-row:2; text-align:left; }
-    .compact-table.holdings td:nth-child(2){ grid-column:2; grid-row:1; }
-    .compact-table.holdings td:nth-child(3){ grid-column:2; grid-row:2; }
-    .compact-table .compact-gap-cell{ grid-column:3; }
-    .compact-table.holdings td:nth-child(5){ grid-column:4; }
-    /* Hai số trong một ô chia theo đúng 2 hàng của dòng để thẳng với cột bên cạnh. */
-    .compact-table.holdings td:nth-child(5){ display:grid; grid-template-rows:subgrid; grid-row:1 / 3; align-items:center; }
-    .compact-table .compact-gap-cell{ grid-row:1 / 3; align-self:center; }
-    .compact-table.holdings td:nth-child(5) .compact-narrow{ display:contents; }
-    .compact-table:not(.holdings) td:nth-child(3){ grid-column:2; grid-row:1 / 3; align-self:center; }
-    .compact-table:not(.holdings) td:nth-child(4){ grid-column:3; grid-row:1 / 3; align-self:center; }
-    .compact-table:not(.holdings) td:nth-child(3) .compact-link{ min-height:44px; }
-    .compact-gap-cell .hold{ color:var(--text-muted); }
-    .compact-quote{
-      display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border-radius:6px;
-      background:var(--surface-2); color:var(--text); font-size:12px;
-    }
-    .compact-quote i{ font-style:normal; opacity:.45; }
-    .compact-quote.up{ background:var(--pos-soft); color:var(--pos); }
-    .compact-quote.down{ background:var(--neg-soft); color:var(--neg); }
-    .compact-quote.ref{ background:var(--warn-soft); color:var(--warn); }
-    .compact-table tr.open .compact-quote:not(.up):not(.down):not(.ref){ background:var(--surface); }
-    .compact-table .row-menu-popover{ left:auto; right:0; }
-    .compact-table td[colspan]{ grid-column:1 / -1 !important; text-align:center !important; padding:16px 0; white-space:normal; }
+    .compact-tools{ display:none; }
   }
   @media(max-width:430px){
     .wrap{ padding-bottom:calc(104px + env(safe-area-inset-bottom)); }
@@ -896,23 +885,25 @@
           <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/><path d="M18 7l-3 3M6 17l3-3"/></svg>
         </button>
       </div></div>
+      <div id="compact-positions-slot"><div id="positions-body">
       <div class="compact-tools" id="compact-tools-positions"></div>
       <div class="compact-mhead holdings num" id="compact-mhead-positions"></div>
       <table class="compact-table holdings num" aria-label="Cổ phiếu đang nắm giữ">
-        <thead id="compact-head-positions"></thead>
         <tbody id="compact-positions"></tbody>
       </table>
+      </div></div>
     </section>
     <section class="compact-panel">
       <div class="compact-head"><h2>Đang theo dõi</h2><button class="icon-action" id="compact-add-watch" type="button" aria-label="Thêm mã theo dõi" title="Thêm mã theo dõi">
         <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       </button></div>
+      <div id="compact-watchlist-slot"><div id="watchlist-body">
       <div class="compact-tools" id="compact-tools-watchlist"></div>
       <div class="compact-mhead num" id="compact-mhead-watchlist"></div>
       <table class="compact-table num" aria-label="Cổ phiếu đang theo dõi">
-        <thead id="compact-head-watchlist"></thead>
         <tbody id="compact-watchlist"></tbody>
       </table>
+      </div></div>
     </section>
     </div>
     <details class="compact-analysis">
@@ -1036,10 +1027,8 @@
   <section>
     <div class="sec-head" data-sec="vi-the">
       <h2>Danh mục</h2>
-      <span class="meta" id="pos-count"></span>
     </div>
-    <div class="pos-grid" id="pos-grid"></div>
-    <div class="card empty" id="pos-empty" hidden>Chưa có cổ phiếu</div>
+    <div id="full-positions-slot"></div>
   </section>
 
   <section>
@@ -1178,10 +1167,8 @@
   <section>
     <div class="sec-head" data-sec="watchlist">
       <h2>Đang theo dõi</h2>
-      <span class="meta" id="wl-count"></span>
     </div>
-    <div class="pos-grid" id="wl-grid"></div>
-    <div class="card empty" id="wl-empty" hidden>Chưa có mã</div>
+    <div id="full-watchlist-slot"></div>
   </section>
 
   <section>
@@ -2452,33 +2439,26 @@ function render(){
   renderScreeningHub();
 
   const priceRows = priceTickers(s.held);
-  renderPositions(s.held);
   renderPriceInputs(priceRows);
   renderTodayBanner(priceRows);
   renderTickerList(s.held);
-  renderWatchlist();
   renderStrategy();
   renderLog();
   renderCompact(s);
   refreshSellAvailability();
 }
 
-const compactColumns = {
-  positions:[["ticker","Mã"],["qty","Số lượng"],["avgCost","Giá mua TB"],["price","Giá hiện tại"],["pnl","Lãi/lỗ"]],
-  watchlist:[["ticker","Mã"],["price","Giá thị trường"],["target","Giá kỳ vọng"],["gap","Chênh lệch điểm"]]
-};
-/* Cột trên điện thoại (≤768px), kiểu bảng tài sản TCBS: mỗi cột 2 dòng số, bấm tiêu đề để sắp xếp. */
-const compactMobileColumns = {
-  positions:[["ticker","Mã",""],["qty","KL","Giá vốn"],["edgeGap","Mua","Bán"],["pnl","Lãi (tr)","Lãi %"]],
+/* Cột bảng mã (Gọn + Đầy đủ) kiểu bảng tài sản TCBS: mỗi cột 2 dòng số, bấm tiêu đề để sắp xếp.
+   Cột GTTT / Vốn chỉ hiện trên màn >768px (class c-wide). */
+const compactTableColumns = {
+  positions:[["ticker","Mã",""],["qty","KL","Giá vốn"],["value","GTTT (tr)","Vốn (tr)"],["edgeGap","Mua","Bán"],["pnl","Lãi (tr)","Lãi %"]],
   watchlist:[["ticker","Mã",""],["target","Kỳ vọng",""],["gap","Cách",""]]
 };
 const compactSort = { positions:null, watchlist:null };
 function compactRows(rows, group){
-  // Điện thoại không có ô tìm / bộ lọc nên bỏ qua lựa chọn còn lưu từ máy tính.
-  const mobile = compactMobileQuery.matches;
-  const query = mobile ? "" : $("compact-search-" + group)?.value.trim().toUpperCase() || "";
-  const status = mobile ? "all" : $("compact-filter-" + group)?.value || "all";
-  const result = rows.filter((r) => r.ticker.includes(query) && (status === "all" || r.status === status));
+  // Ô tìm chỉ có trên máy tính; điện thoại bỏ qua chữ còn sót trong ô.
+  const query = compactMobileQuery.matches ? "" : $("compact-search-" + group)?.value.trim().toUpperCase() || "";
+  const result = rows.filter((r) => r.ticker.includes(query));
   const sort = compactSort[group];
   if(sort) result.sort((a,b) => {
     const av = a[sort.key], bv = b[sort.key];
@@ -2503,8 +2483,7 @@ function toggleCompactRow(row){
 }
 function compactRowAttrs(group, ticker, classes){
   const key = group + ":" + ticker, open = compactOpenRows.has(key);
-  return ' class="' + classes + (open ? ' open' : '') + '" data-row-key="' + esc(key) + '"' +
-    (compactMobileQuery.matches ? ' tabindex="0" aria-expanded="' + open + '"' : '');
+  return ' class="' + classes + (open ? ' open' : '') + '" data-row-key="' + esc(key) + '" tabindex="0" aria-expanded="' + open + '"';
 }
 /* Lãi/lỗ theo triệu, 1 số lẻ, như cột "Lãi (tr)" của TCBS: -6.2 / +0.3. */
 function fmtMillions(n){
@@ -2522,8 +2501,7 @@ function dayMove(ticker, price){
 function compactPriceCell(ticker, price){
   if(price === null || price === undefined || !isFinite(price)) return "—";
   const { ref, move } = dayMove(ticker, price);
-  return '<span class="compact-wide">' + fmtPrice(price) + '</span>' +
-    '<span class="compact-narrow compact-quote ' + move + '">' + (move === "up" ? "↑" : move === "down" ? "↓" : "") + fmtPrice(price) +
+  return '<span class="compact-quote ' + move + '">' + (move === "up" ? "↑" : move === "down" ? "↓" : "") + fmtPrice(price) +
     (ref === null ? "" : '<i>|</i>' + (Math.abs(price - ref) / ref * 100).toFixed(1) + '%') + '</span>';
 }
 /* Số gọn cho dòng tóm tắt điện thoại: 4.200.000 → 4,2tr; 1.250.000.000 → 1,25 tỷ. */
@@ -2608,7 +2586,6 @@ function renderCompact(s){
   const dashboardPnlClass = (n) => pnlClass(n).trim();
   const dashboardPnlText = (value, cost) => pnlMoney(value) + (cost > 0 ? '<span class="compact-note">' + pnlPercent(value / cost * 100) + '</span>' : '');
   const compactPnlClass = (n) => n > 0 ? "pos" : n < 0 ? "neg" : "";
-  const positionPnlText = (value, cost) => fmtVND(value) + (cost > 0 ? '<span class="compact-note">' + fmtPct(value / cost * 100) + '</span>' : '');
   $("c-realized-label").textContent = "Đã chốt · " + rangeLabel;
   $("c-realized").textContent = pnlMoney(dashboard.realizedVND);
   $("c-realized").className = "v num " + dashboardPnlClass(dashboard.realizedVND);
@@ -2626,14 +2603,10 @@ function renderCompact(s){
     (dashboard.cashStatus.key || "") + '">' + (dashboard.cashRatio === null ? "—" : dashboard.cashRatio.toFixed(1) + "%") + '</b>';
   renderCompactToday(s);
   $("global-price-refresh").disabled = priceRefreshBusy || (!s.held.length && !Object.keys(state.watchlist).length);
-  Object.keys(compactColumns).forEach((group) => {
-    const sort = compactSort[group];
-    $("compact-head-" + group).innerHTML = '<tr>' + compactColumns[group].map(([key,label]) => {
-      const active = sort?.key === key;
-      return '<th scope="col" aria-sort="' + (active ? sort.dir === 1 ? 'ascending' : 'descending' : 'none') + '"><button class="compact-sort" type="button" data-sort-group="' + group + '" data-sort-key="' + key + '">' + label + (active ? '<span> ' + (sort.dir === 1 ? '↑' : '↓') + '</span>' : '') + '</button></th>';
-    }).join('') + '</tr>';
-  });
+  // Bảng mã dùng chung Gọn + Đầy đủ (một DOM, chuyển chỗ khi đổi view). Đang kéo thả thì không dựng lại.
+  if(dragSort) return;
   const st = activeStrategy(todayStr());
+  const tr1 = (n) => (n / 1e6).toFixed(1);
   const held = compactRows(sortTickers(s.held, "positions", (h) => h.ticker).map((h) => {
     const pnl = h.hasPrice ? h.qty * (h.price - h.avgCost) * 1000 : null;
     const meta = state.tickers[h.ticker] || {};
@@ -2643,12 +2616,12 @@ function renderCompact(s){
     const move = h.hasPrice ? dayMove(h.ticker, h.price).move : "";
     const edge = !levels ? null : move === "down" || (move !== "up" && h.price < h.avgCost) ? "buy" : "sell";
     return { ...h, price:h.hasPrice ? h.price : null, pnl, levels, edge,
+      value:h.hasPrice ? h.qty * h.price * 1000 : null,
       edgeGap:!edge ? null : edge === "buy" ? h.price - levels.buyAt : levels.sellAt - h.price,
-      strategyAlert:strategyAlert(h, st, meta),
-      status:pnl === null ? 'missing' : pnl > 0 ? 'profit' : pnl < 0 ? 'loss' : 'flat' };
+      strategyAlert:strategyAlert(h, st, meta) };
   }), "positions");
   $("compact-positions").innerHTML = held.map((h) => {
-    const pnl = h.qty * (h.price - h.avgCost) * 1000;
+    const meta = state.tickers[h.ticker] || {};
     const strategyState = h.strategyAlert;
     const alert = strategyState
       ? '<span class="compact-alert near-' + strategyState.kind + '">' +
@@ -2656,67 +2629,69 @@ function renderCompact(s){
           ? (strategyState.kind === "buy" ? "Mua thêm " : "Bán ") + st.lotSize.toLocaleString("vi-VN") + " CP"
           : 'Sắp ' + (strategyState.kind === "buy" ? "mua" : "bán") + ' · ' + fmtPrice(strategyState.remaining) + ' điểm') + '</span>'
       : '';
-    const holdOnly = !!(state.tickers[h.ticker] || {}).hold;
-    const gapCell = '<td class="compact-gap-cell">' + (!h.edge ? '—'
-      : h.edge === "sell" && holdOnly ? '<span class="hold">Giữ</span>'
-      : '<span class="' + h.edge + '" aria-label="Ngưỡng ' + (h.edge === "buy" ? "mua thêm " : "bán ") + fmtPrice(h.edge === "buy" ? h.levels.buyAt : h.levels.sellAt) + '">' +
-        fmtPrice(h.edge === "buy" ? h.levels.buyAt : h.levels.sellAt) + '</span>') + '</td>';
+    const edgePrice = h.edge === "buy" ? h.levels.buyAt : h.edge === "sell" ? h.levels.sellAt : null;
+    const edgeCell = '<td class="a-edge c-edge">' + (!h.edge ? '—'
+      : h.edge === "sell" && meta.hold ? '<span class="hold">Giữ</span>'
+      : '<span class="' + h.edge + '" aria-label="Ngưỡng ' + (h.edge === "buy" ? "mua thêm " : "bán ") + fmtPrice(edgePrice) + '">' + fmtPrice(edgePrice) + '</span>') + '</td>';
     const cost = h.qty * h.avgCost * 1000;
-    return '<tr' + compactRowAttrs("positions", h.ticker, (strategyState ? 'near-' + strategyState.kind + (strategyState.reached ? ' reached' : '') : '')) + '><td><button class="compact-link" type="button" data-chart-ticker="' + esc(h.ticker) + '" aria-label="Xem biểu đồ ' + esc(h.ticker) + '">' + esc(h.ticker) + '</button>' +
-      compactRowMenu(h.ticker, false) + '<span class="compact-note">Nắm giữ ' + ageLabel(h.heldSince) + '</span>' + alert + '</td>' +
-      '<td>' + h.qty.toLocaleString("vi-VN") + '</td>' +
-      '<td>' + fmtPrice(h.avgCost) + '</td>' +
-      '<td class="' + (h.hasPrice ? compactPnlClass(pnl) : '') + '">' + compactPriceCell(h.ticker, h.hasPrice ? h.price : null) + '</td>' +
-      '<td class="' + (h.hasPrice ? compactPnlClass(pnl) : '') + '">' + (h.hasPrice
-        ? '<span class="compact-wide">' + positionPnlText(pnl, cost) + '</span><span class="compact-narrow">' + fmtMillions(pnl) + '<span>' + (cost > 0 ? fmtPct(pnl / cost * 100) : '') + '</span></span>'
-        : '—<span class="compact-note">Chưa có giá</span>') + '</td>' +
-      gapCell + '</tr>';
-  }).join("") || '<tr><td colspan="5">' + (s.held.length ? 'Không có mã phù hợp' : 'Chưa có cổ phiếu') + '</td></tr>';
+    const pnlCls = h.hasPrice ? compactPnlClass(h.pnl) : "";
+    const cycle = h.cycleRealizedPnl * 1000;
+    return '<tr' + compactRowAttrs("positions", h.ticker, (strategyState ? 'near-' + strategyState.kind + (strategyState.reached ? ' reached' : '') : '')) + ' data-sort-ticker="' + esc(h.ticker) + '">' +
+      '<td class="a-drag">' + (compactSort.positions ? '' : sortHandle(h.ticker)) + '</td>' +
+      '<td class="a-tk"><button class="compact-link" type="button" data-chart-ticker="' + esc(h.ticker) + '" aria-label="Xem biểu đồ ' + esc(h.ticker) + '">' + esc(h.ticker) + '</button></td>' +
+      '<td class="a-px ' + pnlCls + '">' + compactPriceCell(h.ticker, h.price) + '</td>' +
+      '<td class="a-qty c-two"><span>' + h.qty.toLocaleString("vi-VN") + '</span><span>' + fmtPrice(h.avgCost) + '</span></td>' +
+      '<td class="a-val c-two c-wide"><span>' + (h.value === null ? '—' : tr1(h.value)) + '</span><span>' + tr1(cost) + '</span></td>' +
+      edgeCell +
+      '<td class="a-pnl c-two ' + pnlCls + '">' + (h.hasPrice
+        ? '<span>' + fmtMillions(h.pnl) + '</span><span>' + (cost > 0 ? pnlPercent(h.pnl / cost * 100) : '') + '</span>'
+        : '<span>—</span><span class="compact-note">Chưa có giá</span>') + '</td>' +
+      '<td class="a-more"><span class="compact-facts">Nắm giữ ' + ageLabel(h.heldSince) +
+        ' · Vốn sau lướt ' + fmtPrice(h.netCost) +
+        ' · Đã chốt chu kỳ <span class="' + compactPnlClass(cycle) + '">' + fmtVND(cycle) + '</span></span>' +
+        alert + thesisBadge(h.ticker) +
+        '<button class="hold-btn' + (meta.hold ? " on" : "") + '" type="button" data-hold="' + esc(h.ticker) + '" aria-pressed="' + !!meta.hold + '" ' +
+          'aria-label="Chuyển ' + esc(h.ticker) + ' sang ' + (meta.hold ? "Giao dịch" : "Giữ dài hạn") + '">' + (meta.hold ? "Giữ dài hạn" : "Giao dịch") + '</button>' +
+        compactRowMenu(h.ticker, false) + '</td></tr>';
+  }).join("") || '<tr><td class="compact-empty">' + (s.held.length ? 'Không có mã phù hợp' : 'Chưa có cổ phiếu') + '</td></tr>';
   const keys = sortTickers(Object.keys(state.watchlist).sort(), "watchlist", (tk) => tk);
   const watched = compactRows(keys.map((tk) => {
     const w = state.watchlist[tk], meta = state.tickers[tk] || {};
     const price = Number.isFinite(meta.lastPrice) ? meta.lastPrice : null;
     const target = Number.isFinite(w.targetBuy) ? w.targetBuy : null;
     const gap = price !== null && target !== null ? price - target : null;
-    return { ticker:tk, price, target, gap, proximity:watchProximity(tk, w, meta, st),
-      status:gap === null ? 'missing' : gap <= 0 ? 'reached' : 'waiting' };
+    return { ticker:tk, price, target, gap, proximity:watchProximity(tk, w, meta, st) };
   }), "watchlist");
   $("compact-watchlist").innerHTML = watched.map((row) => {
-    const tk = row.ticker;
-    const w = state.watchlist[tk], meta = state.tickers[tk] || {};
-    const hasPrice = Number.isFinite(meta.lastPrice), hasTarget = Number.isFinite(w.targetBuy);
-    const gap = hasPrice && hasTarget ? meta.lastPrice - w.targetBuy : null;
+    const tk = row.ticker, gap = row.gap;
+    const meta = state.tickers[tk] || {};
     const trend = watchTrend(tk);
     const near = row.proximity;
+    const gapCls = gap === null ? '' : gap <= 0 ? 'pos' : 'neg';
     const alert = near ? '<span class="compact-alert near-buy">Chuẩn bị mua · ' + fmtPrice(near.remaining) + ' điểm</span>' : '';
-    return '<tr' + compactRowAttrs("watchlist", tk, gap !== null && gap <= 0 ? 'near-buy reached' : near ? 'near-buy' : '') + '><td><button class="compact-link" type="button" data-chart-ticker="' + esc(tk) + '" aria-label="Xem biểu đồ ' + esc(tk) + '">' + esc(tk) + '</button>' +
-      compactRowMenu(tk, true) + '<span class="compact-note">Theo dõi ' + ageLabel(trend.addedDate) + '</span>' + alert + '</td>' +
-      '<td class="' + (gap === null ? '' : gap <= 0 ? 'pos' : 'neg') + '">' + (hasPrice ? compactPriceCell(tk, meta.lastPrice) : '—<span class="compact-note">Chưa có giá</span>') + '</td>' +
-      '<td><button class="compact-link" type="button" data-compact-watch="' + esc(tk) + '" aria-label="Sửa giá kỳ vọng ' + esc(tk) + '">' + (hasTarget ? fmtPrice(w.targetBuy) : '—') + '</button></td>' +
-      '<td class="' + (gap === null ? '' : gap <= 0 ? 'pos' : 'neg') + '">' + (gap === null ? '—' : (gap > 0 ? '+' : '') + gap.toFixed(2)) + '</td></tr>';
-  }).join("") || '<tr><td colspan="4">' + (keys.length ? 'Không có mã phù hợp' : 'Chưa có mã') + '</td></tr>';
-  // Hàng tiêu đề điện thoại: bấm tên cột để sắp xếp, thay cho chip lọc / ô tìm.
+    const dropPct = gap !== null && gap > 0 && row.price > 0 ? gap / row.price * 100 : null;
+    return '<tr' + compactRowAttrs("watchlist", tk, gap !== null && gap <= 0 ? 'near-buy reached' : near ? 'near-buy' : '') + ' data-sort-ticker="' + esc(tk) + '">' +
+      '<td class="a-drag">' + (compactSort.watchlist ? '' : sortHandle(tk)) + '</td>' +
+      '<td class="a-tk"><button class="compact-link" type="button" data-chart-ticker="' + esc(tk) + '" aria-label="Xem biểu đồ ' + esc(tk) + '">' + esc(tk) + '</button></td>' +
+      '<td class="a-px ' + gapCls + '">' + (row.price === null ? '—' : compactPriceCell(tk, row.price)) + '</td>' +
+      '<td class="a-tgt"><button class="compact-link" type="button" data-compact-watch="' + esc(tk) + '" aria-label="Sửa giá kỳ vọng ' + esc(tk) + '">' + (row.target === null ? '—' : fmtPrice(row.target)) + '</button></td>' +
+      '<td class="a-gap ' + gapCls + '">' + (gap === null ? '—' : (gap > 0 ? '+' : '') + gap.toFixed(2)) + '</td>' +
+      '<td class="a-more"><span class="compact-facts">Theo dõi ' + ageLabel(trend.addedDate) +
+        (dropPct === null ? '' : ' · Cần giảm ' + dropPct.toLocaleString("vi-VN", { minimumFractionDigits:2, maximumFractionDigits:2 }) + '%') +
+        ' · Cập nhật ' + (meta.lastPriceDate ? fmtDateVN(meta.lastPriceDate) : '—') + '</span>' +
+        alert + thesisBadge(tk) + compactRowMenu(tk, true) + '</td></tr>';
+  }).join("") || '<tr><td class="compact-empty">' + (keys.length ? 'Không có mã phù hợp' : 'Chưa có mã') + '</td></tr>';
+  // Hàng tiêu đề: bấm tên cột để sắp xếp (lần 2 đảo chiều, lần 3 bỏ). Đang sắp theo cột thì ẩn tay nắm kéo thả.
   const counts = { positions:s.held.length, watchlist:keys.length };
-  Object.keys(compactMobileColumns).forEach((group) => {
+  const areas = { ticker:"a-tk", qty:"a-qty", value:"a-val c-wide", edgeGap:"a-edge", pnl:"a-pnl", target:"a-tgt", gap:"a-gap" };
+  Object.keys(compactTableColumns).forEach((group) => {
     const sort = compactSort[group];
-    $("compact-mhead-" + group).innerHTML = compactMobileColumns[group].map(([key, top, bottom]) => {
+    $("compact-mhead-" + group).innerHTML = compactTableColumns[group].map(([key, top, bottom]) => {
       const active = sort?.key === key;
-      return '<button type="button" data-sort-group="' + group + '" data-sort-key="' + key + '" aria-pressed="' + active + '">' +
+      return '<button class="' + areas[key] + '" type="button" data-sort-group="' + group + '" data-sort-key="' + key + '" aria-pressed="' + active + '">' +
         '<span>' + top + (key === "ticker" ? ' <b>' + counts[group] + '</b>' : '') + (active ? (sort.dir === 1 ? ' ↑' : ' ↓') : '') + '</span>' +
         (bottom ? '<span>' + bottom + '</span>' : '') + '</button>';
     }).join('');
-  });
-  Object.keys(compactColumns).forEach((group) => {
-    const tools = $("compact-tools-" + group);
-    const query = $("compact-search-" + group)?.value || "";
-    const filter = $("compact-filter-" + group)?.value || "all";
-    const sort = compactSort[group];
-    tools?.querySelector("[data-filter-control]")?.classList.toggle("on", filter !== "all");
-    tools?.querySelector("[data-sort-control]")?.classList.toggle("on", !!sort);
-    const sortSelect = $("compact-sort-" + group);
-    if(sortSelect) sortSelect.value = sort ? sort.key + ":" + sort.dir : "";
-    const reset = tools?.querySelector("[data-reset-tools]");
-    if(reset) reset.hidden = !query && filter === "all" && !sort;
   });
 }
 
@@ -2742,42 +2717,16 @@ function openCompactForm(kind, ticker){
 }
 
 function initCompact(){
-  Object.keys(compactColumns).forEach((group) => {
+  Object.keys(compactTableColumns).forEach((group) => {
     try {
       const saved = JSON.parse(localStorage.getItem("fin2-sort-" + group));
-      if(saved && compactColumns[group].concat(compactMobileColumns[group]).some(([key]) => key === saved.key) && [1,-1].includes(saved.dir)) compactSort[group] = saved;
+      if(saved && compactTableColumns[group].some(([key]) => key === saved.key) && [1,-1].includes(saved.dir)) compactSort[group] = saved;
     } catch(e) {}
-    const statuses = group === "positions" ? [["profit","Lãi"],["loss","Lỗ"],["flat","Hòa vốn"],["missing","Thiếu giá"]] : [["reached","Đạt giá"],["waiting","Chưa đạt"],["missing","Thiếu giá"]];
-    const filterOptions = [["all","Tất cả"]].concat(statuses);
     const label = group === "positions" ? "nắm giữ" : "theo dõi";
-    const sortOptions = compactColumns[group].flatMap(([key, title]) => [
-      '<option value="' + key + ':1">' + title + ' tăng dần</option>',
-      '<option value="' + key + ':-1">' + title + ' giảm dần</option>'
-    ]).join('');
     $("compact-tools-" + group).innerHTML =
       '<div class="compact-search-wrap"><button class="icon-action" type="button" data-toggle-search="' + group + '" aria-label="Tìm mã ' + label + '" title="Tìm kiếm">' + UI_ICON.search + '</button>' +
-      '<input type="search" id="compact-search-' + group + '" placeholder="Tìm mã" aria-label="Tìm mã ' + label + '"></div>' +
-      '<label class="icon-action compact-icon-select" data-filter-control aria-label="Lọc ' + label + '" title="Lọc">' + UI_ICON.filter +
-      '<select id="compact-filter-' + group + '" aria-label="Lọc ' + label + '"><option value="all">Tất cả</option>' + statuses.map(([v,l]) => '<option value="' + v + '">' + l + '</option>').join('') + '</select></label>' +
-      '<label class="icon-action compact-icon-select" data-sort-control aria-label="Sắp xếp ' + label + '" title="Sắp xếp">' + UI_ICON.sort +
-      '<select id="compact-sort-' + group + '" aria-label="Sắp xếp ' + label + '"><option value="">Thứ tự đã xếp</option>' + sortOptions + '</select></label>' +
-      '<button class="icon-action compact-reset" type="button" data-reset-tools="' + group + '" aria-label="Đặt lại tìm kiếm, lọc và sắp xếp" title="Đặt lại" hidden>' + UI_ICON.reset + '</button>';
-    if(compactSort[group]) $("compact-sort-" + group).value = compactSort[group].key + ":" + compactSort[group].dir;
-    try {
-      const savedFilter = localStorage.getItem("fin2-filter-" + group);
-      if(filterOptions.some(([value]) => value === savedFilter)) $("compact-filter-" + group).value = savedFilter;
-    } catch(e) {}
+      '<input type="search" id="compact-search-' + group + '" placeholder="Tìm mã" aria-label="Tìm mã ' + label + '"></div>';
     $("compact-search-" + group).addEventListener("input", () => renderCompact(computeSummary()));
-    $("compact-filter-" + group).addEventListener("change", (event) => {
-      try { localStorage.setItem("fin2-filter-" + group, event.target.value); } catch(e) {}
-      renderCompact(computeSummary());
-    });
-    $("compact-sort-" + group).addEventListener("change", (event) => {
-      const [key, dir] = event.target.value.split(":");
-      compactSort[group] = key ? { key, dir:Number(dir) } : null;
-      try { localStorage.setItem("fin2-sort-" + group, JSON.stringify(compactSort[group])); } catch(e) {}
-      renderCompact(computeSummary());
-    });
   });
   // Bản nhập ở trong trang; tải lại cần xác nhận, không lưu dữ liệu tài chính vào localStorage.
   ["tx-form", "price-list", "wl-form"].forEach((id) => {
@@ -2805,6 +2754,8 @@ function initCompact(){
     else decisionHome.after(decisionHub);
     if(compact) $("compact-screening-slot").appendChild(screeningHub);
     else screeningHome.after(screeningHub);
+    $(compact ? "compact-positions-slot" : "full-positions-slot").appendChild($("positions-body"));
+    $(compact ? "compact-watchlist-slot" : "full-watchlist-slot").appendChild($("watchlist-body"));
     renderCompact(computeSummary());
     try { localStorage.setItem("fin2-view", compact ? "compact" : "full"); } catch(e) {}
   }
@@ -2813,38 +2764,41 @@ function initCompact(){
   $("view-mobile-toggle").addEventListener("click", () => showView($("compact-view").hidden ? "compact" : "full"));
   $("compact-trade").addEventListener("click", () => openCompactForm("trade"));
   $("compact-add-watch").addEventListener("click", () => openCompactForm("watch"));
+  ["positions-body", "watchlist-body"].forEach((id) => {
+    $(id).addEventListener("click", (e) => {
+      const sortBtn = e.target.closest("[data-sort-group]");
+      if(sortBtn){
+        const group = sortBtn.dataset.sortGroup;
+        const key = sortBtn.dataset.sortKey, old = compactSort[group];
+        // Bấm cùng cột: tăng → giảm → bỏ sắp xếp (quay về thứ tự đã kéo thả).
+        compactSort[group] = old?.key !== key ? { key, dir:1 } : old.dir === 1 ? { key, dir:-1 } : null;
+        try { localStorage.setItem("fin2-sort-" + group, JSON.stringify(compactSort[group])); } catch(e) {}
+        renderCompact(computeSummary());
+        $("compact-mhead-" + group).querySelector('[data-sort-key="' + key + '"]')?.focus();
+      }
+      const search = e.target.closest("[data-toggle-search]");
+      if(search){
+        const group = search.dataset.toggleSearch, tools = $("compact-tools-" + group);
+        tools.classList.toggle("searching");
+        if(tools.classList.contains("searching")) $("compact-search-" + group).focus();
+      }
+      const watch = e.target.closest("[data-compact-watch]");
+      if(watch) editWatch(watch.dataset.compactWatch);
+      const unwatch = e.target.closest("[data-unwatch]");
+      if(unwatch) removeWatch(unwatch.dataset.unwatch);
+      const hold = e.target.closest("[data-hold]");
+      if(hold) toggleHold(hold.dataset.hold);
+      const row = e.target.closest("tr[data-row-key]");
+      if(row && !e.target.closest("button, a, input, select, details")) toggleCompactRow(row);
+    });
+    $(id).addEventListener("keydown", (e) => {
+      if((e.key === "Enter" || e.key === " ") && e.target.matches("tr[data-row-key]")){
+        e.preventDefault();
+        toggleCompactRow(e.target);
+      }
+    });
+  });
   $("compact-view").addEventListener("click", (e) => {
-    const sortBtn = e.target.closest("[data-sort-group]");
-    if(sortBtn){
-      const group = sortBtn.dataset.sortGroup;
-      const key = sortBtn?.dataset.sortKey, old = compactSort[group];
-      compactSort[group] = { key, dir:old?.key === key ? -old.dir : 1 };
-      try { localStorage.setItem("fin2-sort-" + group, JSON.stringify(compactSort[group])); } catch(e) {}
-      renderCompact(computeSummary());
-      [...document.querySelectorAll('[data-sort-group="' + group + '"][data-sort-key="' + key + '"]')].find((b) => b.offsetParent)?.focus();
-    }
-    const search = e.target.closest("[data-toggle-search]");
-    if(search){
-      const group = search.dataset.toggleSearch, tools = $("compact-tools-" + group);
-      tools.classList.toggle("searching");
-      if(tools.classList.contains("searching")) $("compact-search-" + group).focus();
-    }
-    const reset = e.target.closest("[data-reset-tools]");
-    if(reset){
-      const group = reset.dataset.resetTools;
-      $("compact-search-" + group).value = "";
-      $("compact-filter-" + group).value = "all";
-      $("compact-sort-" + group).value = "";
-      compactSort[group] = null;
-      try { localStorage.setItem("fin2-sort-" + group, "null"); } catch(e) {}
-      try { localStorage.setItem("fin2-filter-" + group, "all"); } catch(e) {}
-      $("compact-tools-" + group).classList.remove("searching");
-      renderCompact(computeSummary());
-    }
-    const watch = e.target.closest("[data-compact-watch]");
-    if(watch) editWatch(watch.dataset.compactWatch);
-    const unwatch = e.target.closest("[data-unwatch]");
-    if(unwatch) removeWatch(unwatch.dataset.unwatch);
     const skip = e.target.closest("[data-skip-highlight]");
     if(skip){
       writeSkippedHighlights(readSkippedHighlights().concat(skip.dataset.skipHighlight));
@@ -2862,14 +2816,6 @@ function initCompact(){
     if(e.target.closest("[data-toggle-summary]")){
       const collapsed = $("compact-view").classList.toggle("summary-collapsed");
       $("compact-summary-toggle").setAttribute("aria-expanded", String(!collapsed));
-    }
-    const row = e.target.closest("tr[data-row-key]");
-    if(row && !e.target.closest("button, a, input, select, details")) toggleCompactRow(row);
-  });
-  $("compact-view").addEventListener("keydown", (e) => {
-    if((e.key === "Enter" || e.key === " ") && e.target.matches("tr[data-row-key]")){
-      e.preventDefault();
-      toggleCompactRow(e.target);
     }
   });
   compactMobileQuery.addEventListener("change", () => renderCompact(computeSummary()));
@@ -3148,67 +3094,6 @@ const ICON = {
   clock:'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
 };
 
-function renderPositions(held){
-  if(dragSort) return;
-  held = sortTickers(held, "positions", (h) => h.ticker);
-  const grid = $("pos-grid"), empty = $("pos-empty");
-  $("pos-count").textContent = held.length ? held.length + " mã" : "";
-  if(held.length === 0){
-    grid.innerHTML = "";
-    empty.hidden = false;
-    return;
-  }
-  empty.hidden = true;
-  const st = activeStrategy(todayStr());
-  grid.innerHTML = held.map((h) => {
-    const meta = state.tickers[h.ticker] || {};
-    const pnl = (h.price - h.avgCost) * h.qty * 1000;
-    const pnlPct = h.avgCost > 0 ? ((h.price - h.avgCost) / h.avgCost * 100) : 0;
-    const pnlCls = pnl > 0 ? " pos" : pnl < 0 ? " neg" : "";
-    const levels = strategyLevels(h.avgCost, st);
-    const strategyState = strategyAlert(h, st, meta);
-    const strategyChip = strategyState
-      ? '<span class="chip near-' + strategyState.kind + '">' +
-        (strategyState.reached
-          ? (strategyState.kind === "buy" ? ICON.down + 'Mua thêm ' : ICON.up + 'Bán ') + st.lotSize.toLocaleString("vi-VN") + ' CP'
-          : 'Sắp ' + (strategyState.kind === "buy" ? "mua" : "bán") + ' · còn ' + fmtPrice(strategyState.remaining) + ' điểm') + '</span>'
-      : '';
-    const sellChip = meta.hold
-      ? '<span class="chip hold">' + ICON.lock + 'Giữ dài hạn</span>'
-      : '<span class="chip sell">' + ICON.up + 'Bán ≥ ' + fmtPrice(levels.sellAt) + '</span>';
-    const staleChip = h.hasPrice ? "" : '<span class="chip stale">' + ICON.clock + 'Chưa có giá</span>';
-    return '<article class="pos-card fade-up' + (strategyState ? ' near-' + strategyState.kind : '') + '" data-sort-ticker="' + esc(h.ticker) + '">' +
-      '<div class="pos-top">' +
-        sortHandle(h.ticker) +
-        '<button class="tk ticker-chart-btn" type="button" data-chart-ticker="' + esc(h.ticker) + '" aria-label="Xem biểu đồ ' + esc(h.ticker) + '">' + esc(h.ticker) + '</button>' +
-        '<button class="hold-btn icon-only" type="button" data-thesis-ticker="' + esc(h.ticker) + '" aria-label="Mở luận điểm ' + esc(h.ticker) + '" title="Luận điểm">' + UI_ICON.note + '</button>' +
-        '<button class="hold-btn' + (meta.hold ? " on" : "") + '" data-hold="' + esc(h.ticker) + '" ' +
-          'aria-pressed="' + (meta.hold ? "true" : "false") + '" ' +
-          'aria-label="Chuyển ' + esc(h.ticker) + ' sang ' + (meta.hold ? "Giao dịch" : "Giữ dài hạn") + '">' +
-          (meta.hold ? "Giữ dài hạn" : "Giao dịch") + '</button>' +
-      '</div>' +
-      '<div class="pos-facts">' +
-        '<div class="fact"><div class="k">Số lượng</div><div class="v num">' + h.qty.toLocaleString("vi-VN") + '</div></div>' +
-        '<div class="fact"><div class="k">Giá TB</div><div class="v num">' + fmtPrice(h.avgCost) + '</div></div>' +
-        '<div class="fact"><div class="k">Giá vốn sau lướt</div><div class="v num">' + fmtPrice(h.netCost) + '</div></div>' +
-        '<div class="fact"><div class="k">Đã chốt chu kỳ</div><div class="v num' + (h.cycleRealizedPnl > 0 ? " pos" : h.cycleRealizedPnl < 0 ? " neg" : "") + '">' + fmtVND(h.cycleRealizedPnl * 1000) + '</div></div>' +
-        '<div class="fact"><div class="k">Giá thị trường</div><div class="v num">' + fmtPrice(h.price) + '</div></div>' +
-        '<div class="fact"><div class="k">Giá trị</div><div class="v num">' + fmtVND(h.qty * h.price * 1000) + '</div></div>' +
-        '<div class="fact"><div class="k">Lãi/lỗ</div><div class="v num' + pnlCls + '">' + fmtVND(pnl) + '</div></div>' +
-        '<div class="fact"><div class="k">Tỷ suất</div><div class="v num' + pnlCls + '">' + fmtPct(pnlPct) + '</div></div>' +
-        '<div class="fact"><div class="k">Nắm giữ</div><div class="v num">' + ageLabel(h.heldSince) + '</div></div>' +
-      '</div>' +
-      '<div class="triggers">' +
-        '<span class="chip buy">' + ICON.down + 'Mua ≤ ' + fmtPrice(levels.buyAt) + '</span>' +
-        sellChip + strategyChip + staleChip + thesisBadge(h.ticker) +
-      '</div>' +
-    '</article>';
-  }).join("");
-
-  grid.querySelectorAll("[data-hold]").forEach((btn) => {
-    btn.addEventListener("click", () => toggleHold(btn.getAttribute("data-hold")));
-  });
-}
 
 /* Ô nhập giá bị dựng lại mỗi khi dữ liệu dội về → giữ lại chữ đang gõ.
    Chỉ dựng lại khi TẬP MÃ đổi; dựng xong thì trả lại giá trị đã chụp. */
@@ -3270,65 +3155,6 @@ function renderTickerList(held){
     .map((tk) => '<option value="' + esc(tk) + '"></option>').join("");
 }
 
-function renderWatchlist(){
-  if(dragSort) return;
-  const grid = $("wl-grid"), empty = $("wl-empty");
-  const keys = sortTickers(Object.keys(state.watchlist).sort(), "watchlist", (tk) => tk);
-  $("wl-count").textContent = keys.length ? keys.length + " mã" : "";
-  if(keys.length === 0){
-    grid.innerHTML = "";
-    empty.hidden = false;
-    return;
-  }
-  empty.hidden = true;
-  const st = activeStrategy(todayStr());
-  grid.innerHTML = keys.map((tk) => {
-    const w = state.watchlist[tk] || {};
-    const meta = state.tickers[tk] || {};
-    const has = isFinite(meta.lastPrice) && isFinite(w.targetBuy);
-    const gap = has ? (meta.lastPrice - w.targetBuy) : null;   // >0 là còn đắt hơn giá muốn mua
-    const gapCls = gap === null ? "" : gap <= 0 ? " pos" : " neg";
-    const dropPct = has && meta.lastPrice > 0 ? Math.max(0, gap / meta.lastPrice * 100) : null;
-    const reach = has && gap <= 0;
-    const proximity = reach ? null : watchProximity(tk, w, meta, st);
-    const trend = watchTrend(tk);
-    return '<article class="pos-card fade-up' + (proximity ? ' near-buy' : '') + '" data-sort-ticker="' + esc(tk) + '">' +
-      '<div class="pos-top">' +
-        sortHandle(tk) +
-        '<button class="tk ticker-chart-btn" type="button" data-chart-ticker="' + esc(tk) + '" aria-label="Xem biểu đồ ' + esc(tk) + '">' + esc(tk) + '</button>' +
-        '<button class="hold-btn icon-only" type="button" data-thesis-ticker="' + esc(tk) + '" aria-label="Mở luận điểm ' + esc(tk) + '" title="Luận điểm">' + UI_ICON.note + '</button>' +
-        '<button class="hold-btn icon-only" data-unwatch="' + esc(tk) + '" title="Bỏ theo dõi" ' +
-          'aria-label="Bỏ theo dõi ' + esc(tk) + '">' + UI_ICON.trash + '</button>' +
-      '</div>' +
-      '<div class="pos-facts">' +
-        '<div class="fact"><div class="k">Giá thị trường</div><div class="v num">' + (has ? fmtPrice(meta.lastPrice) : "—") + '</div></div>' +
-        '<div class="fact"><div class="k">Giá muốn mua</div><div class="v num target-value">' + fmtPrice(w.targetBuy) +
-          '<button class="hold-btn icon-only" type="button" data-edit-watch="' + esc(tk) + '" aria-label="Sửa giá muốn mua ' + esc(tk) + '" title="Sửa giá kỳ vọng">' + UI_ICON.edit + '</button></div></div>' +
-        '<div class="fact"><div class="k">Theo dõi</div><div class="v num">' + ageLabel(trend.addedDate) + '</div></div>' +
-        '<div class="fact"><div class="k">Còn cách</div><div class="v num' + gapCls + '">' +
-          (gap === null ? "—" : (gap > 0 ? "+" : "") + gap.toFixed(2) + " điểm") + '</div></div>' +
-        '<div class="fact"><div class="k">Cần giảm</div><div class="v num' + gapCls + '">' +
-          (dropPct === null ? "—" : dropPct.toLocaleString("vi-VN", { minimumFractionDigits:2, maximumFractionDigits:2 }) + "%") + '</div></div>' +
-        '<div class="fact"><div class="k">Cập nhật</div><div class="v num">' + (meta.lastPriceDate ? fmtDateVN(meta.lastPriceDate) : "—") + '</div></div>' +
-      '</div>' +
-      '<div class="triggers">' +
-        (reach
-          ? '<span class="chip buy">' + ICON.down + 'Đạt giá mua</span>'
-          : proximity
-            ? '<span class="chip near-buy">' + ICON.down + 'Chuẩn bị mua · còn ' + fmtPrice(proximity.remaining) + ' điểm</span>'
-            : '<span class="chip">' + ICON.clock + 'Chờ ≤ ' + fmtPrice(w.targetBuy) + '</span>') +
-        (has ? "" : '<span class="chip stale">' + ICON.clock + 'Chưa có giá</span>') + thesisBadge(tk) +
-      '</div>' +
-    '</article>';
-  }).join("");
-
-  grid.querySelectorAll("[data-unwatch]").forEach((btn) => {
-    btn.addEventListener("click", () => removeWatch(btn.getAttribute("data-unwatch")));
-  });
-  grid.querySelectorAll("[data-edit-watch]").forEach((btn) => {
-    btn.addEventListener("click", () => editWatch(btn.getAttribute("data-edit-watch")));
-  });
-}
 
 function renderStrategy(){
   const st = activeStrategy(todayStr());
@@ -4635,7 +4461,7 @@ function saveTickerOrder(grid, group){
   catch(e){ toast("Chưa nhớ được thứ tự trên máy"); }
 }
 function initSorting(){
-  [["pos-grid", "positions"], ["wl-grid", "watchlist"]].forEach(([id, group]) => {
+  [["compact-positions", "positions"], ["compact-watchlist", "watchlist"]].forEach(([id, group]) => {
     const grid = $(id);
     function moveAt(x, y){
       const drag = dragSort;

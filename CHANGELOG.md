@@ -4,6 +4,19 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-25e (Bảng mã mới dùng chung cho Gọn và Đầy đủ, mọi màn hình)
+
+Owner ưng giao diện bảng kiểu TCBS trên điện thoại và muốn dùng chung cho web, cả view Đầy đủ.
+
+- **Một bảng duy nhất cho hai view:** bảng Đang nắm giữ / Đang theo dõi là một DOM, đổi view thì chuyển chỗ (cùng cách khối Quyết định). Thẻ vị thế và thẻ theo dõi ở Đầy đủ bị thay; `renderPositions` / `renderWatchlist` và CSS thẻ đã xoá.
+- **Màn rộng (>768px):** thêm cột tay nắm kéo thả và cột **GTTT / Vốn (tr)** như TCBS: Mã · KL/Giá vốn · GTTT/Vốn · Mua/Bán · Lãi/Lãi%. Điện thoại giữ 4 cột.
+- **Chức năng thẻ cũ chuyển vào hàng mở của dòng:** nắm giữ X ngày · vốn sau lướt · đã chốt chu kỳ, chữ tín hiệu ("Mua thêm 100 CP"), badge luận điểm, nút **Giữ dài hạn / Giao dịch**, menu ···. Theo dõi: số ngày, % cần giảm, ngày cập nhật giá, sửa giá kỳ vọng, bỏ theo dõi.
+- **Giữ kéo thả:** máy tính có tay nắm ở cột trái; điện thoại tay nắm nằm trong hàng mở. Bấm tiêu đề cột: tăng → giảm → **bỏ sắp xếp** (về thứ tự đã kéo). Đang sắp theo cột thì ẩn tay nắm.
+- **Công cụ trên máy tính chỉ còn ô tìm mã;** bỏ bộ lọc Lãi/Lỗ, nút sắp xếp, nút đặt lại và key `fin2-filter-*`.
+- **Kiểm:** bản dữ liệu giả ở 344px và 1000–1200px, cả Gọn lẫn Đầy đủ: không lỗi JS, không tràn ngang, bảng chuyển đúng chỗ khi đổi view, kéo thả bằng phím lưu đúng thứ tự, sắp xếp 3 trạng thái, mở dòng hiện đủ thông tin.
+
+· `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-25d (Cột Mua / Bán chỉ hiện một ngưỡng theo chiều giá trong ngày)
 
 Owner thấy cột hai số (`✓ / +9.20`) khó hiểu; muốn giá đang giảm thì thấy ngưỡng mua thêm, đang tăng thì thấy ngưỡng bán.
