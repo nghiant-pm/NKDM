@@ -2,12 +2,13 @@
 
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const UNIVERSE = require("./universe");
-const { scoreTicker, evaluateCandidate, SCORE_VERSION, MIN_SCORE } = require("./scoring");
+const { scoreTicker, evaluateCandidate, normalizeConfig, SCORE_VERSION } = require("./scoring");
 
 initializeApp();
 setGlobalOptions({ region: "asia-southeast1", maxInstances: 1 });
@@ -19,7 +20,6 @@ const TELEGRAM_CHAT_ID = defineSecret("TELEGRAM_CHAT_ID");
    cho nút Quét ngay để điểm hai bên khớp nhau. */
 const HISTORY_API = "https://dchart-api.vndirect.com.vn/dchart/history";
 const TIME_ZONE = "Asia/Ho_Chi_Minh";
-const MAX_RESULTS = 5;
 const MAX_MISSING_RATIO = 0.2;
 const HISTORY_DAYS = 240;
 
@@ -144,17 +144,31 @@ function scoreOrder(a, b) {
   return b.totalScore - a.totalScore || b.relativeStrengthScore - a.relativeStrengthScore || a.ticker.localeCompare(b.ticker);
 }
 
-function rank(rows, group) {
-  return rows.filter((row) => row.group === group && row.totalScore >= MIN_SCORE)
+function rank(rows, group, minScore) {
+  return rows.filter((row) => row.group === group && row.totalScore >= minScore)
     .sort(scoreOrder)
     .map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
-function selectResults(rows) {
-  const top = rows.slice().sort(scoreOrder).slice(0, MAX_RESULTS);
-  const fresh = rank(top, "new");
-  const watched = rank(top, "watchlist");
+/* Mỗi nhóm xếp hạng riêng: mã mới lấy tối đa `maxNew`, mã theo dõi đạt chuẩn thì hiện hết —
+   để mã theo dõi không bị mã mới điểm cao hơn chiếm mất chỗ. */
+function selectResults(rows, config = normalizeConfig()) {
+  const fresh = rank(rows, "new", config.minScore).slice(0, config.maxNew);
+  const watched = rank(rows, "watchlist", config.minScore);
   return { fresh, watched, selected: [...fresh, ...watched] };
+}
+
+function priceText(value) {
+  return Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 2 });
+}
+
+/* Khoảng cách tới giá kỳ vọng của mã theo dõi, tính theo "điểm" (nghìn đ) như cả app. */
+function watchGapText(row) {
+  if (!Number.isFinite(row.targetBuy)) return "";
+  const gap = Math.round((row.close - row.targetBuy) * 100) / 100;
+  return gap > 0
+    ? `Còn ${priceText(gap)} điểm tới giá kỳ vọng ${priceText(row.targetBuy)}`
+    : `Đã tới giá kỳ vọng ${priceText(row.targetBuy)}`;
 }
 
 function viDate(date) {
@@ -169,16 +183,21 @@ function telegramHeader(slot, date, marketDate, trial) {
     (trial && trial.isTrial ? `Thử nghiệm ${trial.trialSession}/20 · ` : "") + `Công thức ${SCORE_VERSION}`];
 }
 
-function telegramText(header, fresh, watched) {
+function telegramText(header, fresh, watched, config = normalizeConfig()) {
   const lines = header.slice();
-  if (!fresh.length && !watched.length) return lines.concat("", "Không có mã đạt chuẩn 70 điểm.").join("\n");
+  if (!fresh.length && !watched.length) return lines.concat("", `Không có mã đạt chuẩn ${config.minScore} điểm.`).join("\n");
   if (fresh.length) {
     lines.push("", "Cơ hội mới");
     fresh.forEach((row) => lines.push(`${row.rank}. ${row.ticker} · ${row.totalScore} điểm · ${row.close.toFixed(2)}`, `   ${row.reasons.join(" · ")}`));
   }
   if (watched.length) {
     lines.push("", "Đang theo dõi");
-    watched.forEach((row) => lines.push(`${row.rank}. ${row.ticker} · ${row.totalScore} điểm · ${row.close.toFixed(2)}`, `   ${row.reasons.join(" · ")}`));
+    watched.forEach((row) => {
+      lines.push(`${row.rank}. ${row.ticker} · ${row.totalScore} điểm · ${row.close.toFixed(2)}`);
+      const gap = watchGapText(row);
+      if (gap) lines.push(`   ${gap}`);
+      lines.push(`   ${row.reasons.join(" · ")}`);
+    });
   }
   lines.push("", "Chỉ là đề cử để xem xét, không tự tạo lệnh.");
   return lines.join("\n");
@@ -266,9 +285,10 @@ async function markFailure(db, slotRef, runRef, date, slot, error, token, chatId
   }
 }
 
-/* Tải + chấm điểm, không ghi gì. `marketDate === null` nghĩa là không có phiên để chấm. */
-async function scanMarket({ phase, date, held, watchlist, extraTickers }) {
-  const symbols = [...new Set([...UNIVERSE, ...watchlist, ...extraTickers])].filter(Boolean).sort();
+/* Tải + chấm điểm, không ghi gì. `marketDate === null` nghĩa là không có phiên để chấm.
+   `watchlist` là Map mã → giá kỳ vọng. */
+async function scanMarket({ phase, date, held, watchlist, extraTickers, config = normalizeConfig() }) {
+  const symbols = [...new Set([...UNIVERSE, ...watchlist.keys(), ...extraTickers])].filter(Boolean).sort();
   const benchmarkAll = await fetchHistory("VNINDEX", HISTORY_DAYS, 3);
   const marketDate = marketDateFor(phase, date, benchmarkAll);
   if (!marketDate) return { marketDate: null, latestMarketDate: benchmarkAll.at(-1)?.date || null };
@@ -289,11 +309,13 @@ async function scanMarket({ phase, date, held, watchlist, extraTickers }) {
   const scored = [];
   historyByTicker.forEach((bars, ticker) => {
     if (held.has(ticker) && !watchlist.has(ticker)) return;
-    const result = scoreTicker(ticker, bars, benchmarkBars);
+    const result = scoreTicker(ticker, bars, benchmarkBars, config);
     if (!result.eligible) return;
-    scored.push({ ...result, group: watchlist.has(ticker) ? "watchlist" : "new" });
+    if (!watchlist.has(ticker)) { scored.push({ ...result, group: "new" }); return; }
+    const targetBuy = Number(watchlist.get(ticker));
+    scored.push({ ...result, group: "watchlist", ...(Number.isFinite(targetBuy) && targetBuy > 0 ? { targetBuy } : {}) });
   });
-  return { marketDate, symbols, benchmarkBars, historyByTicker, failures, scored, ...selectResults(scored) };
+  return { marketDate, symbols, benchmarkBars, historyByTicker, failures, scored, config, ...selectResults(scored, config) };
 }
 
 /* Ghi lịch sử chính thức của ngày — chỉ lượt sau đóng cửa, chỉ MỘT lần/ngày.
@@ -307,7 +329,7 @@ async function recordOfficialRun(db, date, scan, oldResultsSnap) {
   const successfulRuns = runsSnap.docs.filter((item) => item.id !== date && ["completed", "empty"].includes(item.data().status)).length;
   const trialSession = Math.min(20, successfulRuns + 1);
   const isTrial = successfulRuns < 20;
-  const { selected, fresh, watched } = scan;
+  const { selected, fresh, watched, config } = scan;
 
   const oldToday = oldResultsSnap.docs.filter((item) => item.data().date === date);
   const keep = new Set(selected.map((row) => `${date}_${row.ticker}`));
@@ -321,6 +343,10 @@ async function recordOfficialRun(db, date, scan, oldResultsSnap) {
       date,
       trialSession,
       isTrial,
+      // Chép ngưỡng đo lúc đề cử — đổi thông số về sau không chấm lại kết quả cũ.
+      evalWinPct: old?.evalWinPct || config.winPct,
+      evalLossPct: old?.evalLossPct || config.lossPct,
+      evalSessions: old?.evalSessions || config.evalSessions,
       evaluation: old?.evaluation || { primary: "pending", resolvedDate: null, sessionsObserved: 0, complete: false, return20Pct: null, excess20Pct: null },
       createdAt: old?.createdAt || FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
@@ -338,6 +364,7 @@ async function recordOfficialRun(db, date, scan, oldResultsSnap) {
     newCount: fresh.length,
     watchlistCount: watched.length,
     scoreVersion: SCORE_VERSION,
+    analysis: config,
     startedAt: run?.startedAt || FieldValue.serverTimestamp(),
     ...(run?.error ? { error: FieldValue.delete() } : {}),
     updatedAt: FieldValue.serverTimestamp(),
@@ -348,7 +375,8 @@ async function recordOfficialRun(db, date, scan, oldResultsSnap) {
   return { trialSession, isTrial };
 }
 
-async function runSlot(db, slot, date, token, chatId) {
+async function runSlot(db, slot, date, token, chatId, settings) {
+  const config = normalizeConfig(settings?.analysis);
   const lock = await acquireSlot(db, date, slot);
   if (lock.skip) { logger.info(`Bỏ qua ${date} ${slot.time}: ${lock.reason}`); return; }
   const runRef = slot.phase === "post" ? db.collection("screening_runs").doc(date) : null;
@@ -363,8 +391,9 @@ async function runSlot(db, slot, date, token, chatId) {
       phase: slot.phase,
       date,
       held: heldTickers(transactionsSnap.docs.map((item) => item.data())),
-      watchlist: new Set(watchlistSnap.docs.map((item) => item.id)),
-      extraTickers: slot.phase === "post" ? pendingTickers : []
+      watchlist: new Map(watchlistSnap.docs.map((item) => [item.id, item.data().targetBuy])),
+      extraTickers: slot.phase === "post" ? pendingTickers : [],
+      config
     });
     if (!scan.marketDate) {
       await lock.ref.set({ status: "holiday", latestMarketDate: scan.latestMarketDate, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
@@ -381,7 +410,7 @@ async function runSlot(db, slot, date, token, chatId) {
       missingCount: scan.failures.length, selectedCount: scan.selected.length, updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
     if (await claimNotification(db, lock.ref, notificationType)) {
-      await sendTelegram(token, chatId, telegramText(telegramHeader(slot, date, scan.marketDate, trial), scan.fresh, scan.watched));
+      await sendTelegram(token, chatId, telegramText(telegramHeader(slot, date, scan.marketDate, trial), scan.fresh, scan.watched, config));
       await lock.ref.set({ notificationSentAt: FieldValue.serverTimestamp() }, { merge: true });
     }
     logger.info(`Hoàn tất ${date} ${slot.time}`, { selected: scan.selected.length, missing: scan.failures.length });
@@ -408,10 +437,25 @@ exports.screenShortTermOpportunities = onSchedule({
   const db = getFirestore();
   const settings = (await db.collection("settings").doc("screening").get()).data();
   if (!slotEnabled(settings, slot.id)) return;
-  await runSlot(db, slot, dateInZone(now), TELEGRAM_BOT_TOKEN.value(), TELEGRAM_CHAT_ID.value());
+  await runSlot(db, slot, dateInZone(now), TELEGRAM_BOT_TOKEN.value(), TELEGRAM_CHAT_ID.value(), settings);
 });
 
 exports._private = {
   dateInZone, slotAt, slotEnabled, marketDateFor, parseHistory, fetchHistory, mapWithConcurrency,
-  heldTickers, rank, selectResults, telegramHeader, telegramText, scanMarket, SLOTS
+  heldTickers, rank, selectResults, watchGapText, telegramHeader, telegramText, scanMarket, SLOTS
 };
+
+// Điểm thử nghiệm độc lập với bot Telegram; có thể chạy dù owner tắt mọi khung nhận tin.
+const { runDecision } = require("./decision-service");
+const decisionHelpers = { fetchHistory, mapWithConcurrency };
+exports.refreshDecisionScores = onCall({ timeoutSeconds: 540, memory: "512MiB", cors: true }, async (request) => {
+  if (request.auth?.token?.email !== "nghiant@youmed.vn" || request.auth.token.email_verified !== true) {
+    throw new HttpsError("permission-denied", "Không có quyền truy cập");
+  }
+  try { return await runDecision(getFirestore(), decisionHelpers); }
+  catch (error) { logger.error("decision scores", error); throw new HttpsError("unavailable", "Chưa cập nhật được điểm quyết định"); }
+});
+exports.closeDecisionScores = onSchedule({ schedule: "30 9-15 * * 1-5", timeZone: TIME_ZONE,
+  timeoutSeconds: 540, memory: "512MiB", retryCount: 0 }, async () => {
+  await runDecision(getFirestore(), decisionHelpers, { scheduled: true });
+});

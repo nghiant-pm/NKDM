@@ -4,6 +4,37 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-27 (Điểm quyết định: chạy bóng mua/bán trên danh mục + theo dõi)
+
+Owner yêu cầu triển khai ý tưởng sau phỏng vấn: ưu tiên tăng lợi nhuận, mua nhịp điều chỉnh trong xu hướng và bán khi xu hướng suy yếu; hệ thống chấm điểm để owner tự quyết định.
+
+- Hai điểm độc lập 0–100, xếp hạng riêng: Mua cho mã đang giữ/theo dõi; Áp lực Bán chỉ khi vị thế có lãi. Mã Giữ vẫn thấy điểm bán. Cùng một bảng ở Gọn/Đầy đủ; bấm điểm mở thành phần, biến động điểm, lý do và tin có dẫn nguồn.
+- Công thức `decision-v1.0.0` chạy ở server. Thị trường/rổ ngành có trọng số lớn; rổ ngành nội bộ ngang trọng số, loại chính mã đang chấm khỏi rổ. Thiếu ngành ghi rõ và không tự cho điểm ngành. `-2/+3` đọc phiên bản chiến lược theo ngày; tiền mặt/T+2 hiện riêng.
+- Nút lấy giá chung gọi chấm điểm sau khi lưu giá thành công. Thêm callable `refreshDecisionScores` chỉ cho email owner; scheduler `closeDecisionScores` chạy 9:30–15:30 T2–T6, độc lập với công tắc Telegram. Trong phiên có nhãn tạm tính; sau đóng cửa dùng OHLCV VNDirect.
+- Lưu mỗi lần chấm, phiên bản công thức và sự kiện vượt 80. Đo +6% trước −3% trong 20 phiên; chiều bán đảo kết quả. Hai ngưỡng cùng phiên = không xác định. Ghi cả mẫu chiến lược cũ theo cùng giai đoạn để so sánh tiến tới, không mô phỏng ngược. Không sửa tín hiệu/lệnh thật và không gửi Telegram cho điểm mới.
+- Chạy bóng ít nhất 20 phiên đóng cửa có đủ dữ liệu, ít nhất 10 sự kiện mới; đủ mẫu vẫn không tự chuyển sang cơ chế chính. Thiếu dữ liệu đánh dấu kết quả cũ; lỗi nguồn không làm mất giá đã cập nhật. File xuất Nhật ký có thêm điểm/sự kiện chạy bóng.
+- Thu thập RSS chính thức HNX, đọc phần nội dung bài thay vì menu trang; tối đa 50 bài mới mỗi lượt, cache 1 giờ. AI tùy chọn (`DECISION_OPENAI_API_KEY` ở Secret Manager), chỉ phân loại/tóm tắt, có đoạn chứng cứ và tin cậy ≥80% mới tác động. Tin trùng gộp, giảm ảnh hưởng trong 20 ngày, tổng giới hạn ±5. Chưa có khóa hoặc lỗi đọc tin = tác động 0, hiện rõ trạng thái.
+- **Giới hạn chưa hoàn tất:** chưa cấu hình khóa AI; HNX RSS chưa bao phủ đầy đủ HOSE và nguồn ngành. Ghi #014 trong ISSUES, không coi đây là lớp tin tức hoàn chỉnh theo ý tưởng.
+- **Kiểm:** cú pháp client/server; smoke sàng lọc cũ; ca dữ liệu giả vị thế lỗ, Giữ, thiếu lịch sử, trùng sự kiện, đếm phiên, so chiến lược cũ, đo phiên kế tiếp, hai ngưỡng cùng phiên. Bấm thật bản fixture 344px và 1280px, Gọn/Đầy đủ, mở/thu chi tiết, sáng/tối; không tràn ngang. Không ghi giao dịch thử vào Firestore thật.
+- **Deploy:** đã thành công lên Firebase Hosting, Firestore rules và hai Cloud Functions mới ngày 27/09/2026; callable production từ chối người chưa đăng nhập với HTTP 403. Chưa kiểm chứng AI đọc tin thật vì chưa cấu hình khóa.
+
+· `public/index.html` · `functions/index.js` · `functions/scoring.js` · `functions/decision-scoring.js` · `functions/decision-service.js` · `functions/decision-news.js` · `firestore.rules` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-25g (Sàng lọc: mỗi nhóm chọn riêng, không mua trùng, thông số chỉnh được)
+
+Làm sau buổi review cơ chế quét và khuyến nghị. Owner chọn A + B + C, thêm chỗ chỉnh thông số trong tab Chiến lược.
+
+- **A. Mã theo dõi không bị chiếm chỗ:** trước đây lấy 5 mã cao nhất chung cho cả hai nhóm rồi mới tách, nên mã theo dõi đạt chuẩn vẫn có thể biến mất và app báo "chưa có mã đạt 70 điểm". Giờ mã mới lấy tối đa N mã, mã theo dõi đạt chuẩn thì hiện hết. Áp dụng cho bot, Telegram và nút Quét ngay.
+- **B. Không ra 2 tín hiệu mua cho một mã:** mã đang nắm giữ mà vẫn nằm trong watchlist thì không ra tín hiệu "Theo dõi" và không hiện "Theo dõi … còn X điểm" ở dải Highlight nữa. Chỉ còn tín hiệu theo giá vốn.
+- **C. Khoảng cách tới giá kỳ vọng:** mỗi dòng "Đang theo dõi" (app và Telegram) ghi "Còn X điểm tới giá kỳ vọng Y", hoặc "Đã tới giá kỳ vọng Y".
+- **Khu "Sàng lọc cơ hội" trong tab Chiến lược:** chỉnh điểm tối thiểu, số mã mới tối đa, vùng giá phù hợp, thanh khoản TB20 tối thiểu, ngưỡng đạt/hỏng (%) và số phiên đo. Có nút "Về mặc định" (70 · 5 · 40–70 · 20 tỷ · +6% / −3% · 20 phiên). Lưu một bộ vào `settings/screening.analysis`, áp dụng từ lượt quét kế tiếp.
+- **Lịch sử không bị chấm lại:** mỗi `screening_runs` chép bộ thông số đã dùng (`analysis`). Mỗi `screening_results` chép ngưỡng đo (`evalWinPct`, `evalLossPct`, `evalSessions`), nên đổi ngưỡng về sau không chấm lại kết quả cũ. Kết quả cũ chưa có các trường này thì dùng mặc định +6% / −3% / 20 phiên, đúng với lúc chúng được sinh ra.
+- **Sửa kèm (bắt buộc):** bật/tắt khung giờ Telegram trước đây ghi đè cả doc `settings/screening`, nên sẽ xoá mất thông số sàng lọc. Giờ chỉ ghi phần khung giờ (`merge`).
+- Công thức chấm điểm giữ nguyên `v1.0.0`. Với thông số mặc định, điểm ra đúng như cũ.
+- **Kiểm:** `npm run smoke` qua, có thêm các ca: chọn theo nhóm, dòng khoảng cách, thông số sai thì dùng mặc định, ngưỡng đo đọc từ kết quả. Đã so bản chấm điểm của app với bot trên 240 lượt dữ liệu giả với 4 bộ thông số: lệch 0. Form mới hiển thị đúng ở 375px, không tràn ngang. Chưa bấm thử với dữ liệu thật vì cần đăng nhập Google.
+
+· `functions/scoring.js` · `functions/index.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-25f (Cột Lãi tính theo K + menu ··· đủ thao tác)
 
 - **Cột "Lãi (K)":** lãi/lỗ trong bảng mã tính theo nghìn đồng (1tr = 1.000K), VD `-6.200` thay cho `-6.2`. Dòng tóm tắt đầu trang và cột GTTT / Vốn vẫn tính theo triệu (owner chọn chỉ đổi cột Lãi).

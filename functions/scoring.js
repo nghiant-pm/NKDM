@@ -2,8 +2,33 @@
 
 const SCORE_VERSION = "v1.0.0";
 const MIN_BARS = 60;
-const MIN_AVG_VALUE_20 = 20_000_000_000;
-const MIN_SCORE = 70;
+
+/* Thông số owner chỉnh ở tab Chiến lược (`settings/screening.analysis`). Bản sao có chủ ý của
+   SCREENING_DEFAULTS + screeningConfig() trong public/index.html — thêm/đổi khoá phải sửa cả hai. */
+const DEFAULT_CONFIG = Object.freeze({
+  minScore: 70, maxNew: 5, minLiquidityBn: 20, fitMin: 40, fitMax: 70,
+  winPct: 6, lossPct: 3, evalSessions: 20
+});
+// [nhỏ nhất, lớn nhất, phải là số nguyên]
+const CONFIG_LIMITS = {
+  minScore: [1, 100, true], maxNew: [1, 20, true], minLiquidityBn: [0, 10000, false],
+  fitMin: [1, 1000, false], fitMax: [1, 1000, false],
+  winPct: [0.1, 50, false], lossPct: [0.1, 50, false], evalSessions: [1, 60, true]
+};
+
+/* Giá trị thiếu hoặc sai thì rơi về mặc định từng khoá, không làm hỏng cả lượt quét. */
+function normalizeConfig(raw) {
+  const out = { ...DEFAULT_CONFIG };
+  if (raw && typeof raw === "object") {
+    Object.keys(CONFIG_LIMITS).forEach((key) => {
+      const [min, max, integer] = CONFIG_LIMITS[key];
+      const value = Number(raw[key]);
+      if (Number.isFinite(value) && value >= min && value <= max && (!integer || Number.isInteger(value))) out[key] = value;
+    });
+  }
+  if (out.fitMin >= out.fitMax) { out.fitMin = DEFAULT_CONFIG.fitMin; out.fitMax = DEFAULT_CONFIG.fitMax; }
+  return out;
+}
 
 function round(value, digits = 2) {
   if (!Number.isFinite(value)) return null;
@@ -122,9 +147,9 @@ function liquidityRiskScore(bars, avgValue20) {
   return { score, volatilityPct, positiveDays };
 }
 
-function fitScore(close) {
-  if (close >= 40 && close <= 70) return 10;
-  if (close >= 30 && close <= 80) return 6;
+function fitScore(close, config) {
+  if (close >= config.fitMin && close <= config.fitMax) return 10;
+  if (close >= config.fitMin - 10 && close <= config.fitMax + 10) return 6;
   return 2;
 }
 
@@ -151,12 +176,12 @@ function buildReasons(parts) {
   return reasons.slice(0, 3);
 }
 
-function scoreTicker(ticker, bars, benchmarkBars) {
+function scoreTicker(ticker, bars, benchmarkBars, config = DEFAULT_CONFIG) {
   if (!Array.isArray(bars) || bars.length < MIN_BARS) return { eligible: false, reason: "insufficient-bars" };
   const cleanBars = bars.filter((bar) => [bar.open, bar.high, bar.low, bar.close, bar.volume].every(Number.isFinite));
   if (cleanBars.length < MIN_BARS) return { eligible: false, reason: "invalid-bars" };
   const avgValue20 = valueAverage20(cleanBars);
-  if (!Number.isFinite(avgValue20) || avgValue20 < MIN_AVG_VALUE_20) {
+  if (!Number.isFinite(avgValue20) || avgValue20 < config.minLiquidityBn * 1_000_000_000) {
     return { eligible: false, reason: "low-liquidity", avgValue20: round(avgValue20 || 0, 0) };
   }
   const trend = trendScore(cleanBars);
@@ -164,7 +189,7 @@ function scoreTicker(ticker, bars, benchmarkBars) {
   const breakout = breakoutScore(cleanBars);
   const pullback = pullbackScore(cleanBars, trend);
   const liquidityRisk = liquidityRiskScore(cleanBars, avgValue20);
-  const priceFit = fitScore(cleanBars.at(-1).close);
+  const priceFit = fitScore(cleanBars.at(-1).close, config);
   const styleScore = Math.max(breakout.score, pullback.score);
   const totalScore = trend.score + relativeStrength.score + styleScore + liquidityRisk.score + priceFit;
   const parts = { trend, relativeStrength, breakout, pullback, liquidityRisk, avgValue20 };
@@ -172,7 +197,7 @@ function scoreTicker(ticker, bars, benchmarkBars) {
   if (liquidityRisk.volatilityPct > 6) riskFlags.push("Biến động ATR14 trên 6%");
   if (breakout.volumeRatio < 0.8) riskFlags.push("Khối lượng gần nhất thấp hơn trung bình");
   return {
-    eligible: totalScore >= MIN_SCORE,
+    eligible: totalScore >= config.minScore,
     ticker,
     date: cleanBars.at(-1).date,
     close: round(cleanBars.at(-1).close),
@@ -192,10 +217,12 @@ function scoreTicker(ticker, bars, benchmarkBars) {
   };
 }
 
+/* Ngưỡng đo đọc từ chính kết quả (chép lúc ghi) để đổi thông số về sau không chấm lại lịch sử. */
 function evaluateCandidate(result, bars, benchmarkBars) {
-  const future = bars.filter((bar) => bar.date > result.date).slice(0, 20);
-  const up = result.close * 1.06;
-  const down = result.close * 0.97;
+  const sessions = result.evalSessions || DEFAULT_CONFIG.evalSessions;
+  const future = bars.filter((bar) => bar.date > result.date).slice(0, sessions);
+  const up = result.close * (1 + (result.evalWinPct || DEFAULT_CONFIG.winPct) / 100);
+  const down = result.close * (1 - (result.evalLossPct || DEFAULT_CONFIG.lossPct) / 100);
   let primary = "pending";
   let resolvedDate = null;
   for (const bar of future) {
@@ -205,12 +232,12 @@ function evaluateCandidate(result, bars, benchmarkBars) {
     if (hitUp) { primary = "win"; resolvedDate = bar.date; break; }
     if (hitDown) { primary = "loss"; resolvedDate = bar.date; break; }
   }
-  const complete = future.length >= 20;
+  const complete = future.length >= sessions;
   if (complete && primary === "pending") primary = "timeout";
   let return20Pct = null;
   let excess20Pct = null;
   if (complete) {
-    const end = future[19];
+    const end = future[sessions - 1];
     return20Pct = pctChange(result.close, end.close);
     const benchmarkByDate = new Map(benchmarkBars.map((bar) => [bar.date, bar.close]));
     const benchmarkReturn = pctChange(benchmarkByDate.get(result.date), benchmarkByDate.get(end.date));
@@ -229,8 +256,10 @@ function evaluateCandidate(result, bars, benchmarkBars) {
 module.exports = {
   SCORE_VERSION,
   MIN_BARS,
-  MIN_AVG_VALUE_20,
-  MIN_SCORE,
+  DEFAULT_CONFIG,
+  normalizeConfig,
   scoreTicker,
-  evaluateCandidate
+  evaluateCandidate,
+  decisionInputs: { round, average, sma, pctChange, returnForBars, atrPct, valueAverage20,
+    alignBenchmarkReturn, trendScore, relativeStrengthScore, breakoutScore, pullbackScore }
 };
