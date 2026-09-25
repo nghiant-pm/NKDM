@@ -4,6 +4,17 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-25d (Cột Mua / Bán chỉ hiện một ngưỡng theo chiều giá trong ngày)
+
+Owner thấy cột hai số (`✓ / +9.20`) khó hiểu; muốn giá đang giảm thì thấy ngưỡng mua thêm, đang tăng thì thấy ngưỡng bán.
+
+- **Một giá ngưỡng duy nhất:** giá ↓ so với tham chiếu trong ngày → hiện **giá ngưỡng mua thêm** (đỏ); giá ↑ → hiện **giá ngưỡng bán** (xanh); mã Giữ đang tăng → chữ "Giữ" (xám).
+- **Đứng giá hoặc chưa có giá tham chiếu:** so với giá vốn — đang lỗ hiện ngưỡng mua, đang lãi hiện ngưỡng bán.
+- Ngưỡng vẫn lấy từ `activeStrategy()` qua `strategyLevels`. Bấm tiêu đề "Mua / Bán" sắp xếp theo số điểm còn cách ngưỡng đang hiện (gần nhất lên đầu).
+- **Kiểm:** bản dữ liệu giả 344px — 5 trường hợp (giảm, tăng, Giữ, đứng giá, chưa tham chiếu) ra đúng ngưỡng, không tràn ngang.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-25c (View Gọn mobile theo mẫu bảng tài sản TCBS)
 
 Owner gửi ảnh màn Tài sản › Cổ phiếu của app TCBS làm mẫu: muốn lãi/lỗ hiện ngay trên dòng, và thay dãy chip lọc bằng hàng tiêu đề cột.
