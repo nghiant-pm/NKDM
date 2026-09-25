@@ -4,6 +4,20 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-25b (View Gọn mobile: mã lên đầu, dòng 1 tầng bấm ra 2 tầng)
+
+Owner mở view Gọn trên iPhone 15 Pro và Z Fold 5 (chủ yếu màn gập 344px) để xem giá từng mã. Trước đây phải cuộn ~720px mới tới mã đầu tiên; trên Fold gập chữ tín hiệu bị cắt còn "Mua t…".
+
+- **Đầu trang còn 2 dòng mảnh (≤768px):** khối 4 chỉ số thành `Chưa bán -4,2tr · Tiền mặt 25,6%`, bấm mở lại đủ 4 ô + Tuần/Tháng. Dải Highlight thu về tiêu đề + số mục, bấm mới mở (bỏ kiểu "2 mục + Xem thêm"). Mở máy là thấy ngay danh sách mã.
+- **Dòng mã 1 tầng:** Mã · Giá hiện tại · **Mua / Bán** = số điểm còn tới ngưỡng mua và ngưỡng bán (`-0.30 / +4.20`, ✓ khi đã tới; mã Giữ chỉ có vế mua). Ngưỡng lấy từ `activeStrategy()` qua `strategyLevels`, không gõ số. Watchlist: Mã · Giá · Cách kỳ vọng.
+- **Bấm dòng mở tầng 2:** số lượng, giá mua TB, lãi/lỗ tiền + %, số ngày, menu ···. Bấm tên mã vẫn mở biểu đồ.
+- **Bỏ chữ tín hiệu trong dòng, giữ vạch màu:** vạch đậm = đã tới ngưỡng, vạch mảnh = sắp tới. Tín hiệu đầy đủ vẫn ở Highlight. Watchlist đạt giá kỳ vọng giờ cũng có vạch đậm (cả desktop).
+- **Sửa lặt vặt:** nút lấy giá nổi lùi xuống khi cuộn xuống, hiện lại khi cuộn lên (hết che cột phải); hàng chip lọc mờ dần ở mép phải thay vì cắt chữ; khối lãi/lỗ hết dính thanh Tuần/Tháng; Fold mở (~690px) hết lỗi chữ tín hiệu đè vạch màu và dùng chip lọc giống điện thoại.
+- **Desktop (>768px) giữ nguyên bảng cũ.**
+- **Kiểm:** bấm thử trên bản dữ liệu giả ở 393 / 344 / 690 / 1200px — không lỗi JS, không tràn ngang, mở/đóng dòng, mở Highlight, nút nổi lùi/hiện đúng.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-25a (Tối ưu view Gọn trên iPhone + nút cập nhật giá nổi)
 
 Owner dùng view Gọn trên iPhone 15 Pro và cần giảm thao tác lọc, bớt xuống dòng, đồng thời bấm cập nhật giá mà không phải kéo về đầu trang.

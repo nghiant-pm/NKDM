@@ -569,7 +569,7 @@
   .view-switch{ display:flex; border:1px solid var(--border); border-radius:var(--r-input); overflow:hidden; }
   .view-switch button{ border:0; padding:8px; min-height:44px; min-width:44px; background:var(--surface); font-size:var(--fs-label); }
   .view-switch button[aria-pressed="true"]{ background:var(--brand-soft); color:var(--brand); }
-  .compact-dashboard-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .compact-dashboard-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
   .compact-dashboard-head h2{ font-size:var(--fs-section); }
   .compact-dashboard-head .range-switch{ margin-bottom:0; }
   .compact-stats{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; padding:16px; }
@@ -606,10 +606,22 @@
     min-height:44px; padding:0 4px; border:0; background:transparent; color:var(--text-muted);
     font-size:var(--fs-label); text-decoration:underline; text-underline-offset:3px; cursor:pointer;
   }
-  .compact-task-more{
-    min-height:44px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--r-input);
-    background:var(--surface); color:var(--brand); font-size:var(--fs-label); cursor:pointer;
+  .compact-today-chevron, .compact-summary-toggle, .compact-gap-cell{ display:none; }
+  .compact-summary-toggle{
+    width:100%; min-height:44px; align-items:center; gap:8px; margin-bottom:12px; padding:8px 14px;
+    border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface);
+    color:var(--text-muted); font-size:var(--fs-label); text-align:left; font-variant-numeric:tabular-nums;
   }
+  .compact-summary-toggle b{ font-weight:500; color:var(--text); }
+  .compact-summary-toggle .pos{ color:var(--pos); } .compact-summary-toggle .neg{ color:var(--neg); }
+  .compact-summary-toggle .warn{ color:var(--warn); }
+  .compact-summary-toggle .analysis-chevron, .compact-today-chevron .ui-icon{ margin-left:auto; transition:transform .18s var(--ease); }
+  .compact-summary-toggle[aria-expanded="true"] .analysis-chevron,
+  .compact-today-chevron[aria-expanded="true"] .ui-icon{ transform:rotate(180deg); }
+  .compact-gap-cell{ white-space:nowrap; color:var(--text-muted); }
+  .compact-gap-cell .hot.buy{ color:var(--brand); } .compact-gap-cell .hot.sell{ color:var(--pos); }
+  .compact-gap-cell .done{ font-weight:500; }
+  .compact-gap-cell i{ font-style:normal; margin:0 3px; opacity:.6; }
   .compact-table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:var(--fs-body); }
   .compact-table th{ color:var(--text-muted); font-size:var(--fs-label); font-weight:400; }
   .compact-table th, .compact-table td{ padding:8px; text-align:right; border-bottom:1px solid var(--border); overflow-wrap:anywhere; }
@@ -722,58 +734,54 @@
   }
   @media(max-width:768px){ .compact-stats{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
   @media(max-width:768px){
+    .compact-summary-toggle{ display:flex; }
+    #compact-view.summary-collapsed .compact-dashboard-head,
+    #compact-view.summary-collapsed .compact-stats{ display:none; }
+    .compact-today-head{ margin-bottom:0; cursor:pointer; }
+    .compact-today-chevron{ display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; margin:-4px -8px -4px 0; padding:0; border:0; background:transparent; color:var(--text-muted); }
+    .compact-today-chevron .ui-icon{ margin-left:0; }
+    .compact-table .compact-link{ text-align:left; }
+    .compact-today-count{ margin-left:auto; }
+    .compact-today.open .compact-today-head{ margin-bottom:6px; }
+    .compact-today:not(.open) .compact-today-list{ display:none; }
     .compact-today-list{ flex-direction:column; }
     .compact-task{ width:100%; border-radius:var(--r-input); }
     .compact-task-skip{ margin-left:auto; }
+    /* Dòng mã: tầng 1 = Mã · Giá · Cách ngưỡng; bấm dòng mở tầng 2. Vạch trái: đậm = đã tới, mảnh = sắp tới. */
     .compact-table thead{ display:none; }
     .compact-table, .compact-table tbody{ display:block; width:100%; }
     .compact-table tr{
-      display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);
-      gap:8px 10px; padding:12px 4px; border-bottom:1px solid var(--border);
+      display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);
+      align-items:center; gap:8px 10px; padding:4px 4px 4px 12px; border-bottom:1px solid var(--border); cursor:pointer;
     }
+    .compact-table tr.open{ padding-bottom:12px; background:var(--surface-2); }
+    .compact-table tr:focus-visible{ outline:2px solid var(--brand); outline-offset:-2px; }
+    .compact-table tr.near-buy{ box-shadow:inset 2px 0 var(--brand); }
+    .compact-table tr.near-sell{ box-shadow:inset 2px 0 var(--pos); }
+    .compact-table tr.near-buy.reached{ box-shadow:inset 5px 0 var(--brand); }
+    .compact-table tr.near-sell.reached{ box-shadow:inset 5px 0 var(--pos); }
+    .compact-table tr[class] td:first-child{ box-shadow:none; }
     .compact-table td, .compact-table th{ display:block; padding:0; border:0; overflow-wrap:normal; }
-    .compact-table td:first-child{ width:auto; grid-column:1 / 3; }
-    .compact-table td:last-child{ grid-column:3; grid-row:1; align-self:start; white-space:nowrap; }
-    .compact-table td:nth-child(2), .compact-table td:nth-child(3), .compact-table td:nth-child(4){ grid-row:2; }
-    .compact-table td:nth-child(2){ grid-column:1; text-align:left; }
-    .compact-table td:nth-child(3){ grid-column:2; }
-    .compact-table td:nth-child(4){ grid-column:3; }
-    .compact-table:not(.holdings) td:first-child{ grid-column:1 / 3; }
-    .compact-table:not(.holdings) td:nth-child(2){ grid-column:1 / 2; grid-row:2; text-align:left; }
-    .compact-table:not(.holdings) td:nth-child(3){ grid-column:2 / 4; grid-row:2; }
-    .compact-table:not(.holdings) td:nth-child(4){ grid-column:3; grid-row:1; }
-    .compact-table td[colspan]{ grid-column:1 / -1 !important; text-align:center !important; }
+    .compact-table td:first-child{ width:auto; grid-column:1; grid-row:1; display:flex; flex-wrap:wrap; align-items:center; gap:0 6px; min-width:0; }
+    .compact-table td:first-child .row-menu, .compact-table td:first-child .compact-note, .compact-table .compact-alert{ display:none; }
+    .compact-table tr.open td:first-child .row-menu{ display:inline-block; }
+    .compact-table tr.open td:first-child .compact-note{ display:inline; white-space:nowrap; }
+    .compact-table.holdings td:nth-child(2), .compact-table.holdings td:nth-child(3),
+    .compact-table.holdings td:nth-child(5), .compact-table:not(.holdings) td:nth-child(3){ display:none; grid-row:2; }
+    .compact-table.holdings td:nth-child(4), .compact-table:not(.holdings) td:nth-child(2){ grid-column:2; grid-row:1; }
+    .compact-table .compact-gap-cell, .compact-table:not(.holdings) td:nth-child(4){ display:block; grid-column:3; grid-row:1; }
+    .compact-table.holdings tr.open td:nth-child(2){ display:block; grid-column:1; text-align:left; }
+    .compact-table.holdings tr.open td:nth-child(3){ display:block; grid-column:2; }
+    .compact-table.holdings tr.open td:nth-child(5){ display:block; grid-column:3; }
+    .compact-table:not(.holdings) tr.open td:nth-child(3){ display:flex; align-items:center; justify-content:space-between; grid-column:1 / -1; }
+    .compact-table td[colspan]{ grid-column:1 / -1 !important; text-align:center !important; padding:16px 0; }
     .mobile-label{ display:block; color:var(--text-muted); font-size:11px; line-height:1.2; }
-    .compact-table td:first-child .compact-note{ display:inline; margin-left:6px; }
-    .compact-alert{ display:block; margin-top:3px; }
-  }
-  @media(max-width:430px){
-    .wrap{ padding-bottom:calc(104px + env(safe-area-inset-bottom)); }
-    .top{ flex-wrap:nowrap; }
-    .top h1{ flex:1 1 auto; white-space:nowrap; }
-    .top .view-switch{ display:none; }
-    .mobile-view-toggle{ display:inline-flex; }
-    #global-price-refresh{
-      position:fixed; z-index:40; right:16px; bottom:calc(16px + env(safe-area-inset-bottom));
-      width:52px; height:52px; border:0; background:var(--brand); color:var(--surface); box-shadow:var(--shadow-lift);
-    }
-    #global-price-refresh:hover{ background:var(--brand); color:var(--surface); filter:brightness(1.06); }
-    #global-price-refresh:disabled{ opacity:.55; filter:none; }
-    #toast{ bottom:calc(84px + env(safe-area-inset-bottom)); max-width:calc(100% - 32px); text-align:center; }
-    .compact-dashboard-head .dashboard-controls{ flex-wrap:nowrap; }
-    .compact-dashboard-head .range-switch{ flex:1; width:auto; }
-    .compact-table{ font-size:var(--fs-meta); }
-    .compact-table th{ padding:8px 4px; }
-    .compact-table td{ padding:0 4px; }
-    .compact-table tr{ gap:6px 8px; padding:10px 4px; }
-    .compact-table td:first-child{ display:flex; align-items:center; gap:4px; min-width:0; }
-    .compact-table td:first-child .compact-note{ margin-left:0; white-space:nowrap; }
-    .compact-table .compact-alert{ display:inline; min-width:0; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .compact-stats{ gap:12px; padding:12px; }
     .compact-tools{ gap:8px; }
     .compact-filter-chips{
       display:flex; flex:1; gap:6px; min-width:0; overflow-x:auto; padding:2px 1px 4px;
       scrollbar-width:none; -webkit-overflow-scrolling:touch;
+      -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent);
+      mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent);
     }
     .compact-filter-chips::-webkit-scrollbar{ display:none; }
     .compact-tools [data-filter-control]{ display:none; }
@@ -784,6 +792,26 @@
     .compact-tools.searching .compact-filter-chips{ display:none; }
     .compact-tools.searching .compact-search-wrap{ flex:1; }
     .compact-tools.searching .compact-search-wrap input{ width:100%; }
+  }
+  @media(max-width:430px){
+    .wrap{ padding-bottom:calc(104px + env(safe-area-inset-bottom)); }
+    .top{ flex-wrap:nowrap; }
+    .top h1{ flex:1 1 auto; white-space:nowrap; }
+    .top .view-switch{ display:none; }
+    .mobile-view-toggle{ display:inline-flex; }
+    #global-price-refresh{
+      position:fixed; z-index:40; right:16px; bottom:calc(16px + env(safe-area-inset-bottom));
+      width:52px; height:52px; border:0; background:var(--brand); color:var(--surface); box-shadow:var(--shadow-lift);
+      transition:transform .2s var(--ease);
+    }
+    #global-price-refresh.fab-away{ transform:translateY(calc(100% + 24px + env(safe-area-inset-bottom))); }
+    #global-price-refresh:hover{ background:var(--brand); color:var(--surface); filter:brightness(1.06); }
+    #global-price-refresh:disabled{ opacity:.55; filter:none; }
+    #toast{ bottom:calc(84px + env(safe-area-inset-bottom)); max-width:calc(100% - 32px); text-align:center; }
+    .compact-dashboard-head .dashboard-controls{ flex-wrap:nowrap; }
+    .compact-dashboard-head .range-switch{ flex:1; width:auto; }
+    .compact-table{ font-size:var(--fs-meta); }
+    .compact-stats{ gap:12px; padding:12px; }
   }
 
   ::-webkit-scrollbar{ width:8px; height:8px; }
@@ -831,7 +859,11 @@
   </div>
   <div class="price-refresh-status" id="global-price-status" role="status" aria-live="polite"></div>
 
-  <div id="compact-view" hidden>
+  <div id="compact-view" class="summary-collapsed" hidden>
+    <button class="compact-summary-toggle" id="compact-summary-toggle" type="button" data-toggle-summary aria-expanded="false" aria-label="Dòng tiền và lãi/lỗ">
+      <span id="compact-summary-line"></span>
+      <svg class="ui-icon analysis-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
     <div class="compact-dashboard-head">
       <h2>Dòng tiền &amp; lãi/lỗ</h2>
       <div class="dashboard-controls">
@@ -853,7 +885,8 @@
       <div><div class="k">Tỷ lệ tiền mặt</div><div class="v num" id="c-cash-ratio">—</div></div>
     </section>
     <section class="card compact-today" aria-labelledby="compact-today-title">
-      <div class="compact-today-head"><h2 id="compact-today-title">Highlight hôm nay</h2><span class="compact-today-count" id="compact-today-count"></span></div>
+      <div class="compact-today-head" data-toggle-highlights><h2 id="compact-today-title">Highlight hôm nay</h2><span class="compact-today-count" id="compact-today-count"></span>
+        <button class="compact-today-chevron" id="compact-today-chevron" type="button" aria-expanded="false" aria-controls="compact-today-list" aria-label="Mở Highlight hôm nay"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
       <div class="compact-today-list" id="compact-today-list"></div>
     </section>
     <div class="compact-main-grid">
@@ -2449,8 +2482,29 @@ function compactRows(rows, group){
 /* Mục đã "Bỏ qua" ở dải Highlight: sở thích hiển thị theo MÁY, tự hết hạn khi sang ngày mới.
    Chỉ ẩn khỏi dải này — không đụng signals, lệnh hay khối Quyết định. */
 const SKIP_HIGHLIGHT_KEY = "fin2-skip-highlight";
-const compactMobileQuery = window.matchMedia("(max-width:430px)");
+const compactMobileQuery = window.matchMedia("(max-width:768px)");
 let compactHighlightsExpanded = false;
+/* Dòng đang mở tầng 2 trên điện thoại — chỉ nhớ trong phiên, giữ qua các lần vẽ lại khi giá về. */
+const compactOpenRows = new Set();
+function toggleCompactRow(row){
+  const key = row.dataset.rowKey;
+  if(compactOpenRows.has(key)) compactOpenRows.delete(key); else compactOpenRows.add(key);
+  row.classList.toggle("open", compactOpenRows.has(key));
+  row.setAttribute("aria-expanded", String(compactOpenRows.has(key)));
+}
+function compactRowAttrs(group, ticker, classes){
+  const key = group + ":" + ticker, open = compactOpenRows.has(key);
+  return ' class="' + classes + (open ? ' open' : '') + '" data-row-key="' + esc(key) + '"' +
+    (compactMobileQuery.matches ? ' tabindex="0" aria-expanded="' + open + '"' : '');
+}
+/* Số gọn cho dòng tóm tắt điện thoại: 4.200.000 → 4,2tr; 1.250.000.000 → 1,25 tỷ. */
+function fmtShortVND(n){
+  if(n === null || n === undefined || !isFinite(n)) return "—";
+  const a = Math.abs(n), sign = n < 0 ? "-" : "";
+  if(a >= 1e9) return sign + (a / 1e9).toLocaleString("vi-VN", { maximumFractionDigits:2 }) + " tỷ";
+  if(a >= 1e6) return sign + (a / 1e6).toLocaleString("vi-VN", { maximumFractionDigits:1 }) + "tr";
+  return fmtVND(n);
+}
 function readSkippedHighlights(){
   try {
     const saved = JSON.parse(localStorage.getItem(SKIP_HIGHLIGHT_KEY) || "null");
@@ -2496,11 +2550,13 @@ function renderCompactToday(s){
   const visible = tasks.filter((task) => !skipped.includes(task.key));
   const hidden = tasks.length - visible.length;
   const mobile = compactMobileQuery.matches;
-  const shown = mobile ? (compactHighlightsExpanded ? visible : visible.slice(0, 2)) : visible.slice(0, 6);
-  const more = mobile && visible.length > 2
-    ? '<button class="compact-task-more" type="button" data-toggle-highlights aria-expanded="' + compactHighlightsExpanded + '">' +
-      (compactHighlightsExpanded ? 'Thu gọn' : 'Xem thêm ' + (visible.length - 2)) + '</button>'
-    : (!mobile && visible.length > 6 ? '<span class="compact-task">+' + (visible.length - 6) + ' mục khác</span>' : '');
+  // Điện thoại: dải thu thành 1 dòng, bấm mới mở. Không còn mục nào thì mở sẵn để thấy lời báo.
+  const open = !mobile || compactHighlightsExpanded || !visible.length;
+  const shown = mobile ? visible : visible.slice(0, 6);
+  const more = !mobile && visible.length > 6 ? '<span class="compact-task">+' + (visible.length - 6) + ' mục khác</span>' : '';
+  $("compact-today-list").closest(".compact-today").classList.toggle("open", open);
+  $("compact-today-chevron").hidden = !visible.length;
+  $("compact-today-chevron").setAttribute("aria-expanded", String(open));
   $("compact-today-count").textContent = visible.length ? visible.length + " mục" : "";
   $("compact-today-list").innerHTML = (visible.length
     ? shown.map((task) => '<span class="compact-task skippable ' + task.kind + '">' + esc(task.text) +
@@ -2536,6 +2592,9 @@ function renderCompact(s){
   $("c-cash-ratio").innerHTML = (dashboard.cashRatio === null ? "—" : dashboard.cashRatio.toFixed(1) + "%") +
     '<span class="compact-note">' + dashboard.cashStatus.label + ' · ' +
     dashboard.strategy.minCashRatio.toFixed(0) + '–' + dashboard.strategy.maxCashRatio.toFixed(0) + '%</span>';
+  $("compact-summary-line").innerHTML = 'Chưa bán <b class="' + dashboardPnlClass(pnlScope.unrealizedPnl) + '">' +
+    (pnlScope.rows.length ? (hidePnl ? "••••" : fmtShortVND(pnlScope.unrealizedPnl)) : "—") + '</b> · Tiền mặt <b class="' +
+    (dashboard.cashStatus.key || "") + '">' + (dashboard.cashRatio === null ? "—" : dashboard.cashRatio.toFixed(1) + "%") + '</b>';
   renderCompactToday(s);
   $("global-price-refresh").disabled = priceRefreshBusy || (!s.held.length && !Object.keys(state.watchlist).length);
   Object.keys(compactColumns).forEach((group) => {
@@ -2562,12 +2621,20 @@ function renderCompact(s){
           ? (strategyState.kind === "buy" ? "Mua thêm " : "Bán ") + st.lotSize.toLocaleString("vi-VN") + " CP"
           : 'Sắp ' + (strategyState.kind === "buy" ? "mua" : "bán") + ' · ' + fmtPrice(strategyState.remaining) + ' điểm') + '</span>'
       : '';
-    return '<tr class="' + (strategyState ? 'near-' + strategyState.kind : '') + '"><td><button class="compact-link" type="button" data-chart-ticker="' + esc(h.ticker) + '" aria-label="Xem biểu đồ ' + esc(h.ticker) + '">' + esc(h.ticker) + '</button>' +
+    // Cột "Mua / Bán" (chỉ điện thoại): còn bao nhiêu điểm tới từng ngưỡng; ✓ = đã tới. Mã Giữ không có vế bán.
+    const levels = h.hasPrice ? strategyLevels(h.avgCost, st) : null;
+    const holdOnly = !!(state.tickers[h.ticker] || {}).hold;
+    const gapPart = (kind, remaining) => '<span class="' + kind + (strategyState?.kind === kind ? ' hot' : '') + (remaining <= 0 ? ' done' : '') + '">' +
+      (remaining <= 0 ? '✓' : (kind === "buy" ? '-' : '+') + fmtPrice(remaining)) + '</span>';
+    const gapCell = '<td class="compact-gap-cell"><span class="mobile-label">' + (holdOnly ? 'Mua' : 'Mua / Bán') + '</span>' +
+      (levels ? gapPart("buy", h.price - levels.buyAt) + (holdOnly ? '' : '<i>/</i>' + gapPart("sell", levels.sellAt - h.price)) : '—') + '</td>';
+    return '<tr' + compactRowAttrs("positions", h.ticker, (strategyState ? 'near-' + strategyState.kind + (strategyState.reached ? ' reached' : '') : '')) + '><td><button class="compact-link" type="button" data-chart-ticker="' + esc(h.ticker) + '" aria-label="Xem biểu đồ ' + esc(h.ticker) + '">' + esc(h.ticker) + '</button>' +
       compactRowMenu(h.ticker, false) + '<span class="compact-note">' + ageLabel(h.heldSince) + '</span>' + alert + '</td>' +
       '<td><span class="mobile-label">Số lượng</span>' + h.qty.toLocaleString("vi-VN") + '</td>' +
       '<td><span class="mobile-label">Giá mua TB</span>' + fmtPrice(h.avgCost) + '</td>' +
       '<td class="' + (h.hasPrice ? compactPnlClass(pnl) : '') + '"><span class="mobile-label">Giá hiện tại</span>' + (h.hasPrice ? fmtPrice(h.price) : '—') + '</td>' +
-      '<td class="' + (h.hasPrice ? compactPnlClass(pnl) : '') + '">' + (h.hasPrice ? positionPnlText(pnl, h.qty * h.avgCost * 1000) : '—<span class="compact-note">Chưa có giá</span>') + '</td></tr>';
+      '<td class="' + (h.hasPrice ? compactPnlClass(pnl) : '') + '"><span class="mobile-label">Lãi/lỗ</span>' + (h.hasPrice ? positionPnlText(pnl, h.qty * h.avgCost * 1000) : '—<span class="compact-note">Chưa có giá</span>') + '</td>' +
+      gapCell + '</tr>';
   }).join("") || '<tr><td colspan="5">' + (s.held.length ? 'Không có mã phù hợp' : 'Chưa có cổ phiếu') + '</td></tr>';
   const keys = sortTickers(Object.keys(state.watchlist).sort(), "watchlist", (tk) => tk);
   const watched = compactRows(keys.map((tk) => {
@@ -2586,11 +2653,11 @@ function renderCompact(s){
     const trend = watchTrend(tk);
     const near = row.proximity;
     const alert = near ? '<span class="compact-alert near-buy">Chuẩn bị mua · ' + fmtPrice(near.remaining) + ' điểm</span>' : '';
-    return '<tr class="' + (near ? 'near-buy' : '') + '"><td><button class="compact-link" type="button" data-chart-ticker="' + esc(tk) + '" aria-label="Xem biểu đồ ' + esc(tk) + '">' + esc(tk) + '</button>' +
+    return '<tr' + compactRowAttrs("watchlist", tk, gap !== null && gap <= 0 ? 'near-buy reached' : near ? 'near-buy' : '') + '><td><button class="compact-link" type="button" data-chart-ticker="' + esc(tk) + '" aria-label="Xem biểu đồ ' + esc(tk) + '">' + esc(tk) + '</button>' +
       compactRowMenu(tk, true) + '<span class="compact-note">' + ageLabel(trend.addedDate) + '</span>' + alert + '</td>' +
       '<td class="' + (gap === null ? '' : gap <= 0 ? 'pos' : 'neg') + '"><span class="mobile-label">Giá thị trường</span>' + (hasPrice ? fmtPrice(meta.lastPrice) : '—<span class="compact-note">Chưa có giá</span>') + '</td>' +
       '<td><span class="mobile-label">Giá kỳ vọng</span><button class="compact-link" type="button" data-compact-watch="' + esc(tk) + '" aria-label="Sửa giá kỳ vọng ' + esc(tk) + '">' + (hasTarget ? fmtPrice(w.targetBuy) : '—') + '</button></td>' +
-      '<td class="' + (gap === null ? '' : gap <= 0 ? 'pos' : 'neg') + '">' + (gap === null ? '—' : (gap > 0 ? '+' : '') + gap.toFixed(2)) + '</td></tr>';
+      '<td class="' + (gap === null ? '' : gap <= 0 ? 'pos' : 'neg') + '"><span class="mobile-label">Cách kỳ vọng</span>' + (gap === null ? '—' : (gap > 0 ? '+' : '') + gap.toFixed(2)) + '</td></tr>';
   }).join("") || '<tr><td colspan="4">' + (keys.length ? 'Không có mã phù hợp' : 'Chưa có mã') + '</td></tr>';
   Object.keys(compactColumns).forEach((group) => {
     const tools = $("compact-tools-" + group);
@@ -2753,13 +2820,31 @@ function initCompact(){
       writeSkippedHighlights([]);
       renderCompactToday(computeSummary());
     }
-    if(e.target.closest("[data-toggle-highlights]")){
+    if(e.target.closest("[data-toggle-highlights]") && compactMobileQuery.matches){
       compactHighlightsExpanded = !compactHighlightsExpanded;
       renderCompactToday(computeSummary());
-      $("compact-today-list").querySelector("[data-toggle-highlights]")?.focus();
+    }
+    if(e.target.closest("[data-toggle-summary]")){
+      const collapsed = $("compact-view").classList.toggle("summary-collapsed");
+      $("compact-summary-toggle").setAttribute("aria-expanded", String(!collapsed));
+    }
+    const row = e.target.closest("tr[data-row-key]");
+    if(row && !e.target.closest("button, a, input, select, details")) toggleCompactRow(row);
+  });
+  $("compact-view").addEventListener("keydown", (e) => {
+    if((e.key === "Enter" || e.key === " ") && e.target.matches("tr[data-row-key]")){
+      e.preventDefault();
+      toggleCompactRow(e.target);
     }
   });
-  compactMobileQuery.addEventListener("change", () => renderCompactToday(computeSummary()));
+  compactMobileQuery.addEventListener("change", () => renderCompact(computeSummary()));
+  // Nút lấy giá nổi (điện thoại) lùi xuống khi cuộn xuống để khỏi che cột phải, hiện lại khi cuộn lên.
+  let lastScrollY = window.scrollY;
+  window.addEventListener("scroll", () => {
+    const y = window.scrollY;
+    $("global-price-refresh").classList.toggle("fab-away", y > lastScrollY && y > 120);
+    lastScrollY = y;
+  }, { passive:true });
   $("compact-close").addEventListener("click", () => $("compact-dialog").close());
   $("compact-dialog").addEventListener("close", () => {
     if(compactFormHome){
