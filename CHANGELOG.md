@@ -4,6 +4,16 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-25f (Cột Lãi tính theo K + menu ··· đủ thao tác)
+
+- **Cột "Lãi (K)":** lãi/lỗ trong bảng mã tính theo nghìn đồng (1tr = 1.000K), VD `-6.200` thay cho `-6.2`. Dòng tóm tắt đầu trang và cột GTTT / Vốn vẫn tính theo triệu (owner chọn chỉ đổi cột Lãi).
+- **Menu ··· của mã nắm giữ:** Ghi giao dịch (mở form điền sẵn mã) · Chuyển sang Giữ dài hạn / Giao dịch · Luận điểm. Mã theo dõi: Mua mã này (form giao dịch điền sẵn mã) · Luận điểm · Sửa giá kỳ vọng · Bỏ theo dõi. Chọn xong menu tự đóng.
+- Nút Giữ / Giao dịch rời ở hàng mở được bỏ (đã vào menu); mã Giữ hiện nhãn "Giữ dài hạn" ở hàng mở.
+- Dọn 3 icon không còn dùng (lọc, sắp xếp, đặt lại) sót từ lần bỏ công cụ lọc.
+- **Kiểm:** dữ liệu giả 344 / 393px — menu đủ mục, không tràn màn, "Ghi giao dịch" mở form điền đúng mã, cột Lãi ra K, không lỗi JS.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-25e (Bảng mã mới dùng chung cho Gọn và Đầy đủ, mọi màn hình)
 
 Owner ưng giao diện bảng kiểu TCBS trên điện thoại và muốn dùng chung cho web, cả view Đầy đủ.

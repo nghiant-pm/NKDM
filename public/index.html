@@ -644,7 +644,6 @@
   .compact-table tr.open .a-drag{ display:block; grid-area:more; justify-self:start; align-self:start; padding-top:6px; }
   .compact-table tr.open .a-drag:not(:empty) ~ .a-more{ padding-left:32px; }
   .compact-table .a-more .compact-facts{ flex:1 1 100%; color:var(--text-muted); font-size:var(--fs-label); text-align:left; }
-  .compact-table .a-more .hold-btn{ min-height:44px; }
   .compact-table .sort-handle{ min-width:28px; padding:4px 0; }
   .compact-table td.compact-empty{ grid-column:1 / -1; grid-row:1; text-align:center; color:var(--text-muted); padding:16px 0; white-space:normal; }
   .compact-link{ border:0; padding:4px 0; min-width:44px; min-height:44px; background:transparent; color:var(--brand); font-weight:500; text-decoration:underline; text-underline-offset:3px; }
@@ -664,7 +663,8 @@
   .compact-quote.down{ background:var(--neg-soft); color:var(--neg); }
   .compact-quote.ref{ background:var(--warn-soft); color:var(--warn); }
   .compact-table tr.open .compact-quote:not(.up):not(.down):not(.ref){ background:var(--surface); }
-  .compact-table .row-menu-popover{ left:auto; right:0; }
+  .compact-table .row-menu-popover{ left:auto; right:0; width:max-content; }
+  .compact-table .row-menu-popover button{ white-space:nowrap; }
   .compact-alert{ font-size:var(--fs-label); font-weight:500; }
   .compact-alert.near-buy{ color:var(--brand); }
   .compact-alert.near-sell{ color:var(--pos); }
@@ -2451,7 +2451,7 @@ function render(){
 /* Cột bảng mã (Gọn + Đầy đủ) kiểu bảng tài sản TCBS: mỗi cột 2 dòng số, bấm tiêu đề để sắp xếp.
    Cột GTTT / Vốn chỉ hiện trên màn >768px (class c-wide). */
 const compactTableColumns = {
-  positions:[["ticker","Mã",""],["qty","KL","Giá vốn"],["value","GTTT (tr)","Vốn (tr)"],["edgeGap","Mua","Bán"],["pnl","Lãi (tr)","Lãi %"]],
+  positions:[["ticker","Mã",""],["qty","KL","Giá vốn"],["value","GTTT (tr)","Vốn (tr)"],["edgeGap","Mua","Bán"],["pnl","Lãi (K)","Lãi %"]],
   watchlist:[["ticker","Mã",""],["target","Kỳ vọng",""],["gap","Cách",""]]
 };
 const compactSort = { positions:null, watchlist:null };
@@ -2485,11 +2485,11 @@ function compactRowAttrs(group, ticker, classes){
   const key = group + ":" + ticker, open = compactOpenRows.has(key);
   return ' class="' + classes + (open ? ' open' : '') + '" data-row-key="' + esc(key) + '" tabindex="0" aria-expanded="' + open + '"';
 }
-/* Lãi/lỗ theo triệu, 1 số lẻ, như cột "Lãi (tr)" của TCBS: -6.2 / +0.3. */
-function fmtMillions(n){
+/* Lãi/lỗ theo nghìn đồng cho cột "Lãi (K)": -6.200.000 đ → -6.200; +250.000 đ → +250. */
+function fmtThousands(n){
   if(hidePnl) return "••••";
   if(n === null || n === undefined || !isFinite(n)) return "—";
-  return (n > 0 ? "+" : "") + (n / 1e6).toFixed(1);
+  return (n > 0 ? "+" : "") + Math.round(n / 1000).toLocaleString("vi-VN");
 }
 /* Ô giá: máy tính chỉ hiện giá; điện thoại hiện thêm mũi tên + % so với giá tham chiếu
    của CÙNG ngày lấy giá (refPrice/refPriceDate ghi ở refreshAllPrices). Giá nhập tay ngày khác thì không có %. */
@@ -2573,8 +2573,11 @@ function renderCompactToday(s){
     (hidden ? '<button class="compact-task-restore" type="button" data-restore-highlight>Hiện lại ' + hidden + ' mục đã bỏ qua</button>' : '');
 }
 function compactRowMenu(ticker, watch){
+  const hold = !watch && !!(state.tickers[ticker] || {}).hold;
   return '<details class="row-menu"><summary class="icon-action" aria-label="Thao tác với ' + esc(ticker) + '" title="Thao tác">' + UI_ICON.more + '</summary>' +
-    '<div class="row-menu-popover"><button type="button" data-thesis-ticker="' + esc(ticker) + '">' + UI_ICON.note + 'Luận điểm</button>' +
+    '<div class="row-menu-popover"><button type="button" data-trade-ticker="' + esc(ticker) + '">' + UI_ICON.trade + (watch ? 'Mua mã này' : 'Ghi giao dịch') + '</button>' +
+    (watch ? '' : '<button type="button" data-hold="' + esc(ticker) + '">' + UI_ICON.lock + (hold ? 'Chuyển sang Giao dịch' : 'Chuyển sang Giữ dài hạn') + '</button>') +
+    '<button type="button" data-thesis-ticker="' + esc(ticker) + '">' + UI_ICON.note + 'Luận điểm</button>' +
     (watch ? '<button type="button" data-compact-watch="' + esc(ticker) + '">' + UI_ICON.edit + 'Sửa giá kỳ vọng</button>' +
       '<button class="danger" type="button" data-unwatch="' + esc(ticker) + '">' + UI_ICON.trash + 'Bỏ theo dõi</button>' : '') +
     '</div></details>';
@@ -2644,14 +2647,12 @@ function renderCompact(s){
       '<td class="a-val c-two c-wide"><span>' + (h.value === null ? '—' : tr1(h.value)) + '</span><span>' + tr1(cost) + '</span></td>' +
       edgeCell +
       '<td class="a-pnl c-two ' + pnlCls + '">' + (h.hasPrice
-        ? '<span>' + fmtMillions(h.pnl) + '</span><span>' + (cost > 0 ? pnlPercent(h.pnl / cost * 100) : '') + '</span>'
+        ? '<span>' + fmtThousands(h.pnl) + '</span><span>' + (cost > 0 ? pnlPercent(h.pnl / cost * 100) : '') + '</span>'
         : '<span>—</span><span class="compact-note">Chưa có giá</span>') + '</td>' +
       '<td class="a-more"><span class="compact-facts">Nắm giữ ' + ageLabel(h.heldSince) +
         ' · Vốn sau lướt ' + fmtPrice(h.netCost) +
         ' · Đã chốt chu kỳ <span class="' + compactPnlClass(cycle) + '">' + fmtVND(cycle) + '</span></span>' +
-        alert + thesisBadge(h.ticker) +
-        '<button class="hold-btn' + (meta.hold ? " on" : "") + '" type="button" data-hold="' + esc(h.ticker) + '" aria-pressed="' + !!meta.hold + '" ' +
-          'aria-label="Chuyển ' + esc(h.ticker) + ' sang ' + (meta.hold ? "Giao dịch" : "Giữ dài hạn") + '">' + (meta.hold ? "Giữ dài hạn" : "Giao dịch") + '</button>' +
+        alert + (meta.hold ? '<span class="chip hold">Giữ dài hạn</span>' : '') + thesisBadge(h.ticker) +
         compactRowMenu(h.ticker, false) + '</td></tr>';
   }).join("") || '<tr><td class="compact-empty">' + (s.held.length ? 'Không có mã phù hợp' : 'Chưa có cổ phiếu') + '</td></tr>';
   const keys = sortTickers(Object.keys(state.watchlist).sort(), "watchlist", (tk) => tk);
@@ -2788,6 +2789,10 @@ function initCompact(){
       if(unwatch) removeWatch(unwatch.dataset.unwatch);
       const hold = e.target.closest("[data-hold]");
       if(hold) toggleHold(hold.dataset.hold);
+      const trade = e.target.closest("[data-trade-ticker]");
+      if(trade) openCompactForm("trade", trade.dataset.tradeTicker);
+      const menuItem = e.target.closest(".row-menu-popover button");
+      if(menuItem) menuItem.closest("details").open = false;
       const row = e.target.closest("tr[data-row-key]");
       if(row && !e.target.closest("button, a, input, select, details")) toggleCompactRow(row);
     });
@@ -3078,11 +3083,10 @@ function initStockChart(){
 
 const UI_ICON = {
   search:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
-  filter:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v5l-4 2v-7z"/></svg>',
-  sort:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h12M8 12h8M8 18h4M4 4v16"/></svg>',
-  reset:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v6h6"/><path d="M5.5 15a8 8 0 1 0 1-8L4 10"/></svg>',
   note:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>',
   edit:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16zM13.5 6.5l4 4"/></svg>',
+  trade:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/><path d="M18 7l-3 3M6 17l3-3"/></svg>',
+  lock:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg>',
   more:'<svg class="ui-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>',
   bell:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.3 20a2 2 0 0 0 3.4 0"/></svg>',
   trash:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 3h6l1 4H8zM7 7l1 14h8l1-14M10 11v6M14 11v6"/></svg>'
