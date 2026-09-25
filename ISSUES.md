@@ -6,6 +6,17 @@ Mã tăng dần. 🔴 đang mở · 🟢 đã fix.
 
 ## Đang mở
 
+### 🔴 #014 — Lớp tin của Điểm quyết định chưa đủ khóa AI và độ phủ nguồn
+**Triệu chứng:** điểm kỹ thuật chạy được nhưng tin chưa được AI phân tích; nguồn HNX RSS không bao phủ toàn bộ HOSE và tin ngành. Không được coi tính năng tin đã hoàn tất.
+
+**Nguyên nhân:** dự án chưa được cung cấp khóa `DECISION_OPENAI_API_KEY`; kết nối máy đọc đã kiểm chứng mới có hai RSS HNX, chưa có luồng tin HOSE/ngành ổn định. Các tin chỉ có PDF đính kèm không đủ nội dung để suy luận từ tiêu đề.
+
+**Đã xử lý an toàn:** tin thiếu AI hoặc lấy lỗi tác động bằng 0; app báo rõ nguồn/độ phủ và trạng thái. Có sẵn bộ thu thập + phân loại, bằng chứng nguyên văn, gộp tin, giảm ảnh hưởng theo tuổi và giới hạn ±5. Không tự đoán thông tin trong PDF.
+
+**Cần làm:** owner cấu hình khóa trong Firebase Secret Manager (không gửi qua chat); cho tài khoản chạy hai function quyền đọc đúng secret. Sau đó kiểm một lượt AI thật; bổ sung và kiểm chứng nguồn HOSE/ngành trước khi đóng issue. Hướng dẫn ở CODEMAP, mục Điểm quyết định.
+
+**File:** `functions/decision-news.js` — `apiKey`, `collectNews`, `classify`.
+
 ### 🔴 #013 — Xoá giao dịch sinh từ “Khớp” không cập nhật lại lệnh
 **Triệu chứng:** xoá trong Nhật ký một giao dịch được tạo khi bấm Khớp lệnh thì giao dịch mất,
 nhưng lệnh gốc vẫn hiện “Đã khớp” / “Khớp một phần” với số lượng cũ. Hai nguồn lệch nhau.
