@@ -4,6 +4,14 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-27c (File deploy.bat)
+
+- Thêm `deploy.bat` ở thư mục gốc: bấm đúp để deploy. Tự lấy code nhánh trên GitHub, hỏi trước khi cất tạm thay đổi chưa commit, chạy smoke nếu máy có thư viện, hỏi xác nhận rồi mới `firebase deploy`. Lỗi ở bước nào thì dừng và báo "Deploy CHƯA xong".
+- `.gitattributes` giữ file `.bat` xuống dòng kiểu Windows.
+- **Kiểm:** chưa chạy thử trên Windows (máy cloud là Linux); đã kiểm định dạng file (UTF-8, CRLF).
+
+· `deploy.bat` · `.gitattributes` · `CLAUDE.md` · `AGENTS.md` · `CHANGELOG.md`
+
 ## 2026-09-27b (Điểm quyết định v1.1.0: đo công bằng, thang 10, tab Phân tích)
 
 Sau buổi review tính năng, owner chọn sửa hết các điểm đã nêu, đổi sang thang 10 và tách phần chi tiết cho đỡ rối.

@@ -23,6 +23,8 @@ Không realtime nhiều người cùng sửa → **không cần merge 3 chiều,
 public/index.html    Toàn bộ app: markup + style + logic. Nguồn sự thật duy nhất.
 firestore.rules      Hàng rào bảo mật THẬT (server-side).
 firebase.json        Cấu hình hosting + rules.
+deploy.bat           Deploy 1 chạm trên Windows: lấy nhánh từ GitHub → smoke → hỏi xác nhận → deploy.
+                     Biến BRANCH đầu file: đổi thành main sau khi PR #1 được gộp.
 artifact-da-doi.html Trang "đã dời" đã publish đè lên Artifact cũ. KHÔNG phải app.
 portfolio-tracker.html   Bản app CŨ chạy trên Artifact, đã ngưng. Giữ làm lịch sử
                      vì chưa có git. Có git rồi thì xoá được.
