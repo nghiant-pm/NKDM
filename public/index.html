@@ -184,6 +184,7 @@
   .tab:hover{ color:var(--text); }
   .tab.on{ background:var(--surface); color:var(--brand); font-weight:500; box-shadow:var(--shadow); }
   .tab:focus-visible{ outline:2px solid var(--brand); outline-offset:1px; }
+  @media(max-width:430px){ .tab{ padding:9px 2px; font-size:13px; } }
 
   /* ---------- blocks ---------- */
   section{ margin-bottom:20px; }
@@ -669,9 +670,7 @@
   .compact-alert{ font-size:var(--fs-label); font-weight:500; }
   .compact-alert.near-buy{ color:var(--brand); }
   .compact-alert.near-sell{ color:var(--pos); }
-  .compact-table td.a-score{ grid-column:1 / -1; grid-row:3; text-align:left; white-space:normal; }
-  .compact-table tr.open .a-more{ grid-row:4; }
-  @media(max-width:768px){ .compact-table tr.open .a-drag:not(:empty){ grid-row:4; } }
+  .compact-table .a-more .decision-score-button{ flex:1 1 100%; justify-content:flex-start; }
   .decision-score-button{ display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px 12px; min-height:44px;
     border:0; padding:4px 0; background:transparent; color:var(--text-muted); font-size:var(--fs-label);
     font-weight:400; text-align:left; font-variant-numeric:tabular-nums; cursor:pointer;
@@ -680,13 +679,22 @@
   .decision-score-button .notable{ color:var(--brand); font-weight:500; }
   .decision-score-button .pressure{ color:var(--warn); font-weight:500; }
   .decision-score-button:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; }
-  .decision-detail{ flex:1 1 100%; min-width:0; color:var(--text); text-align:left; font-size:var(--fs-label); }
+  .decision-detail{ min-width:0; color:var(--text); text-align:left; font-size:var(--fs-label); }
+  .analysis-item{ margin:0 0 8px; }
+  .analysis-item > summary{ font-weight:400; font-variant-numeric:tabular-nums; }
+  .analysis-head{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; min-width:0; }
+  .analysis-item > summary b{ font-weight:500; min-width:44px; }
+  .analysis-item > summary .notable{ color:var(--brand); font-weight:500; }
+  .analysis-item > summary .pressure{ color:var(--warn); font-weight:500; }
+  .analysis-item > summary .compact-note{ color:var(--text-muted); font-size:var(--fs-label); }
+  .analysis-item .decision-detail{ padding:4px 12px 12px; }
   .decision-detail h4{ font-weight:500; margin:12px 0 4px; }
   .decision-detail p{ margin:4px 0; overflow-wrap:anywhere; }
   .decision-parts{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px;
     margin:8px 0; font-variant-numeric:tabular-nums; }
   .decision-detail a{ color:var(--brand); overflow-wrap:anywhere; }
-  .decision-pilot{ margin-top:12px; color:var(--text-muted); font-size:var(--fs-label); }
+  .decision-pilot{ color:var(--text-muted); font-size:var(--fs-label); }
+  .decision-pilot p{ margin:4px 0; }
   @media(prefers-reduced-motion:reduce){ .decision-score-button{ transition:none; } }
   .compact-tools{ display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px; min-height:44px; }
   .compact-search-wrap{ display:flex; align-items:center; gap:8px; min-width:0; margin-right:auto; }
@@ -940,6 +948,8 @@
       data-tab="theo-doi" aria-controls="panel-theo-doi" aria-selected="false">Theo dõi</button>
     <button class="tab" type="button" role="tab" id="tab-chien-luoc"
       data-tab="chien-luoc" aria-controls="panel-chien-luoc" aria-selected="false">Chiến lược</button>
+    <button class="tab" type="button" role="tab" id="tab-phan-tich"
+      data-tab="phan-tich" aria-controls="panel-phan-tich" aria-selected="false">Phân tích</button>
   </nav>
 
   <div class="panel" id="panel-danh-muc" role="tabpanel" aria-labelledby="tab-danh-muc">
@@ -1023,7 +1033,6 @@
         <h2>Quyết định</h2>
         <span class="meta" id="decision-count"></span>
       </div>
-      <div class="card decision-pilot" id="decision-pilot" role="status" aria-live="polite"></div>
       <div class="decision-grid">
         <div class="card decision-card">
           <h3>Hàng đợi tín hiệu</h3>
@@ -1363,6 +1372,21 @@
   </section>
 
   </div><!-- /panel Chiến lược -->
+
+  <div class="panel" id="panel-phan-tich" role="tabpanel" aria-labelledby="tab-phan-tich" hidden>
+  <section>
+    <div class="sec-head" data-sec="pt-chay-bong"><h2>Chạy bóng</h2></div>
+    <div class="card decision-pilot" id="decision-pilot" role="status" aria-live="polite"></div>
+  </section>
+  <section>
+    <div class="sec-head" data-sec="pt-nam-giu"><h2>Đang nắm giữ</h2><span class="meta" id="analysis-positions-meta"></span></div>
+    <div id="analysis-positions"></div>
+  </section>
+  <section>
+    <div class="sec-head" data-sec="pt-theo-doi"><h2>Đang theo dõi</h2><span class="meta" id="analysis-watchlist-meta"></span></div>
+    <div id="analysis-watchlist"></div>
+  </section>
+  </div><!-- /panel Phân tích -->
   </div><!-- /full-view -->
 
 </div>
@@ -1559,7 +1583,7 @@ const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const fs = getFirestore(app);
 const decisionApi = httpsCallable(getFunctions(app, "asia-southeast1"), "refreshDecisionScores", { timeout:540000 });
-const decisionState = { latest:{}, runs:[], events:[], control:null, busy:false, error:"", expanded:new Set() };
+const decisionState = { latest:{}, runs:[], events:[], control:null, busy:false, error:"" };
 
 let ready = false;
 const state = {
@@ -2501,7 +2525,6 @@ function renderScreeningHub(){
 }
 
 function renderDecisionHub(summary){
-  renderDecisionPilot();
   const strategy = activeStrategy(todayStr());
   const signals = buildSignals(todayStr(), summary);
   const pending = openOrders().slice().sort((a,b) => (a.createdAt || "") < (b.createdAt || "") ? 1 : -1);
@@ -2561,36 +2584,46 @@ function renderDecisionHub(summary){
   ).join("") : '<div class="decision-empty">Chưa có lãi/lỗ để phân tích</div>';
 }
 
-function decisionScoreCell(ticker, group){
+/* Server lưu điểm thang 0–100; app hiển thị thang 10 (7,4) để không lẫn với % hay "điểm" giá. */
+function score10(n){ return (n / 10).toLocaleString('vi-VN', { minimumFractionDigits:1, maximumFractionDigits:1 }); }
+function signedScore10(n){ return (n > 0 ? '+' : n < 0 ? '−' : '') + score10(Math.abs(n)); }
+function decisionStatus(ticker, summary){
   const row = decisionState.latest[ticker];
   const error = decisionState.error || decisionState.control?.error;
   const waiting = decisionState.busy || decisionState.control?.status === "running";
-  const detail = decisionState.expanded.has(group + ':' + ticker);
-  if(!row) return '<td class="a-score"><span class="compact-note">' +
-    (waiting ? 'Đang chấm điểm…' : error ? 'Chưa cập nhật được điểm' : 'Điểm thử nghiệm · chưa có dữ liệu') + '</span></td>';
-  const current = computeSummary().held.find((h) => h.ticker === ticker);
+  if(!row) return { row:null, label:waiting ? 'Đang chấm điểm…' : error ? 'Chưa cập nhật được điểm' : 'Chưa có điểm' };
+  const current = summary.held.find((h) => h.ticker === ticker);
   const changed = Math.abs((current?.avgCost || 0) - (row.avgCost || 0)) > 0.001 || (current?.qty || 0) !== row.qty ||
     (!current && state.watchlist[ticker]?.targetBuy !== row.targetBuy);
   const stale = row.stale || changed || row.date !== todayStr() || !!error;
-  const freshSell = current && current.hasPrice && current.price > current.avgCost;
-  const buy = '<span class="' + (!stale && row.buyScore >= 80 ? 'notable' : '') + '">Mua ' + row.buyScore + ' · #' + row.buyRank + '</span>';
-  const sell = row.sellScore !== null && freshSell ? '<span class="' + (!stale && row.sellScore >= 80 ? 'pressure' : '') + '">Bán ' + row.sellScore + ' · #' + row.sellRank + '</span>' : '';
-  return '<td class="a-score"><button type="button" class="decision-score-button" data-decision-ticker="' + esc(ticker) +
-    '" aria-expanded="' + detail + '" aria-controls="decision-detail-' + esc(group + '-' + ticker) + '" aria-label="Điểm quyết định ' + esc(ticker) + '">' +
-    buy + sell + '<span>' + (waiting ? 'Đang cập nhật' : changed ? 'Danh mục đã đổi' : stale ? 'Điểm cũ · ' + fmtDateVN(row.date) :
-      row.phase === 'intraday' ? 'Trong phiên · tạm tính' : row.phase === 'pre' ? 'Phiên đã đóng' : 'Sau đóng cửa') +
-    (row.conflict ? ' · Xung đột' : '') + '</span></button></td>';
+  const showSell = row.sellScore !== null && !!current && current.hasPrice && current.price > current.avgCost;
+  // Dòng cũ (trước v1.1.0) chưa có threshold → không tô nổi bật.
+  const threshold = Number.isFinite(row.threshold) ? row.threshold : Infinity;
+  const label = waiting ? 'Đang cập nhật' : changed ? 'Danh mục đã đổi' : stale ? 'Điểm cũ · ' + fmtDateVN(row.date) :
+    row.phase === 'intraday' ? 'Trong phiên · tạm tính' : row.phase === 'pre' ? 'Phiên đã đóng' : 'Sau đóng cửa';
+  return { row, stale, showSell, threshold, label };
 }
-function decisionDetail(ticker, summary, group){
-  if(!decisionState.expanded.has(group + ':' + ticker)) return '';
+function decisionScoreSpans(st, withRank){
+  const r = st.row, hl = (score, cls) => !st.stale && score >= st.threshold ? cls : '';
+  return '<span class="' + hl(r.buyScore, 'notable') + '">Mua ' + score10(r.buyScore) + (withRank ? ' · #' + r.buyRank : '') + '</span>' +
+    (st.showSell ? '<span class="' + hl(r.sellScore, 'pressure') + '">Bán ' + score10(r.sellScore) + (withRank ? ' · #' + r.sellRank : '') + '</span>' : '');
+}
+/* Tầng 2 của bảng mã: chỉ điểm + trạng thái. Bấm → tab Phân tích, mở đúng mã. */
+function decisionScoreLine(ticker, summary){
+  const st = decisionStatus(ticker, summary);
+  return '<button type="button" class="decision-score-button" data-decision-ticker="' + esc(ticker) +
+    '" aria-label="Xem phân tích điểm ' + esc(ticker) + '">' + (st.row ? decisionScoreSpans(st, false) : '') +
+    '<span>' + esc(st.label) + '</span></button>';
+}
+function analysisDetail(ticker, summary){
   const r = decisionState.latest[ticker];
   if(!r) return '';
   const labels = { market:'Thị trường + rổ ngành', trend:'Xu hướng', pullback:'Nhịp điều chỉnh', confirmation:'Giá–khối lượng',
     price:'Giá vốn / giá mục tiêu', risk:'Thanh khoản + biến động', relative:'Sức mạnh tương đối', distribution:'Phân phối', heat:'Tăng nóng', profit:'Khoảng lợi nhuận' };
   const weights = { buy:{market:25,trend:20,pullback:20,confirmation:10,price:10,risk:10}, sell:{trend:25,relative:20,distribution:20,heat:15,profit:15} };
   const parts = (kind, values) => '<div class="decision-parts">' + Object.entries(values || {}).map(([key,value]) =>
-    '<span>' + labels[key] + '</span><span>' + value + '/' + weights[kind][key] + '</span>').join('') + '</div>';
-  const delta = (now, previous) => previous == null ? '' : ' · ' + (now - previous > 0 ? '+' : '') + (now - previous) + ' điểm';
+    '<span>' + labels[key] + '</span><span>' + score10(value) + '/' + score10(weights[kind][key]) + '</span>').join('') + '</div>';
+  const delta = (now, previous) => previous == null ? '' : ' · ' + signedScore10(now - previous);
   const held = summary.held.find((h) => h.ticker === ticker), strategy = activeStrategy(todayStr());
   const cash = projectedCash(summary, { kind:'buy', qty:strategy.lotSize, price:r.close });
   const available = held ? computeSellAvailability(state.transactions, ticker, new Date()).available : 0;
@@ -2598,12 +2631,13 @@ function decisionDetail(ticker, summary, group){
     'ai-error':'AI chưa đọc được tin · tác động 0', partial:'Nguồn tin chưa đầy đủ' })[r.newsStatus] || 'Tin đã kiểm tra';
   const items = r.sourceNews || r.news || [];
   const time = r.updatedAt ? new Date(r.updatedAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}) : '';
-  return '<div class="decision-detail" id="decision-detail-' + esc(group + '-' + ticker) + '"><p>Thử nghiệm · ' + esc(r.scoreVersion) + ' · ' + esc(time) + '</p>' +
-    '<h4>Điểm Mua ' + r.buyScore + delta(r.buyScore,r.previousBuy) + '</h4>' + parts('buy',r.buyParts) +
+  return '<div class="decision-detail"><p>Thử nghiệm · ' + esc(r.scoreVersion) + ' · ' + esc(time) +
+      (Number.isFinite(r.threshold) ? ' · Đáng chú ý từ ' + score10(r.threshold) : '') + '</p>' +
+    '<h4>Điểm Mua ' + score10(r.buyScore) + delta(r.buyScore,r.previousBuy) + '</h4>' + parts('buy',r.buyParts) +
     (r.sellScore === null ? '<p>Áp lực Bán — ' + (held ? 'vị thế chưa có lãi' : 'chưa nắm giữ') + '</p>' :
-      '<h4>Áp lực Bán ' + r.sellScore + delta(r.sellScore,r.previousSell) + '</h4>' + parts('sell',r.sellParts)) +
-    '<p>Tin: ' + (r.newsImpact > 0 ? '+' : '') + r.newsImpact + '/±5 điểm mua · ' + (r.newsImpact > 0 ? '−' : '+') + Math.abs(r.newsImpact) + ' điểm bán</p>' +
-    (r.conflict ? '<p class="neg">Xung đột — cần xem chi tiết</p>' : '') +
+      '<h4>Áp lực Bán ' + score10(r.sellScore) + delta(r.sellScore,r.previousSell) + '</h4>' + parts('sell',r.sellParts)) +
+    '<p>Tin: Mua ' + signedScore10(r.newsImpact) + ' · Bán ' + signedScore10(-r.newsImpact) + ' · tối đa ±' + score10(5) + '</p>' +
+    (r.conflict ? '<p class="neg">Xung đột — Mua và Bán cùng cao</p>' : '') +
     r.reasons.map((text) => '<p>' + esc(text) + '</p>').join('') +
     r.riskFlags.map((text) => '<p class="neg">' + esc(text) + '</p>').join('') +
     '<p>Giá chấm ' + fmtPrice(r.close) + ' · ' + esc(r.priceSource || '') + '</p>' +
@@ -2618,25 +2652,60 @@ function decisionDetail(ticker, summary, group){
         ' · ' + (n.analyzed ? 'Tin cậy ' + Math.round(n.confidence * 100) + '%' : 'Chưa được AI đánh giá') + '</p>';
     }).join('') : '<p>Không có tin liên quan trong nguồn đã lấy</p>') + '</div>';
 }
+/* Mã đang mở ở tab Phân tích — nhớ trong phiên để vẽ lại khi giá/điểm về không bị gập. */
+const analysisOpen = new Set();
+const ANALYSIS_CHEVRON = '<svg class="ui-icon analysis-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+function analysisItem(ticker, summary){
+  const st = decisionStatus(ticker, summary), open = analysisOpen.has(ticker);
+  return '<details class="compact-analysis analysis-item" id="analysis-' + esc(ticker) + '" data-analysis-ticker="' + esc(ticker) + '"' + (open ? ' open' : '') + '>' +
+    '<summary><span class="analysis-head"><b>' + esc(ticker) + '</b>' + (st.row ? decisionScoreSpans(st, true) : '') +
+    '<span class="compact-note">' + esc(st.label) + (st.row?.conflict ? ' · Xung đột' : '') + '</span></span>' + ANALYSIS_CHEVRON + '</summary>' +
+    (open && st.row ? analysisDetail(ticker, summary) : '') + '</details>';
+}
+function renderAnalysis(summary){
+  renderDecisionPilot();
+  const byBuy = (a, b) => (decisionState.latest[b]?.buyScore ?? -1) - (decisionState.latest[a]?.buyScore ?? -1) || a.localeCompare(b);
+  const held = summary.held.map((h) => h.ticker).sort(byBuy);
+  const watched = Object.keys(state.watchlist).filter((tk) => !held.includes(tk)).sort(byBuy);
+  [["positions", held, "Chưa có cổ phiếu"], ["watchlist", watched, "Chưa có mã theo dõi"]].forEach(([group, list, empty]) => {
+    $("analysis-" + group + "-meta").textContent = list.length ? list.length + " mã" : "";
+    $("analysis-" + group).innerHTML = list.map((tk) => analysisItem(tk, summary)).join('') || '<div class="decision-empty">' + empty + '</div>';
+  });
+}
+function openAnalysis(ticker){
+  analysisOpen.add(ticker);
+  showTab("phan-tich");
+  renderAnalysis(computeSummary());
+  const item = $("analysis-" + ticker);
+  if(!item) return;
+  item.scrollIntoView({ block:"start", behavior:window.matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
+  item.querySelector("summary").focus({ preventScroll:true });
+}
 function renderDecisionPilot(){
   const panel = $('decision-pilot');
   if(!panel) return;
   const days = Number(decisionState.control?.trialSession || 0);
+  // Chỉ tổng kết sự kiện của công thức đang chạy; sự kiện bản cũ giữ nguyên trong file xuất.
+  const version = Object.values(decisionState.latest).sort((a,b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0]?.scoreVersion;
+  const events = decisionState.events.filter((r) => r.scoreVersion === version);
   const summarize = (kind, engine) => {
-    const rows = decisionState.events.filter((r) => r.kind === kind && (r.engine || 'decision') === engine);
+    const rows = events.filter((r) => r.kind === kind && (r.engine || 'decision') === engine);
     const settled = rows.filter((r) => ['win','loss'].includes(r.evaluation?.primary));
     const complete = rows.filter((r) => r.evaluation?.complete && Number.isFinite(r.evaluation.effectPct));
     const average = complete.length ? complete.reduce((sum,r) => sum+r.evaluation.effectPct,0)/complete.length : null;
     return (kind === 'buy' ? 'Mua' : 'Bán') + ': ' + (settled.length ? Math.round(settled.filter((r) => r.evaluation.primary==='win').length/settled.length*100)+'% đúng · '+settled.length+' mẫu' : 'Đang đo · '+rows.length+' mẫu') +
-      (average === null ? '' : ' · TB20 '+fmtPct(average)) + ' · Không xác định '+rows.filter((r) => r.evaluation?.primary==='indeterminate').length + ' · Hết kỳ '+rows.filter((r) => r.evaluation?.primary==='timeout').length;
+      (average === null ? '' : ' · TB '+fmtPct(average)) + ' · Không xác định '+rows.filter((r) => r.evaluation?.primary==='indeterminate').length + ' · Hết kỳ '+rows.filter((r) => r.evaluation?.primary==='timeout').length;
   };
-  const count = decisionState.events.filter((r) => (r.engine || 'decision') === 'decision').length;
-  const weakBuy = decisionState.events.filter((r) => r.engine==='legacy' && r.kind==='buy' && r.snapshot?.riskFlags?.includes('Xu hướng yếu — nguy cơ bắt dao rơi')).length;
-  const extraBuy = decisionState.events.filter((r) => r.engine==='decision' && r.kind==='buy' && !r.legacyReached).length;
-  const earlySell = decisionState.events.filter((r) => r.engine==='legacy' && r.kind==='sell' && r.snapshot?.sellScore<80).length;
-  panel.innerHTML = '<div>Điểm quyết định · Chạy bóng ' + Math.min(20,days) + '/20 phiên · ' + count + ' sự kiện</div>' +
-    '<p>' + esc(summarize('buy','decision')) + ' · ' + esc(summarize('sell','decision')) + '</p>' +
-    '<p>-2/+3 · ' + esc(summarize('buy','legacy')) + ' · ' + esc(summarize('sell','legacy')) + '</p>' +
+  const count = events.filter((r) => (r.engine || 'decision') === 'decision').length;
+  const weakBuy = events.filter((r) => r.engine==='legacy' && r.kind==='buy' && r.snapshot?.riskFlags?.includes('Xu hướng yếu — nguy cơ bắt dao rơi')).length;
+  const extraBuy = events.filter((r) => r.engine==='decision' && r.kind==='buy' && !r.legacyReached).length;
+  const earlySell = events.filter((r) => r.engine==='legacy' && r.kind==='sell' && r.snapshot?.sellScore < r.policy?.threshold).length;
+  const policy = events[0]?.policy;
+  panel.innerHTML = '<div>Chạy bóng ' + Math.min(20,days) + '/20 phiên · ' + count + ' sự kiện' + (version ? ' · ' + esc(version) : '') + '</div>' +
+    (policy ? '<p>Đo ' + policy.sessions + ' phiên: Mua đúng khi +' + policy.winPct + '% trước −' + policy.lossPct + '% · Bán đúng khi −' +
+      policy.winPct + '% trước +' + policy.lossPct + '% · Sự kiện ghi khi vượt ' + score10(policy.threshold) + ' lúc đóng cửa</p>' : '') +
+    '<p>' + esc(summarize('buy','decision')) + '</p><p>' + esc(summarize('sell','decision')) + '</p>' +
+    '<p>Chiến lược đang áp dụng · ' + esc(summarize('buy','legacy')) + '</p><p>Chiến lược đang áp dụng · ' + esc(summarize('sell','legacy')) + '</p>' +
     '<p>Ngưỡng mua khi xu hướng yếu '+weakBuy+' · Cơ hội mua ngoài ngưỡng '+extraBuy+' · Chốt lời khi áp lực bán thấp '+earlySell+'</p>' +
     '<p>' + (days >= 20 && count >= 10 ? 'Đủ kỳ thử nghiệm · vẫn chạy bóng' : days >= 20 ? 'Chưa đủ 10 mẫu · tiếp tục chạy bóng' : 'Tín hiệu hiện tại tiếp tục theo chiến lược đang áp dụng') + '</p>' +
     (decisionState.error || decisionState.control?.error ? '<p class="neg">' + esc(decisionState.error || decisionState.control.error) + '</p>' : '') +
@@ -2644,11 +2713,11 @@ function renderDecisionPilot(){
 }
 async function refreshDecisionScores(){
   if(decisionState.busy || !ready) return;
-  decisionState.busy = true; decisionState.error = ''; renderCompact(computeSummary());
+  decisionState.busy = true; decisionState.error = ''; renderCompact(computeSummary()); renderAnalysis(computeSummary());
   try { const response = await decisionApi();
     if(response.data.status === 'busy') toast('Điểm đang cập nhật · xem kết quả sau ít phút');
   }catch(error){ console.error('decision scores',error); decisionState.error = 'Chưa cập nhật được điểm · đang giữ kết quả trước'; }
-  finally { decisionState.busy=false; renderCompact(computeSummary()); renderDecisionPilot(); }
+  finally { decisionState.busy=false; renderCompact(computeSummary()); renderAnalysis(computeSummary()); }
 }
 
 /* ================= render ================= */
@@ -2707,6 +2776,7 @@ function render(){
   renderScreeningSettings();
   renderLog();
   renderCompact(s);
+  renderAnalysis(s);
   refreshSellAvailability();
 }
 
@@ -2742,12 +2812,6 @@ function toggleCompactRow(row){
   if(compactOpenRows.has(key)) compactOpenRows.delete(key); else compactOpenRows.add(key);
   row.classList.toggle("open", compactOpenRows.has(key));
   row.setAttribute("aria-expanded", String(compactOpenRows.has(key)));
-  if(!compactOpenRows.has(key)){
-    decisionState.expanded.delete(key);
-    const button=row.querySelector('[data-decision-ticker]');
-    button?.setAttribute('aria-expanded','false');
-    row.querySelector('.decision-detail')?.remove();
-  }
 }
 function compactRowAttrs(group, ticker, classes){
   const key = group + ":" + ticker, open = compactOpenRows.has(key);
@@ -2913,7 +2977,6 @@ function renderCompact(s){
       '<td class="a-drag">' + (compactSort.positions ? '' : sortHandle(h.ticker)) + '</td>' +
       '<td class="a-tk"><button class="compact-link" type="button" data-chart-ticker="' + esc(h.ticker) + '" aria-label="Xem biểu đồ ' + esc(h.ticker) + '">' + esc(h.ticker) + '</button></td>' +
       '<td class="a-px ' + pnlCls + '">' + compactPriceCell(h.ticker, h.price) + '</td>' +
-      decisionScoreCell(h.ticker,'positions') +
       '<td class="a-qty c-two"><span>' + h.qty.toLocaleString("vi-VN") + '</span><span>' + fmtPrice(h.avgCost) + '</span></td>' +
       '<td class="a-val c-two c-wide"><span>' + (h.value === null ? '—' : tr1(h.value)) + '</span><span>' + tr1(cost) + '</span></td>' +
       edgeCell +
@@ -2923,7 +2986,7 @@ function renderCompact(s){
       '<td class="a-more"><span class="compact-facts">Nắm giữ ' + ageLabel(h.heldSince) +
         ' · Vốn sau lướt ' + fmtPrice(h.netCost) +
         ' · Đã chốt chu kỳ <span class="' + compactPnlClass(cycle) + '">' + fmtVND(cycle) + '</span></span>' +
-        decisionDetail(h.ticker,s,'positions') + alert + (meta.hold ? '<span class="chip hold">Giữ dài hạn</span>' : '') + thesisBadge(h.ticker) +
+        decisionScoreLine(h.ticker,s) + alert + (meta.hold ? '<span class="chip hold">Giữ dài hạn</span>' : '') + thesisBadge(h.ticker) +
         compactRowMenu(h.ticker, false) + '</td></tr>';
   }).join("") || '<tr><td class="compact-empty">' + (s.held.length ? 'Không có mã phù hợp' : 'Chưa có cổ phiếu') + '</td></tr>';
   const keys = sortTickers(Object.keys(state.watchlist).sort(), "watchlist", (tk) => tk);
@@ -2946,13 +3009,12 @@ function renderCompact(s){
       '<td class="a-drag">' + (compactSort.watchlist ? '' : sortHandle(tk)) + '</td>' +
       '<td class="a-tk"><button class="compact-link" type="button" data-chart-ticker="' + esc(tk) + '" aria-label="Xem biểu đồ ' + esc(tk) + '">' + esc(tk) + '</button></td>' +
       '<td class="a-px ' + gapCls + '">' + (row.price === null ? '—' : compactPriceCell(tk, row.price)) + '</td>' +
-      decisionScoreCell(tk,'watchlist') +
       '<td class="a-tgt"><button class="compact-link" type="button" data-compact-watch="' + esc(tk) + '" aria-label="Sửa giá kỳ vọng ' + esc(tk) + '">' + (row.target === null ? '—' : fmtPrice(row.target)) + '</button></td>' +
       '<td class="a-gap ' + gapCls + '">' + (gap === null ? '—' : (gap > 0 ? '+' : '') + gap.toFixed(2)) + '</td>' +
       '<td class="a-more"><span class="compact-facts">Theo dõi ' + ageLabel(trend.addedDate) +
         (dropPct === null ? '' : ' · Cần giảm ' + dropPct.toLocaleString("vi-VN", { minimumFractionDigits:2, maximumFractionDigits:2 }) + '%') +
         ' · Cập nhật ' + (meta.lastPriceDate ? fmtDateVN(meta.lastPriceDate) : '—') + '</span>' +
-        decisionDetail(tk,s,'watchlist') + alert + thesisBadge(tk) + compactRowMenu(tk, true) + '</td></tr>';
+        decisionScoreLine(tk,s) + alert + thesisBadge(tk) + compactRowMenu(tk, true) + '</td></tr>';
   }).join("") || '<tr><td class="compact-empty">' + (keys.length ? 'Không có mã phù hợp' : 'Chưa có mã') + '</td></tr>';
   // Hàng tiêu đề: bấm tên cột để sắp xếp (lần 2 đảo chiều, lần 3 bỏ). Đang sắp theo cột thì ẩn tay nắm kéo thả.
   const counts = { positions:s.held.length, watchlist:keys.length };
@@ -3037,19 +3099,26 @@ function initCompact(){
   $("view-mobile-toggle").addEventListener("click", () => showView($("compact-view").hidden ? "compact" : "full"));
   $("compact-trade").addEventListener("click", () => openCompactForm("trade"));
   $("compact-add-watch").addEventListener("click", () => openCompactForm("watch"));
+  // Tab Phân tích: chi tiết chỉ dựng khi mở mã, nhớ mã đang mở qua các lần vẽ lại.
+  ["analysis-positions", "analysis-watchlist"].forEach((id) => {
+    $(id).addEventListener("toggle", (e) => {
+      const item = e.target.closest?.("[data-analysis-ticker]");
+      if(!item) return;
+      const ticker = item.dataset.analysisTicker;
+      if(item.open){
+        if(analysisOpen.has(ticker)) return;
+        analysisOpen.add(ticker);
+        item.insertAdjacentHTML("beforeend", analysisDetail(ticker, computeSummary()));
+      }else{
+        analysisOpen.delete(ticker);
+        item.querySelector(".decision-detail")?.remove();
+      }
+    }, true);
+  });
   ["positions-body", "watchlist-body"].forEach((id) => {
     $(id).addEventListener("click", (e) => {
       const score = e.target.closest('[data-decision-ticker]');
-      if(score){
-        const ticker=score.dataset.decisionTicker;
-        const row=score.closest('tr'), key=row.dataset.rowKey;
-        if(decisionState.expanded.has(key)) decisionState.expanded.delete(key);
-        else { decisionState.expanded.add(key);
-          if(row && !row.classList.contains('open')) toggleCompactRow(row); }
-        renderCompact(computeSummary());
-        $(id).querySelector('[data-decision-ticker="'+ticker+'"]')?.focus();
-        return;
-      }
+      if(score){ openAnalysis(score.dataset.decisionTicker); return; }
       const sortBtn = e.target.closest("[data-sort-group]");
       if(sortBtn){
         const group = sortBtn.dataset.sortGroup;
@@ -4122,7 +4191,7 @@ function buildExport(days){
       .map((tk) => ({ ma:tk, giaMuonMua:state.watchlist[tk].targetBuy, themLuc:state.watchlist[tk].addedAt || null })),
     luanDiem: Object.keys(state.theses).sort().map((tk) => ({ ma:tk, lyDo:state.theses[tk].thesis || "",
       dieuKienSai:state.theses[tk].invalidation || "", ngayXemLai:state.theses[tk].reviewDate || null })),
-    diemQuyetDinh: { mode:'shadow', tienDo:decisionState.control?.trialSession || 0,
+    diemQuyetDinh: { mode:'shadow', thangDiem:'0–100 (app hiển thị ÷10)', tienDo:decisionState.control?.trialSession || 0,
       hienTai:Object.values(decisionState.latest), suKien:decisionState.events.filter((r) => inRange(r.date)) },
     viTheHienTai: computeSummary().held
       .map((h) => ({
@@ -4541,7 +4610,7 @@ function initForms(){
 /* ================= tab ================= */
 /* Tab đang mở thuộc về MÁY, không phải dữ liệu → localStorage, không đồng bộ.
    Panel ẩn vẫn nằm trong DOM: render() không cần biết tab nào đang mở. */
-const TABS = ["danh-muc", "theo-doi", "chien-luoc"];
+const TABS = ["danh-muc", "theo-doi", "chien-luoc", "phan-tich"];
 
 function renderPrivacyControl(){
   const btn = $("pnl-privacy-btn");

@@ -4,7 +4,9 @@ const { randomUUID } = require("node:crypto");
 const D = require("./decision-scoring");
 const { collectNews } = require("./decision-news");
 
-// Tầng mặc định tương ứng activeStrategy() của app; phiên bản thật luôn đọc strategies.
+/* Bản sao có chủ ý (ghi ở CLAUDE.md): DEFAULT_STRATEGY ↔ RULE_* · activeStrategy() ↔ activeStrategy() ·
+   holdings() ↔ computeLedger() · buyAt/sellAt legacy ↔ strategyLevels() trong public/index.html.
+   Đổi một bên phải đổi bên kia. Phiên bản thật luôn đọc từ strategies. */
 const DEFAULT_STRATEGY = { id: null, buyDrop: 2, sellRise: 3, buyDropPct: null, sellRisePct: null,
   lotSize: 100, minCashRatio: 20, maxCashRatio: 30 };
 function activeStrategy(rows, date) {
@@ -44,7 +46,8 @@ function vnClock(now) {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, phase: minutes >= 930 ? "post" : minutes >= 540 ? "intraday" : "pre" };
 }
 async function saveEvaluation(db, events, histories) {
-  const pending = events.filter((e) => !e.data().evaluation?.complete && histories.has(e.data().ticker));
+  // Chỉ đo sự kiện của phiên bản hiện tại: sự kiện bản cũ giữ nguyên kết quả theo luật lúc đó.
+  const pending = events.filter((e) => e.data().scoreVersion === D.VERSION && !e.data().evaluation?.complete && histories.has(e.data().ticker));
   for (let i = 0; i < pending.length; i += 350) {
     const batch = db.batch();
     pending.slice(i, i + 350).forEach((e) => batch.update(e.ref, { evaluation: D.evaluateDecision(e.data(), histories.get(e.data().ticker)),
@@ -52,15 +55,25 @@ async function saveEvaluation(db, events, histories) {
     await batch.commit();
   }
 }
+const ENGINES = ["decision", "legacy"], KINDS = ["buy", "sell"];
+const aboveKey = (engine, kind) => engine === "decision" ? kind + "Above" : kind === "buy" ? "legacyBuyAbove" : "legacySellAbove";
+function reached(r, engine, kind) {
+  if (engine === "legacy") return !!r[kind === "buy" ? "legacyBuy" : "legacySell"];
+  const score = r[kind + "Score"];
+  return score !== null && score >= D.POLICY.threshold;
+}
+/* Cờ "đang ở trên ngưỡng" chỉ đổi ở lượt sau đóng cửa — lượt trong phiên giữ nguyên cờ cũ,
+   để một cú vượt ngưỡng giữa phiên rồi tụt lại không đẻ sự kiện. */
+function aboveFlags(r, priorRow, phase) {
+  return Object.fromEntries(ENGINES.flatMap((engine) => KINDS.map((kind) => [aboveKey(engine, kind),
+    phase === "post" ? reached(r, engine, kind) : !!priorRow?.[aboveKey(engine, kind)]])));
+}
 function makeEvents(rows, prior, date, phase) {
-  if (phase === "pre") return [];
-  return rows.flatMap((r) => ["decision", "legacy"].flatMap((engine) => ["buy", "sell"].filter((kind) => {
-    const score = r[kind + "Score"];
-    // Các cảnh báo mã Giữ vẫn được đo; không tạo lệnh. Lượt intraday là bóng, nến sau ngày đó mới đo.
-    return engine === "decision" ? score !== null && score >= D.POLICY.threshold && !(prior[r.ticker]?.[kind + "Above"]) :
-      !!r[kind === "buy" ? "legacyBuy" : "legacySell"] &&
-        (prior[r.ticker]?.phase === "pre" || !prior[r.ticker]?.[kind === "buy" ? "legacyBuy" : "legacySell"]);
-  }).map((kind) => ({ ticker: r.ticker, kind, engine, date, phase, close: r.close, score: r[kind + "Score"],
+  // Chỉ lượt sau đóng cửa sinh sự kiện; mã Giữ vẫn được đo, không tạo lệnh.
+  if (phase !== "post") return [];
+  return rows.flatMap((r) => ENGINES.flatMap((engine) => KINDS.filter((kind) =>
+    reached(r, engine, kind) && !prior[r.ticker]?.[aboveKey(engine, kind)]
+  ).map((kind) => ({ ticker: r.ticker, kind, engine, date, phase, close: r.close, score: r[kind + "Score"],
     legacyReached: kind === "buy" ? r.legacyBuy : r.legacySell,
     scoreVersion: D.VERSION, policy: { ...D.POLICY }, snapshot: r,
     evaluation: { primary: "pending", complete: false, sessionsObserved: 0, effectPct: null } }))));
@@ -97,7 +110,7 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     const benchmark = benchmarkAll.filter((b) => b.date <= marketDate);
     const effectivePhase = marketDate < date ? "pre" : phase;
     const peers = targets.flatMap((tk) => D.SECTORS[D.sectorFor(tk)]?.split(" ") || []);
-    const pendingTickers = docs(5).filter((r) => !r.evaluation?.complete).map((r) => r.ticker);
+    const pendingTickers = docs(5).filter((r) => r.scoreVersion === D.VERSION && !r.evaluation?.complete).map((r) => r.ticker);
     const symbols = [...new Set([...targets, ...peers, ...pendingTickers])];
     const fetched = await helpers.mapWithConcurrency(symbols, 5, (tk) => helpers.fetchHistory(tk));
     const histories = new Map();
@@ -147,7 +160,8 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     const [runs, version] = await Promise.all([db.collection("decision_runs").get(), db.collection("decision_versions").doc(D.VERSION).get()]);
     const closedDates = new Set(runs.docs.filter((r) => r.data().phase === "post" && r.data().status === "complete" && r.data().scoreVersion === D.VERSION).map((r) => r.data().date));
     const trialSession = closedDates.size + (!closedDates.has(marketDate) && effectivePhase === "post" && !missing.length ? 1 : 0);
-    const events = makeEvents(ranked, Object.fromEntries(Object.entries(prior).filter(([, r]) => r.scoreVersion === D.VERSION)), marketDate, effectivePhase);
+    const priorSame = Object.fromEntries(Object.entries(prior).filter(([, r]) => r.scoreVersion === D.VERSION));
+    const events = makeEvents(ranked, priorSame, marketDate, effectivePhase);
     // Doc chính thức sau đóng cửa giữ lần đầu; lượt làm mới tiếp theo vẫn lưu bản riêng để không mất lịch sử.
     const officialExists = runs.docs.some((r) => r.id === runId && r.data().status === "complete");
     const actualRef = officialExists ? db.collection("decision_runs").doc(`${marketDate}_${now.toISOString().replace(/[:.]/g, "-")}`) : runRef;
@@ -159,9 +173,7 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     }
     for (const r of ranked) {
       batch.set(db.collection("decision_snapshots").doc(`${actualRef.id}_${r.ticker}`), r); writes += 1;
-      batch.set(db.collection("decision_latest").doc(r.ticker), { ...r,
-      buyAbove: effectivePhase === "pre" ? !!prior[r.ticker]?.buyAbove : r.buyScore >= D.POLICY.threshold,
-      sellAbove: effectivePhase === "pre" ? !!prior[r.ticker]?.sellAbove : r.sellScore !== null && r.sellScore >= D.POLICY.threshold }); writes += 1;
+      batch.set(db.collection("decision_latest").doc(r.ticker), { ...r, ...aboveFlags(r, priorSame[r.ticker], effectivePhase) }); writes += 1;
       if (writes >= 350) await flush();
     }
     // Thiếu mã: giữ kết quả cũ với cờ stale thay vì hiển thị như kết quả mới.
@@ -178,7 +190,7 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     }
     batch.set(actualRef, { date: marketDate, phase: effectivePhase, scoreVersion: D.VERSION,
       status: missing.length ? "partial" : "complete", trialSession: Math.min(20, trialSession),
-      pilotReady: trialSession >= 20 && docs(5).filter((r) => r.engine === "decision").length + events.filter((r) => r.engine === "decision").length >= 10,
+      pilotReady: trialSession >= 20 && docs(5).filter((r) => r.engine === "decision" && r.scoreVersion === D.VERSION).length + events.filter((r) => r.engine === "decision").length >= 10,
       missing, rows: ranked.map((r) => ({ ticker:r.ticker, buyScore:r.buyScore, sellScore:r.sellScore, buyRank:r.buyRank, sellRank:r.sellRank })),
       newsStatus: news.status, createdAt: now.toISOString(), mode: "shadow" });
     batch.set(lock, { status: missing.length ? "partial" : "complete", completedAt: new Date().toISOString(),
@@ -191,4 +203,4 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     throw error;
   }
 }
-module.exports = { runDecision, activeStrategy, holdings, makeEvents, vnClock };
+module.exports = { runDecision, activeStrategy, holdings, makeEvents, aboveFlags, vnClock };

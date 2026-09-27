@@ -4,6 +4,24 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-27b (Điểm quyết định v1.1.0: đo công bằng, thang 10, tab Phân tích)
+
+Sau buổi review tính năng, owner chọn sửa hết các điểm đã nêu, đổi sang thang 10 và tách phần chi tiết cho đỡ rối.
+
+- **Đo chiều Bán công bằng:** trước đây Bán "đúng" khi giá chỉ cần giảm 3%, còn Mua phải tăng 6% → tỷ lệ đúng của Bán bị thổi phồng. Giờ đối xứng: Bán đúng khi giảm 6% trước khi tăng 3%.
+- **Sự kiện chỉ ghi lúc đóng cửa:** vượt ngưỡng giữa phiên rồi tụt lại không còn tính là một mẫu. Lượt trong phiên vẫn chấm để xem, nhãn "Trong phiên · tạm tính".
+- **Mã ngoài rổ ngành không bị trừ 10 điểm:** thiếu dữ liệu ngành thì phần Thị trường tính trọn từ VN-Index.
+- **Ngưỡng cố định theo phiên bản** (8,0 · thanh khoản 20 tỷ · +6/−3 · 20 phiên), ghi rõ trong code và hiện ở tab Phân tích. Không đọc tab Chiến lược để mẫu chạy bóng so được với nhau.
+- **Nâng công thức lên `decision-v1.1.0`:** bộ đếm 20 phiên chạy lại từ đầu. Sự kiện bản v1.0.0 giữ nguyên kết quả cũ, không bị chấm lại, không tính vào tổng kết mới.
+- **Thang 10:** mọi điểm, thành phần, biến động và tác động tin hiện dạng 7,4 (server vẫn lưu 0–100; file xuất ghi rõ `thangDiem`). Dòng lý do từ server cũng đổi sang /10.
+- **Tầng 1 bảng mã bỏ dòng điểm.** Điểm + trạng thái chỉ hiện ở tầng 2 khi bấm mở mã; bấm vào điểm chuyển sang tab mới **Phân tích**, mở đúng mã đó.
+- **Tab Phân tích:** tổng kết chạy bóng (chuyển từ khu Quyết định) + danh sách mã nắm giữ / theo dõi xếp theo điểm Mua, mỗi mã gập/mở để xem thành phần, lý do, rủi ro, tin. Tab trên điện thoại thu gọn chữ để 4 tab không bị cắt ở 344px.
+- **CLAUDE.md:** thêm các collection `decision_*`, chỗ nhân bản server ↔ app và quyết định đã chốt.
+- **Kiểm:** `npm run smoke` qua; kiểm riêng bằng dữ liệu giả: đo đối xứng Mua/Bán, sự kiện chỉ ở lượt đóng cửa, cờ ngưỡng giữ nguyên trong phiên, thiếu ngành không bị phạt. Bấm thử app với Firebase giả lập ở 344px và 1280px: mở tầng 2 → bấm điểm → sang tab Phân tích mở đúng mã, gập/mở mã khác, không tràn ngang, không lỗi JS. Chưa bấm với dữ liệu thật.
+- **Deploy:** CHƯA. Cần owner chạy `firebase deploy --project fin2-danh-muc` (máy cloud không có quyền vào project).
+
+· `functions/decision-scoring.js` · `functions/decision-service.js` · `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-27 (Điểm quyết định: chạy bóng mua/bán trên danh mục + theo dõi)
 
 Owner yêu cầu triển khai ý tưởng sau phỏng vấn: ưu tiên tăng lợi nhuận, mua nhịp điều chỉnh trong xu hướng và bán khi xu hướng suy yếu; hệ thống chấm điểm để owner tự quyết định.
