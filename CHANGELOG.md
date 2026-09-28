@@ -8,6 +8,7 @@ Ngày mới nhất trên đầu.
 
 - Thêm `deploy.bat` ở thư mục gốc: bấm đúp để deploy. Tự lấy code nhánh trên GitHub, hỏi trước khi cất tạm thay đổi chưa commit, chạy smoke nếu máy có thư viện, hỏi xác nhận rồi mới `firebase deploy`. Lỗi ở bước nào thì dừng và báo "Deploy CHƯA xong".
 - `.gitattributes` giữ file `.bat` xuống dòng kiểu Windows.
+- **Sửa sau lần chạy đầu (lỗi thật trên máy owner):** bước cất tạm bỏ sót file mới chưa được git theo dõi (`deploy.bat`, `functions/decision-*.js`) nên chuyển nhánh bị từ chối. Giờ kiểm cả file mới và cất bằng `git stash -u`; file tự chạy từ bản sao trong `%TEMP%` để việc cất tạm/chuyển nhánh thay chính nó không làm cmd đọc lệch.
 - **Kiểm:** chưa chạy thử trên Windows (máy cloud là Linux); đã kiểm định dạng file (UTF-8, CRLF).
 
 · `deploy.bat` · `.gitattributes` · `CLAUDE.md` · `AGENTS.md` · `CHANGELOG.md`

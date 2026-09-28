@@ -1,5 +1,15 @@
 @echo off
 chcp 65001 >nul
+rem Chay tu ban sao trong TEMP: buoc cat tam/chuyen nhanh duoc phep thay chinh file nay ma khong lam cmd doc lech.
+if defined FIN2_DEPLOY_COPY goto :main
+set "FIN2_DEPLOY_COPY=1"
+set "FIN2_DIR=%~dp0"
+copy /y "%~f0" "%TEMP%\fin2-deploy.bat" >nul || goto :main
+"%TEMP%\fin2-deploy.bat" %*
+:main
+set "FIN2_HERE=%FIN2_DIR%"
+set "FIN2_DEPLOY_COPY="
+set "FIN2_DIR="
 setlocal
 rem ============================================================
 rem  Deploy Fin2 len Firebase (Hosting + Firestore rules + Functions).
@@ -9,14 +19,15 @@ rem ============================================================
 set "BRANCH=main-1isfwa"
 if not "%~1"=="" set "BRANCH=%~1"
 set "PROJECT=fin2-danh-muc"
-cd /d "%~dp0"
+cd /d "%FIN2_HERE%" || goto :fail
 
 where git >nul 2>nul || (echo [LỖI] Máy chưa cài git. & goto :fail)
 where firebase >nul 2>nul || (echo [LỖI] Máy chưa cài Firebase CLI. Cài bằng lệnh: npm install -g firebase-tools & goto :fail)
 
-rem --- 1. Thay đổi chưa commit: hỏi trước khi cất tạm ---
-git diff --quiet && git diff --cached --quiet
-if errorlevel 1 goto :dirty
+rem --- 1. Thay đổi chưa commit (kể cả file mới git chưa theo dõi): hỏi trước khi cất tạm ---
+set "DIRTY="
+for /f "delims=" %%i in ('git status --porcelain') do set "DIRTY=1"
+if defined DIRTY goto :dirty
 goto :sync
 
 :dirty
@@ -26,7 +37,7 @@ git status --short
 echo.
 choice /c YN /m "Cất tạm các thay đổi này (git stash) để tiếp tục deploy"
 if errorlevel 2 goto :cancel
-git stash push -m "deploy.bat cat tam" || goto :fail
+git stash push -u -m "deploy.bat cat tam" || goto :fail
 echo Đã cất tạm. Xem lại bằng: git stash list
 
 rem --- 2. Lấy đúng code trên GitHub ---
