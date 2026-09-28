@@ -4,6 +4,20 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-28c (Tab Phân tích viết lời thường)
+
+Owner thấy phần chi tiết chấm điểm quá kỹ thuật. Chỉ đổi cách hiển thị; công thức, điểm và bot giữ nguyên.
+
+- **Từng thành phần điểm** đổi tên dễ hiểu (VD "Giá–khối lượng" → "Phiên gần nhất", "Phân phối" → "Có người bán ra mạnh"), thay con số x/y bằng mức **Tốt / Vừa / Kém** (áp lực Bán: **Cao / Vừa / Thấp / Không**), kèm một câu dựng từ số liệu thật: VD "Giá cao hơn 7,4% so với giá trung bình 1 tháng — đang tăng nóng", "Còn cao hơn mức mua thêm 59.00 khoảng 10,2%".
+- **Dòng đầu mỗi điểm:** "Điểm Mua 5,2/10 · trung bình · giảm 0,3 so với lần trước".
+- **Cảnh báo** dịch sang lời thường dưới mục "Cần lưu ý" (VD "Biến động ATR14 trên 6%" → "Giá lên xuống rất mạnh (hơn 6% mỗi phiên)"). Điểm Mua bị giữ ở 7,5 thì có câu giải thích.
+- Bỏ các chữ kỹ thuật: tên phiên bản công thức, "OHLCV", "TB20", "±0,5". Tin tức ghi rõ có tính vào điểm hay không.
+- **Mục "Chạy bóng" đổi tên "Chạy thử"**, viết lại: cách chấm đúng/sai một câu, kết quả dạng "đúng 1/2 lần (50%)", tách "Điểm chấm" và "Quy tắc giá vốn của anh", phần khác biệt chỉ hiện khi có.
+- File xuất cho AI không đổi (vẫn giữ số gốc).
+- **Kiểm:** chạy app với 3 mã dữ liệu giả (đang lãi có áp lực bán cao, đang lỗ có cảnh báo, mã theo dõi chấm trong phiên) ở 375px: đủ câu, mức đánh giá khớp câu mô tả, không tràn ngang, không lỗi JS. Kiểm cú pháp qua; `npm run smoke` qua. Chưa xem với điểm thật.
+
+· `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-28b (File xuất cho AI đầy đủ hơn)
 
 Owner muốn file "Xuất nhật ký" đủ dữ liệu để đem đi phân tích, vẫn giữ cách tải file về như cũ.

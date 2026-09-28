@@ -692,9 +692,11 @@
   .decision-detail p{ margin:4px 0; overflow-wrap:anywhere; }
   .decision-parts{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px;
     margin:8px 0; font-variant-numeric:tabular-nums; }
+  .decision-parts .why{ grid-column:1 / -1; margin:-2px 0 4px; color:var(--text-muted); }
   .decision-detail a{ color:var(--brand); overflow-wrap:anywhere; }
   .decision-pilot{ color:var(--text-muted); font-size:var(--fs-label); }
   .decision-pilot p{ margin:4px 0; }
+  .decision-pilot h4{ margin:12px 0 4px; color:var(--text); font-weight:500; }
   @media(prefers-reduced-motion:reduce){ .decision-score-button{ transition:none; } }
   .compact-tools{ display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px; min-height:44px; }
   .compact-search-wrap{ display:flex; align-items:center; gap:8px; min-width:0; margin-right:auto; }
@@ -1379,7 +1381,7 @@
 
   <div class="panel" id="panel-phan-tich" role="tabpanel" aria-labelledby="tab-phan-tich" hidden>
   <section>
-    <div class="sec-head" data-sec="pt-chay-bong"><h2>Chạy bóng</h2></div>
+    <div class="sec-head" data-sec="pt-chay-bong"><h2>Chạy thử</h2></div>
     <div class="card decision-pilot" id="decision-pilot" role="status" aria-live="polite"></div>
   </section>
   <section>
@@ -2594,7 +2596,6 @@ function renderDecisionHub(summary){
 
 /* Server lưu điểm thang 0–100; app hiển thị thang 10 (7,4) để không lẫn với % hay "điểm" giá. */
 function score10(n){ return (n / 10).toLocaleString('vi-VN', { minimumFractionDigits:1, maximumFractionDigits:1 }); }
-function signedScore10(n){ return (n > 0 ? '+' : n < 0 ? '−' : '') + score10(Math.abs(n)); }
 function decisionStatus(ticker, summary){
   const row = decisionState.latest[ticker];
   const error = decisionState.error || decisionState.control?.error;
@@ -2623,42 +2624,104 @@ function decisionScoreLine(ticker, summary){
     '" aria-label="Xem phân tích điểm ' + esc(ticker) + '">' + (st.row ? decisionScoreSpans(st, false) : '') +
     '<span>' + esc(st.label) + '</span></button>';
 }
+/* Cảnh báo của bot (chuỗi cố định trong functions/decision-scoring.js) → lời thường.
+   Không sửa chuỗi gốc phía bot: renderDecisionPilot đang đếm theo đúng chuỗi đó. */
+const DECISION_RISK_TEXT = {
+  "Chưa đủ dữ liệu rổ ngành": "Chưa đủ dữ liệu các mã cùng ngành để so sánh",
+  "Xu hướng yếu — nguy cơ bắt dao rơi": "Giá đang trong đà giảm — dễ mua phải lúc giá còn giảm tiếp",
+  "VN-Index đang yếu": "Thị trường chung đang yếu",
+  "Thanh khoản TB20 dưới 20 tỷ đồng": "Ít người giao dịch (dưới 20 tỷ đồng mỗi phiên) — khó mua bán nhanh",
+  "Biến động ATR14 trên 6%": "Giá lên xuống rất mạnh (hơn 6% mỗi phiên)"
+};
+/* Diễn giải điểm cho người không chuyên: mỗi thành phần = mức đánh giá + một câu dựng từ số liệu bot đã lưu.
+   Chỉ đổi cách hiển thị; công thức và điểm lưu trên server giữ nguyên. */
 function analysisDetail(ticker, summary){
   const r = decisionState.latest[ticker];
   if(!r) return '';
-  const labels = { market:'Thị trường + rổ ngành', trend:'Xu hướng', pullback:'Nhịp điều chỉnh', confirmation:'Giá–khối lượng',
-    price:'Giá vốn / giá mục tiêu', risk:'Thanh khoản + biến động', relative:'Sức mạnh tương đối', distribution:'Phân phối', heat:'Tăng nóng', profit:'Khoảng lợi nhuận' };
-  const weights = { buy:{market:25,trend:20,pullback:20,confirmation:10,price:10,risk:10}, sell:{trend:25,relative:20,distribution:20,heat:15,profit:15} };
-  const parts = (kind, values) => '<div class="decision-parts">' + Object.entries(values || {}).map(([key,value]) =>
-    '<span>' + labels[key] + '</span><span>' + score10(value) + '/' + score10(weights[kind][key]) + '</span>').join('') + '</div>';
-  const delta = (now, previous) => previous == null ? '' : ' · ' + signedScore10(now - previous);
+  const m = r.market || {}, sector = r.sector || {};
+  const num = (n, digits = 1) => Number(n).toLocaleString('vi-VN', { maximumFractionDigits:digits });
+  const maGap = Number.isFinite(r.close) && m.ma20 > 0 ? (r.close / m.ma20 - 1) * 100 : null;
+  const excess = Number.isFinite(m.excess20Pct) ? m.excess20Pct : null;
+  const levels = Number.isFinite(r.avgCost) && r.strategy ? strategyLevels(r.avgCost, r.strategy) : null;
+  const buyAt = levels ? levels.buyAt : r.targetBuy;
+  const vsIndex = excess === null ? '' : (excess >= 0 ? 'tăng hơn' : 'kém') + ' VN-Index ' + num(Math.abs(excess)) + '% trong 1 tháng';
+  const vsAverage = maGap === null ? '' : 'Giá ' + (maGap >= 0 ? 'cao hơn ' : 'thấp hơn ') + num(Math.abs(maGap)) + '% so với giá trung bình 1 tháng';
+  const buyWhy = {
+    market:['Thị trường chung', 25, 'VN-Index ' + (m.trend >= 20 ? 'đang đi lên' : m.trend >= 15 ? 'đi ngang' : 'đang yếu') + ' · ' +
+      (sector.available ? 'nhóm ' + sector.name + ' ' + (sector.return20Pct >= 0 ? 'tăng ' : 'giảm ') + num(Math.abs(sector.return20Pct)) + '% trong 1 tháng'
+        : 'chưa đủ dữ liệu nhóm ngành')],
+    trend:['Đà tăng của mã', 20, [vsAverage, vsIndex].filter(Boolean).join(' · ')],
+    pullback:['Thời điểm mua', 20, maGap === null ? '' : maGap > 5 ? 'Giá đã chạy xa giá trung bình 1 tháng (+' + num(maGap) + '%) — mua lúc này là mua đuổi'
+      : maGap > 3 ? 'Giá hơi xa giá trung bình 1 tháng (+' + num(maGap) + '%)'
+      : maGap >= -1 ? 'Giá đang sát giá trung bình 1 tháng — không phải mua đuổi'
+      : 'Giá đang dưới giá trung bình 1 tháng — chưa thấy dấu hiệu hồi'],
+    confirmation:['Phiên gần nhất', 10, null],
+    price:['So với giá anh định mua', 10, !Number.isFinite(buyAt) ? 'Chưa có giá mua thêm hoặc giá kỳ vọng'
+      : r.close <= buyAt ? 'Giá đã về mức ' + (levels ? 'mua thêm ' : 'kỳ vọng ') + fmtPrice(buyAt)
+      : 'Còn cao hơn mức ' + (levels ? 'mua thêm ' : 'kỳ vọng ') + fmtPrice(buyAt) + ' khoảng ' + num((r.close / buyAt - 1) * 100) + '%'],
+    risk:['Độ an toàn', 10, (Number.isFinite(m.avgValue20) ? 'Giao dịch trung bình ' + num(m.avgValue20 / 1e9, 0) + ' tỷ đồng mỗi phiên' : '') +
+      (Number.isFinite(m.atr14Pct) ? ' · giá dao động khoảng ' + num(m.atr14Pct) + '% mỗi phiên' : '')]
+  };
+  const sellWhy = {
+    trend:['Đà tăng yếu đi', 25, null],
+    relative:['So với thị trường', 20, vsIndex ? 'Mã ' + vsIndex : ''],
+    distribution:['Có người bán ra mạnh', 20, m.distributionDays > 0
+      ? m.distributionDays + ' phiên giảm kèm lượng bán lớn trong 5 phiên gần nhất' : 'Không có phiên bán tháo trong 5 phiên gần nhất'],
+    heat:['Tăng quá nóng', 15, maGap === null ? '' : maGap >= 6 ? vsAverage + ' — đang tăng nóng' : vsAverage],
+    profit:['Gần ngưỡng bán', 15, !levels ? '' : r.close >= levels.sellAt ? 'Giá đã chạm ngưỡng bán ' + fmtPrice(levels.sellAt)
+      : 'Giá ' + fmtPrice(r.close) + ' · ngưỡng bán ' + fmtPrice(levels.sellAt)]
+  };
+  const grade = (value, max, sell) => {
+    const ratio = max ? value / max : 0;
+    if(sell) return value <= 0 ? 'Không' : ratio >= .7 ? 'Cao' : ratio >= .4 ? 'Vừa' : 'Thấp';
+    return ratio >= .7 ? 'Tốt' : ratio >= .5 ? 'Vừa' : 'Kém';
+  };
+  // Hai thành phần không lưu số chi tiết → câu theo mức đánh giá.
+  const fallback = { buy:{ confirmation:{ 'Tốt':'Giá tăng và có nhiều người mua hơn bình thường', 'Vừa':'Giá nhích nhẹ, lượng mua bình thường', 'Kém':'Giá giảm hoặc ít người mua' } },
+    sell:{ trend:{ 'Cao':'Giá đã mất đà tăng', 'Vừa':'Đà tăng chững lại', 'Thấp':'Đà tăng vẫn còn, hơi chậm lại', 'Không':'Đà tăng vẫn tốt' } } };
+  const parts = (kind, values) => '<div class="decision-parts">' + Object.entries(values || {}).map(([key, value]) => {
+    const [label, max, text] = (kind === 'sell' ? sellWhy : buyWhy)[key] || [key, 0, ''];
+    const g = grade(value, max, kind === 'sell');
+    const why = text ?? fallback[kind][key]?.[g] ?? '';
+    return '<span>' + label + '</span><span>' + g + '</span>' + (why ? '<span class="why">' + esc(why) + '</span>' : '');
+  }).join('') + '</div>';
+  const level = (score, sell) => sell
+    ? (score >= r.threshold ? 'cao' : score >= 60 ? 'khá cao' : score >= 40 ? 'vừa' : 'thấp')
+    : (score >= r.threshold ? 'đáng chú ý' : score >= 60 ? 'khá' : score >= 40 ? 'trung bình' : 'thấp');
+  const delta = (now, previous) => previous == null || now === previous ? '' : ' · ' + (now > previous ? 'tăng ' : 'giảm ') + score10(Math.abs(now - previous)) + ' so với lần trước';
+  const rawBuy = Object.values(r.buyParts || {}).reduce((a, b) => a + b, 0) + (r.newsImpact || 0);
+  const capped = r.buyScore === 75 && Math.round(rawBuy) > 75;
   const held = summary.held.find((h) => h.ticker === ticker), strategy = activeStrategy(todayStr());
   const cash = projectedCash(summary, { kind:'buy', qty:strategy.lotSize, price:r.close });
   const available = held ? computeSellAvailability(state.transactions, ticker, new Date()).available : 0;
-  const newsLabel = (!r.newsAiReady && !['source-error','ai-error'].includes(r.newsStatus) ? 'Chưa cấu hình AI đọc tin · tác động 0' : '') || ({ 'ai-unconfigured':'Chưa cấu hình AI đọc tin · tác động 0', 'source-error':'Lỗi nguồn tin · tác động 0',
-    'ai-error':'AI chưa đọc được tin · tác động 0', partial:'Nguồn tin chưa đầy đủ' })[r.newsStatus] || 'Tin đã kiểm tra';
+  const newsReady = r.newsAiReady && !['ai-unconfigured','source-error','ai-error'].includes(r.newsStatus);
+  const newsLine = r.newsStatus === 'source-error' ? 'Không lấy được tin lúc chấm — tin tức chưa tính vào điểm'
+    : r.newsStatus === 'ai-error' ? 'AI chưa đọc được tin — tin tức chưa tính vào điểm'
+    : !newsReady ? 'Chưa bật AI đọc tin — tin tức chưa tính vào điểm'
+    : !r.newsImpact ? 'Tin tức không làm thay đổi điểm'
+    : 'Tin ' + (r.newsImpact > 0 ? 'tốt: cộng ' : 'xấu: trừ ') + score10(Math.abs(r.newsImpact)) + ' điểm Mua, ' + (r.newsImpact > 0 ? 'giảm ' : 'tăng ') + 'áp lực Bán tương ứng';
   const items = r.sourceNews || r.news || [];
   const time = r.updatedAt ? new Date(r.updatedAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Ho_Chi_Minh'}) : '';
-  return '<div class="decision-detail"><p>Thử nghiệm · ' + esc(r.scoreVersion) + ' · ' + esc(time) +
-      (Number.isFinite(r.threshold) ? ' · Đáng chú ý từ ' + score10(r.threshold) : '') + '</p>' +
-    '<h4>Điểm Mua ' + score10(r.buyScore) + delta(r.buyScore,r.previousBuy) + '</h4>' + parts('buy',r.buyParts) +
-    (r.sellScore === null ? '<p>Áp lực Bán — ' + (held ? 'vị thế chưa có lãi' : 'chưa nắm giữ') + '</p>' :
-      '<h4>Áp lực Bán ' + score10(r.sellScore) + delta(r.sellScore,r.previousSell) + '</h4>' + parts('sell',r.sellParts)) +
-    '<p>Tin: Mua ' + signedScore10(r.newsImpact) + ' · Bán ' + signedScore10(-r.newsImpact) + ' · tối đa ±' + score10(5) + '</p>' +
-    (r.conflict ? '<p class="neg">Xung đột — Mua và Bán cùng cao</p>' : '') +
-    r.reasons.map((text) => '<p>' + esc(text) + '</p>').join('') +
-    r.riskFlags.map((text) => '<p class="neg">' + esc(text) + '</p>').join('') +
-    '<p>Giá chấm ' + fmtPrice(r.close) + ' · ' + esc(r.priceSource || '') + '</p>' +
-    '<p>Sau mua ' + strategy.lotSize + ' CP: ' + (cash.ratio == null ? '—' : cash.ratio.toFixed(1) + '% tiền mặt') +
-      (cash.cash < 0 ? ' · Không đủ tiền mặt' : cash.ratio < strategy.minCashRatio ? ' · Dưới mục tiêu tiền mặt' : '') + '</p>' +
-    (held ? '<p>Có thể bán ' + available.toLocaleString('vi-VN') + ' CP · ' + ((state.tickers[ticker] || {}).hold ? 'Giữ dài hạn' : 'Giao dịch') + '</p>' : '') +
-    '<h4>' + esc(newsLabel) + '</h4><p>' + esc(r.newsCoverage || '') + '</p>' +
+  const risks = (r.riskFlags || []).map((text) => DECISION_RISK_TEXT[text] || text);
+  return '<div class="decision-detail"><p>Đang chạy thử, chỉ để tham khảo · chấm lúc ' + esc(time) + ' theo giá ' + fmtPrice(r.close) +
+      (r.phase === 'intraday' ? ' · trong phiên nên còn thay đổi' : '') + '</p>' +
+    '<h4>Điểm Mua ' + score10(r.buyScore) + '/10 · ' + level(r.buyScore) + delta(r.buyScore, r.previousBuy) + '</h4>' + parts('buy', r.buyParts) +
+    (capped ? '<p>Điểm Mua bị giữ tối đa 7,5 vì ' + (risks.length ? 'có rủi ro bên dưới' : 'giá chưa ở nhịp chỉnh hợp lý') + '</p>' : '') +
+    (r.sellScore === null ? '<p>Chưa chấm áp lực Bán vì ' + (held ? 'mã đang chưa có lãi' : 'anh chưa nắm giữ mã này') + '</p>' :
+      '<h4>Áp lực Bán ' + score10(r.sellScore) + '/10 · ' + level(r.sellScore, true) + delta(r.sellScore, r.previousSell) + '</h4>' + parts('sell', r.sellParts)) +
+    (r.conflict ? '<p class="neg">Điểm Mua và áp lực Bán cùng cao — hai hướng trái nhau, cần xem kỹ</p>' : '') +
+    (risks.length ? '<h4>Cần lưu ý</h4>' + risks.map((text) => '<p class="neg">' + esc(text) + '</p>').join('') : '') +
+    '<h4>Tiền và cổ phiếu</h4>' +
+    '<p>Nếu mua thêm ' + strategy.lotSize + ' CP: tiền mặt còn ' + (cash.ratio == null ? '—' : num(cash.ratio) + '% tổng tài sản') +
+      (cash.cash < 0 ? ' · không đủ tiền' : cash.ratio < strategy.minCashRatio ? ' · dưới mục tiêu ' + num(strategy.minCashRatio, 0) + '%' : '') + '</p>' +
+    (held ? '<p>Bán được ngay ' + available.toLocaleString('vi-VN') + ' CP · ' + ((state.tickers[ticker] || {}).hold ? 'giữ dài hạn' : 'giao dịch') + '</p>' : '') +
+    '<h4>Tin tức</h4><p>' + esc(newsLine) + '</p>' +
     (items.length ? items.map((n) => {
       let url=''; try { const u=new URL(n.url); if(u.protocol==='https:' && /(^|\.)hnx\.vn$/.test(u.hostname)) url=u.href; } catch(_){}
       return '<p>' + (url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(n.title) + '</a>' : esc(n.title)) +
-        ' · ' + esc(n.publishedAt?.slice(0,10) || '') + '</p><p>' + esc(n.summary || '') +
-        ' · ' + (n.analyzed ? 'Tin cậy ' + Math.round(n.confidence * 100) + '%' : 'Chưa được AI đánh giá') + '</p>';
-    }).join('') : '<p>Không có tin liên quan trong nguồn đã lấy</p>') + '</div>';
+        ' · ' + esc(fmtDateVN(n.publishedAt?.slice(0,10) || '')) + '</p><p>' + esc(n.summary || '') +
+        ' · ' + (n.analyzed ? 'AI chắc ' + Math.round(n.confidence * 100) + '%' : 'AI chưa đọc') + '</p>';
+    }).join('') : '<p>Không có tin mới về mã này</p>') + '</div>';
 }
 /* Mã đang mở ở tab Phân tích — nhớ trong phiên để vẽ lại khi giá/điểm về không bị gập. */
 const analysisOpen = new Set();
@@ -2701,23 +2764,31 @@ function renderDecisionPilot(){
     const settled = rows.filter((r) => ['win','loss'].includes(r.evaluation?.primary));
     const complete = rows.filter((r) => r.evaluation?.complete && Number.isFinite(r.evaluation.effectPct));
     const average = complete.length ? complete.reduce((sum,r) => sum+r.evaluation.effectPct,0)/complete.length : null;
-    return (kind === 'buy' ? 'Mua' : 'Bán') + ': ' + (settled.length ? Math.round(settled.filter((r) => r.evaluation.primary==='win').length/settled.length*100)+'% đúng · '+settled.length+' mẫu' : 'Đang đo · '+rows.length+' mẫu') +
-      (average === null ? '' : ' · TB '+fmtPct(average)) + ' · Không xác định '+rows.filter((r) => r.evaluation?.primary==='indeterminate').length + ' · Hết kỳ '+rows.filter((r) => r.evaluation?.primary==='timeout').length;
+    const unclear = rows.filter((r) => r.evaluation?.primary==='indeterminate').length;
+    const timeout = rows.filter((r) => r.evaluation?.primary==='timeout').length;
+    const wins = settled.filter((r) => r.evaluation.primary==='win').length;
+    return (kind === 'buy' ? 'Báo Mua' : 'Báo Bán') + ': ' + (!rows.length ? 'chưa có lần nào'
+        : settled.length ? 'đúng ' + wins + '/' + settled.length + ' lần (' + Math.round(wins/settled.length*100) + '%)' : 'chưa có kết quả, đang theo dõi ' + rows.length + ' lần') +
+      (average === null ? '' : ' · sau ' + (policy?.sessions || 20) + ' phiên giá đi đúng hướng trung bình ' + fmtPct(average)) +
+      (unclear ? ' · ' + unclear + ' lần chưa phân định' : '') + (timeout ? ' · ' + timeout + ' lần giá không chạm mốc nào' : '');
   };
   const count = events.filter((r) => (r.engine || 'decision') === 'decision').length;
   const weakBuy = events.filter((r) => r.engine==='legacy' && r.kind==='buy' && r.snapshot?.riskFlags?.includes('Xu hướng yếu — nguy cơ bắt dao rơi')).length;
   const extraBuy = events.filter((r) => r.engine==='decision' && r.kind==='buy' && !r.legacyReached).length;
   const earlySell = events.filter((r) => r.engine==='legacy' && r.kind==='sell' && r.snapshot?.sellScore < r.policy?.threshold).length;
   const policy = events[0]?.policy;
-  panel.innerHTML = '<div>Chạy bóng ' + Math.min(20,days) + '/20 phiên · ' + count + ' sự kiện' + (version ? ' · ' + esc(version) : '') + '</div>' +
-    (policy ? '<p>Đo ' + policy.sessions + ' phiên: Mua đúng khi +' + policy.winPct + '% trước −' + policy.lossPct + '% · Bán đúng khi −' +
-      policy.winPct + '% trước +' + policy.lossPct + '% · Sự kiện ghi khi vượt ' + score10(policy.threshold) + ' lúc đóng cửa</p>' : '') +
-    '<p>' + esc(summarize('buy','decision')) + '</p><p>' + esc(summarize('sell','decision')) + '</p>' +
-    '<p>Chiến lược đang áp dụng · ' + esc(summarize('buy','legacy')) + '</p><p>Chiến lược đang áp dụng · ' + esc(summarize('sell','legacy')) + '</p>' +
-    '<p>Ngưỡng mua khi xu hướng yếu '+weakBuy+' · Cơ hội mua ngoài ngưỡng '+extraBuy+' · Chốt lời khi áp lực bán thấp '+earlySell+'</p>' +
-    '<p>' + (days >= 20 && count >= 10 ? 'Đủ kỳ thử nghiệm · vẫn chạy bóng' : days >= 20 ? 'Chưa đủ 10 mẫu · tiếp tục chạy bóng' : 'Tín hiệu hiện tại tiếp tục theo chiến lược đang áp dụng') + '</p>' +
-    (decisionState.error || decisionState.control?.error ? '<p class="neg">' + esc(decisionState.error || decisionState.control.error) + '</p>' : '') +
-    (decisionState.control?.missing?.length ? '<p class="neg">Thiếu dữ liệu: ' + esc(decisionState.control.missing.join(', ')) + '</p>' : '');
+  panel.innerHTML = '<div>Đã chạy thử ' + Math.min(20,days) + '/20 phiên · ' + count + ' lần điểm vượt ' + score10(policy?.threshold ?? 80) + '</div>' +
+    (policy ? '<p>Cách chấm: điểm Mua được tính là đúng nếu trong ' + policy.sessions + ' phiên sau đó giá tăng ' + policy.winPct +
+      '% trước khi giảm ' + policy.lossPct + '%. Áp lực Bán thì ngược lại.</p>' : '') +
+    '<h4>Điểm chấm</h4><p>' + esc(summarize('buy','decision')) + '</p><p>' + esc(summarize('sell','decision')) + '</p>' +
+    '<h4>Quy tắc giá vốn của anh</h4><p>' + esc(summarize('buy','legacy')) + '</p><p>' + esc(summarize('sell','legacy')) + '</p>' +
+    (weakBuy || extraBuy || earlySell ? '<h4>Khác biệt giữa hai cách</h4>' +
+      (weakBuy ? '<p>' + weakBuy + ' lần quy tắc báo Mua khi giá đang trong đà giảm</p>' : '') +
+      (extraBuy ? '<p>' + extraBuy + ' lần điểm thấy cơ hội Mua mà quy tắc chưa báo</p>' : '') +
+      (earlySell ? '<p>' + earlySell + ' lần quy tắc báo Bán khi áp lực bán còn thấp</p>' : '') : '') +
+    '<p>' + (days >= 20 && count >= 10 ? 'Đã đủ thời gian thử · điểm vẫn chỉ để tham khảo' : days >= 20 ? 'Đủ 20 phiên nhưng chưa đủ 10 lần để kết luận · tiếp tục chạy thử' : 'Tín hiệu Mua/Bán vẫn theo quy tắc giá vốn của anh') + '</p>' +
+    (decisionState.error || decisionState.control?.error ? '<p class="neg">Lần chấm gần nhất bị lỗi: ' + esc(decisionState.error || decisionState.control.error) + '</p>' : '') +
+    (decisionState.control?.missing?.length ? '<p class="neg">Chưa chấm được: ' + esc(decisionState.control.missing.join(', ')) + '</p>' : '');
 }
 async function refreshDecisionScores(){
   if(decisionState.busy || !ready) return;
