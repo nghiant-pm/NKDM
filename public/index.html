@@ -748,6 +748,10 @@
     padding:0; overflow:auto;
   }
   .chart-head{ padding:10px 12px; margin:0; border-bottom:1px solid var(--border); background:var(--bg); }
+  .chart-head{ flex-wrap:nowrap; }
+  .chart-title{ min-width:0; }
+  .chart-company{ margin:2px 0 0; color:var(--text-muted); font-size:var(--fs-meta); }
+  .chart-company:empty{ display:none; }
   .chart-body{ display:grid; gap:12px; padding:16px; background:var(--surface); }
   .chart-range{ display:flex; gap:8px; }
   .chart-range .btn{ min-width:72px; min-height:44px; padding:8px 12px; }
@@ -1400,7 +1404,10 @@
 
 <dialog class="edit-dialog chart-dialog" id="chart-dialog" aria-labelledby="chart-dialog-title">
   <div class="compact-head chart-head">
-    <h2 id="chart-dialog-title">Biểu đồ</h2>
+    <div class="chart-title">
+      <h2 id="chart-dialog-title">Biểu đồ</h2>
+      <p class="chart-company" id="chart-company"></p>
+    </div>
     <button class="icon-action" id="chart-close" type="button" aria-label="Đóng" title="Đóng"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div class="chart-body">
@@ -1507,6 +1514,7 @@ const OWNER_EMAIL = "nghiant@youmed.vn";
    Chỉ gửi đi danh sách mã, không gửi số lượng hay số dư. */
 const PRICE_API = "https://bgapidatafeed.vps.com.vn/getliststockdata/";
 const PRICE_HISTORY_API = "https://histdatafeed.vps.com.vn/tradingview/history";
+const STOCK_LIST_API = "https://bgapidatafeed.vps.com.vn/getlistallstock";
 /* Nguồn OHLCV để CHẤM ĐIỂM — phải trùng HISTORY_API trong functions/index.js để điểm Quét ngay
    khớp bot. Biểu đồ (PRICE_HISTORY_API) vẫn dùng VPS. */
 const SCREENING_HISTORY_API = "https://dchart-api.vndirect.com.vn/dchart/history";
@@ -3253,6 +3261,24 @@ async function fetchPriceHistory(ticker){
     .filter((x) => Number.isFinite(x.t) && Number.isFinite(x.p) && x.p > 0)
     .sort((a, b) => a.t - b.t);
 }
+/* Tên công ty + sàn theo mã. Danh sách ~650KB nên tải 1 lần mỗi phiên, giữ trong bộ nhớ.
+   Lỗi thì trả null và lần sau thử lại. */
+let stockNamesPromise = null;
+function stockCompany(ticker){
+  if(!stockNamesPromise){
+    stockNamesPromise = fetch(STOCK_LIST_API).then((res) => {
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then((rows) => {
+      const map = {};
+      (Array.isArray(rows) ? rows : []).forEach((r) => {
+        if(r && r.stock_code) map[r.stock_code] = { name:r.name_vn || r.name_en || "", exchange:r.post_to || "" };
+      });
+      return map;
+    }).catch((e) => { console.error(e); stockNamesPromise = null; return {}; });
+  }
+  return stockNamesPromise.then((map) => map[ticker] || null);
+}
 function renderStockChart(){
   const svg = $("chart-svg"), status = $("chart-status"), tooltip = $("chart-tooltip");
   const end = chartHistory.length ? chartHistory[chartHistory.length - 1].t : 0;
@@ -3371,6 +3397,11 @@ async function openStockChart(ticker, trigger){
   chartRangeDays = 90;
   chartReturnFocus = trigger || document.activeElement;
   $("chart-dialog-title").textContent = "Biểu đồ · " + ticker;
+  $("chart-company").textContent = "";
+  stockCompany(ticker).then((info) => {
+    if(chartTicker !== ticker || !info) return;
+    $("chart-company").textContent = [info.name, info.exchange].filter(Boolean).join(" · ");
+  });
   $("chart-last").textContent = "—";
   $("chart-change").textContent = "";
   $("chart-legend").innerHTML = "";

@@ -4,6 +4,14 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-28 (Tên công ty trong popup biểu đồ)
+
+- Bấm mã mở biểu đồ → dưới tiêu đề hiện **tên công ty + sàn** (VD "Công ty Cổ phần FPT · HOSE") để chắc đang xem đúng mã. Tên dài tự xuống dòng, không bị cắt.
+- Nguồn: danh sách toàn bộ mã của datafeed VPS (`getlistallstock`, ~650KB, cho gọi từ trình duyệt). Tải **1 lần mỗi phiên** ở lần mở biểu đồ đầu tiên, giữ trong bộ nhớ, không ghi Firestore/localStorage. Lỗi mạng thì chỉ không hiện dòng tên, biểu đồ vẫn chạy.
+- **Kiểm:** gọi nguồn từ đúng tên miền app (3.528 mã, ~1,3 giây); dựng popup ở 375px với tên dài nhất thường gặp — đủ chữ, nút đóng không lệch. Kiểm cú pháp script qua; `npm run smoke` qua. Chưa bấm với tài khoản đăng nhập thật.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-27c (File deploy.bat)
 
 - Thêm `deploy.bat` ở thư mục gốc: bấm đúp để deploy. Tự lấy code nhánh trên GitHub, hỏi trước khi cất tạm thay đổi chưa commit, chạy smoke nếu máy có thư viện, hỏi xác nhận rồi mới `firebase deploy`. Lỗi ở bước nào thì dừng và báo "Deploy CHƯA xong".

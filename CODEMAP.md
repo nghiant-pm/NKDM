@@ -112,6 +112,7 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | | `renderStrategy()` | Chiến lược hiện/lưu riêng `nearRange`, `watchNearRange` và mục tiêu tiền mặt |
 | | `renderScreeningSettings()` `saveScreeningSettings(values)` `SCREENING_FIELDS` | khu "Sàng lọc cơ hội" ở tab Chiến lược: điền sẵn bộ đang chạy (`screeningConfig()`), kiểm giới hạn `SCREENING_LIMITS`, ghi `settings/screening.analysis` (`merge`); nút Về mặc định ghi lại `SCREENING_DEFAULTS` |
 | Biểu đồ | `fetchPriceHistory(ticker)` `renderStockChart()` | khi owner bấm mã mới lấy tối đa 370 ngày giá đóng cửa từ `histdatafeed.vps.com.vn`; vẽ thêm giá vốn, ngưỡng mua/bán, mục tiêu watchlist và điểm giao dịch. Giao dịch ngoài khung giá chỉ báo số lượng, không kéo méo trục |
+| | `stockCompany(ticker)` | tên công ty + sàn cho dòng phụ dưới tiêu đề popup; tải `getlistallstock` của VPS 1 lần mỗi phiên, giữ trong bộ nhớ, lỗi thì lần sau thử lại |
 | | `showChartPoint(e)` `hideChartPoint()` | chạm/rê trên biểu đồ để tìm điểm gần nhất và hiện tooltip gồm giá + ngày; rời biểu đồ thì ẩn tooltip |
 | | `openStockChart(ticker,trigger)` `initStockChart()` | mở modal cho mã được bấm ở cả Gọn và Đầy đủ, đổi kỳ xem, vẽ lại khi màn hình đổi kích thước; đóng thì huỷ yêu cầu, dọn dữ liệu tạm và trả focus về nút vừa bấm |
 | | `renderLog()` | danh sách nhật ký; hợp ngày có snapshot, giao dịch, lệnh đặt, nạp-rút và `watch_prices`. Lệnh giữ trạng thái chờ/khớp một phần/đã khớp/đã hủy |
