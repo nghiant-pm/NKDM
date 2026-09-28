@@ -6,39 +6,44 @@ Mã tăng dần. 🔴 đang mở · 🟢 đã fix.
 
 ## Đang mở
 
-### 🔴 #016 — Chưa rõ TCBS `/se` có tính cổ phiếu mua trong ngày (T0) chưa về không
-**Triệu chứng (dự kiến, chưa gặp thật):** ngày có lệnh mua khớp, thẻ Kết nối TCBS có thể báo
-"Lịch sử chưa đầy đủ" dù không thiếu lệnh nào.
+### 🔴 #017 — Đối chiếu TCBS: phần lệnh thiếu lấy giá bình quân cả nhóm, có thể lệch nhẹ
+**Triệu chứng (dự kiến):** sổ tay đã ghi một phần lệnh trong ngày (VD sổ 100 CP, TCBS khớp 300 CP cùng mã,
+cùng chiều) → hộp Đối chiếu đề xuất thêm 200 CP, nhưng giá là bình quân của **cả 300 CP**, không phải giá khớp
+thật của 200 CP còn thiếu. Giá vốn trong sổ có thể lệch nhẹ so với TCBS.
 
-**Bug gốc:** chưa xác định. Tài liệu TCBS không nói rõ số lượng trong `/se` (tài sản) có gồm CP mua
-hôm nay chưa về tài khoản hay không. Nếu KHÔNG gồm, thì ảnh đầu kỳ + lệnh khớp (đã có lệnh mua hôm nay)
-sẽ lớn hơn số `/se` báo → `quantitiesMatch` trả sai → `historyComplete = false`.
+**Bug gốc:** `tcbsMissingTrades` so theo nhóm ngày · mã · chiều bằng **số lượng**, không ghép từng lệnh sổ tay
+với từng lệnh khớp TCBS (sổ tay không lưu mã lệnh TCBS để ghép). Đây là giới hạn của cách so, đã biết khi làm.
 
-**Cần kiểm khi đồng bộ thật:** đồng bộ vào một ngày có lệnh mua khớp, so KL mã đó ở `tcbs_positions`
-với KL trên app TCBS và với tổng lệnh khớp. Nếu lệch đúng bằng lượng mua hôm nay thì cần cách so khác
-(chưa chốt — hỏi owner trước khi sửa). Nếu hôm sau tự hết cảnh báo thì chỉ là lệch trong ngày.
+**Tạm xử lý:** bảng Vị thế trong hộp Đối chiếu sẽ hiện giá vốn lệch nếu có. Owner có thể bỏ chọn lệnh đó và
+nhập tay đúng giá.
 
-**Cần làm (việc của owner):** tạo 3 secret TCBS trong Secret Manager, nhập iOTP và đồng bộ ít nhất một
-lần vào ngày có lệnh mua.
+**File:** `public/index.html` — `tcbsMissingTrades`, `tcbsTransaction`.
 
-**File:** `functions/tcbs-service.js` — `normalizeAssets`, `quantitiesMatch`, `persistSync`;
-`public/index.html` — `renderTcbs`, `computeSellAvailability`.
+### 🔴 #016 — Đối chiếu TCBS: chưa rõ số dư tiền có gồm tiền bán chờ về (T+2) không
+**Triệu chứng (dự kiến):** trong ~2 ngày sau khi bán, mục Tiền mặt có thể báo lệch dù sổ tay đúng.
 
-### 🔴 #015 — Chưa rõ cách phân trang lệnh khớp TCBS (`matching-details`)
-**Triệu chứng (dự kiến, chưa gặp thật):** tài khoản có nhiều lệnh khớp thì có thể thiếu lệnh trong
-`tcbs_trades`, dẫn tới "Lịch sử chưa đầy đủ" hoặc lãi/lỗ đã chốt sau chuyển giao bị thiếu.
+**Bug gốc:** chưa xác định. Tài liệu TCBS không nói `cashBalance` (từ `/cashInvestments`) có tính tiền bán chưa về
+hay không. Sổ tay thì cộng tiền bán ngay ngày bán (`computeCashVND`).
 
-**Bug gốc:** chưa xác định. Tài liệu TCBS không nêu tham số phân trang. Code tạm gửi
-`pageSize=50&pageIndex=…`, đọc lần lượt từng trang, gộp theo `tradeId`, dừng khi hết dữ liệu, đủ
-`totalCount`, hoặc 2 trang liền không có lệnh mới (dấu hiệu TCBS bỏ qua tham số). Tối đa 20 trang/tiểu khoản.
-Ngắt kết nối từ chối nếu phải chép quá 480 lệnh một lượt.
+**Cần làm (việc của owner):** lần đầu đọc TCBS sau một lệnh bán, xem mục Tiền mặt có lệch đúng bằng tiền bán
+chưa về không. Nếu có: **bỏ chọn mục Tiền mặt** trong những ngày đó, đừng ghi dòng Đối chiếu — không thì 2 ngày
+sau lại lệch ngược. Báo lại kết quả để quyết định có cần sửa cách so.
 
-**Cần kiểm khi đồng bộ thật:** so số lệnh trong `tcbs_trades` với lịch sử khớp trên app TCBS cùng khoảng
-ngày; xem TCBS có trả `totalCount` không và trang 2 có khác trang 1 không.
+**File:** `functions/tcbs-service.js` — `normalizeCash`; `public/index.html` — `renderTcbsReview`.
 
-**Cần làm (việc của owner):** như #016 — tạo secret + nhập iOTP để có lượt đồng bộ thật.
+### 🔴 #015 — Đối chiếu TCBS: chưa rõ danh sách lệnh khớp trả về bao xa
+**Triệu chứng (dự kiến):** lệnh của ngày trước bị thiếu trong sổ có thể **không hiện** ở mục "Lệnh thiếu trong sổ";
+chỉ thấy gián tiếp qua bảng Vị thế lệch số lượng.
 
-**File:** `functions/tcbs-service.js` — `readTrades`, `normalizeTrade`, `disconnect`.
+**Bug gốc:** chưa xác định. Tài liệu TCBS không nêu cách phân trang hay khoảng thời gian của `matching-details`.
+Nếu nó chỉ trả lệnh trong ngày thì lệnh cũ không đến được app. Code đang đọc lần lượt từng trang (tối đa 20 trang
+× 50 lệnh), dừng khi hết dữ liệu hoặc 2 trang liền không có lệnh mới; lệnh thiếu trường thì bỏ và hiện dòng
+"Danh sách lệnh chưa đầy đủ".
+
+**Cần làm (việc của owner):** lần đọc TCBS thật đầu tiên, xem mục Lệnh thiếu có hiện được lệnh của các ngày trước
+không. Nếu không, báo lại để tìm tham số ngày của TCBS.
+
+**File:** `functions/tcbs-service.js` — `readTrades`, `normalizeTrade`; `public/index.html` — `tcbsMissingTrades`.
 
 ### 🔴 #014 — Lớp tin của Điểm quyết định chưa đủ khóa AI và độ phủ nguồn
 **Triệu chứng:** điểm kỹ thuật chạy được nhưng tin chưa được AI phân tích; nguồn HNX RSS không bao phủ toàn bộ HOSE và tin ngành. Không được coi tính năng tin đã hoàn tất.

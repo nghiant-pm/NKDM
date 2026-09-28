@@ -398,29 +398,20 @@
   .fact .v{ font-size:var(--fs-body); }
   .fact .v.pos{ color:var(--pos); }
   .fact .v.neg{ color:var(--neg); }
-  .tcbs-status{ display:flex; align-items:flex-start; gap:9px; margin-bottom:12px; }
-  .tcbs-status .dot{ margin-top:7px; }
-  .tcbs-status-main{ min-width:0; flex:1; }
-  .tcbs-status-title{ font-weight:500; }
-  .tcbs-status-meta{ margin-top:2px; color:var(--text-muted); font-size:var(--fs-label); font-variant-numeric:tabular-nums; }
-  .tcbs-actions{ display:flex; gap:8px; flex-wrap:wrap; }
-  .tcbs-actions .btn{ min-height:44px; }
-  .tcbs-preview{ margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border); }
-  #tcbs-btn.loading .ui-icon{ animation:spin .8s linear infinite; }
-  #tcbs-btn.warn{ color:var(--neg); border-color:var(--neg); }
-  .tcbs-compare{ display:grid; grid-template-columns:1fr auto auto; gap:7px 12px; align-items:center; font-size:var(--fs-label); }
-  .tcbs-compare .head{ color:var(--text-muted); }
-  .tcbs-compare .value{ text-align:right; font-variant-numeric:tabular-nums; }
-  .tcbs-compare .diff{ color:var(--warn); }
-  .manual-locked{ opacity:.65; }
-  @media(max-width:430px){
-    .tcbs-actions{ flex-direction:column; }
-    .tcbs-actions .btn{ width:100%; }
-    .tcbs-compare{ gap:7px 8px; font-size:var(--fs-meta); }
-  }
   .target-value{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .edit-dialog{ width:min(360px,calc(100% - 32px)); border:1px solid var(--border); border-radius:12px; padding:20px; background:var(--bg); color:var(--text); }
   .edit-dialog.workflow-dialog{ width:min(560px,calc(100% - 24px)); max-height:calc(100dvh - 32px); overflow:auto; }
+  #tcbs-btn.loading .ui-icon{ animation:spin .8s linear infinite; }
+  .tcbs-meta{ color:var(--text-muted); font-size:var(--fs-label); margin-bottom:4px; font-variant-numeric:tabular-nums; }
+  .tcbs-block{ padding:12px 0; border-bottom:1px solid var(--border); }
+  .tcbs-head{ font-weight:500; margin-bottom:4px; }
+  .tcbs-row{ display:flex; align-items:center; gap:10px; min-height:44px; font-variant-numeric:tabular-nums; }
+  .tcbs-row input{ width:18px; height:18px; flex:none; margin:0; }
+  .tcbs-muted{ color:var(--text-muted); }
+  .tcbs-compare{ display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:6px 12px; font-size:var(--fs-label); font-variant-numeric:tabular-nums; }
+  .tcbs-compare .h{ color:var(--text-muted); }
+  .tcbs-compare .v{ text-align:right; }
+  #tcbs-review .today-actions{ margin-top:12px; }
   .edit-dialog::backdrop{ background:rgba(0,0,0,.4); }
 
   .chip{
@@ -889,7 +880,7 @@
     <button class="icon-btn" id="global-price-refresh" type="button" aria-label="Cập nhật giá tất cả mã" title="Cập nhật giá tất cả mã">
       <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M18.5 9A7 7 0 0 0 6.2 6.2L4 8M5.5 15A7 7 0 0 0 17.8 17.8L20 16"/></svg>
     </button>
-    <button class="icon-btn" id="tcbs-btn" type="button" aria-label="Đồng bộ TCBS" title="Đồng bộ TCBS">
+    <button class="icon-btn" id="tcbs-btn" type="button" aria-label="Đối chiếu TCBS" title="Đối chiếu TCBS">
       <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10h18"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 21h18"/><path d="M12 3 3 8h18z"/></svg>
     </button>
     <button class="icon-btn" id="pnl-privacy-btn" type="button" aria-pressed="false" aria-label="Ẩn lãi lỗ dashboard" title="Ẩn lãi lỗ dashboard">
@@ -1270,28 +1261,6 @@
   </section>
 
   <section>
-    <div class="card" id="tcbs-card">
-      <div class="sec-head" data-sec="st-tcbs">
-        <h2>Kết nối TCBS</h2>
-        <span class="meta" id="tcbs-session-meta"></span>
-      </div>
-      <div class="tcbs-status" role="status" aria-live="polite">
-        <span class="dot" id="tcbs-status-dot"></span>
-        <div class="tcbs-status-main">
-          <div class="tcbs-status-title" id="tcbs-status-title">Chưa kết nối</div>
-          <div class="tcbs-status-meta" id="tcbs-status-meta"></div>
-        </div>
-      </div>
-      <div class="tcbs-preview" id="tcbs-preview" hidden></div>
-      <div class="tcbs-actions">
-        <button class="btn primary" id="tcbs-confirm" type="button" hidden>Xác nhận chuyển sang TCBS</button>
-        <button class="btn danger" id="tcbs-disconnect" type="button" hidden>Ngắt kết nối</button>
-      </div>
-      <div class="form-msg" id="tcbs-msg" role="status" aria-live="polite"></div>
-    </div>
-  </section>
-
-  <section>
     <div class="card">
       <div class="sec-head" data-sec="st-doi"><h2>Đổi chiến lược</h2></div>
       <form id="st-form" novalidate>
@@ -1520,16 +1489,22 @@
   </form>
 </dialog>
 
-<dialog class="edit-dialog" id="tcbs-dialog" aria-labelledby="tcbs-otp-label">
+<dialog class="edit-dialog workflow-dialog" id="tcbs-dialog" aria-labelledby="tcbs-dialog-title">
+  <div class="compact-head"><h2 id="tcbs-dialog-title">Đối chiếu TCBS</h2><button class="icon-action" type="button" data-tcbs-close aria-label="Đóng" title="Đóng"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
   <form id="tcbs-form">
-    <label id="tcbs-otp-label" for="tcbs-otp">iOTP TCBS</label>
+    <label for="tcbs-otp">iOTP</label>
     <input id="tcbs-otp" type="password" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4,10}" required>
-    <div class="today-actions">
-      <button class="btn" id="tcbs-cancel" type="button">Huỷ</button>
-      <button class="btn primary" id="tcbs-connect" type="submit">Kết nối</button>
-    </div>
-    <div class="form-msg" id="tcbs-dialog-msg" role="status"></div>
+    <button class="btn primary wide" id="tcbs-read" type="submit">Đọc TCBS</button>
   </form>
+  <div id="tcbs-review" hidden>
+    <div class="tcbs-meta" id="tcbs-meta"></div>
+    <div id="tcbs-body"></div>
+    <div class="today-actions">
+      <button class="btn" type="button" data-tcbs-close>Đóng</button>
+      <button class="btn primary" id="tcbs-apply" type="button">Đồng bộ mục đã chọn</button>
+    </div>
+  </div>
+  <div class="form-msg" id="tcbs-msg" role="status" aria-live="polite"></div>
 </dialog>
 
 <dialog class="edit-dialog" id="wl-edit" aria-labelledby="wl-edit-label">
@@ -1649,12 +1624,8 @@ const EXCLUDE_HOLD_PNL_KEY = "fin2-exclude-hold-pnl";
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
 const fs = getFirestore(app);
-const cloudFns = getFunctions(app, "asia-southeast1");
-const decisionApi = httpsCallable(cloudFns, "refreshDecisionScores", { timeout:540000 });
-const connectTcbsApi = httpsCallable(cloudFns, "connectTcbs", { timeout:90000 });
-const syncTcbsApi = httpsCallable(cloudFns, "syncTcbsPortfolio", { timeout:90000 });
-const confirmTcbsApi = httpsCallable(cloudFns, "confirmTcbsCutover", { timeout:90000 });
-const disconnectTcbsApi = httpsCallable(cloudFns, "disconnectTcbs", { timeout:90000 });
+const decisionApi = httpsCallable(getFunctions(app, "asia-southeast1"), "refreshDecisionScores", { timeout:540000 });
+const tcbsReadApi = httpsCallable(getFunctions(app, "asia-southeast1"), "readTcbsPortfolio", { timeout:90000 });
 const decisionState = { latest:{}, runs:[], events:[], control:null, busy:false, error:"" };
 
 let ready = false;
@@ -1669,11 +1640,7 @@ const state = {
   screeningRuns: [],
   screeningResults: [],
   screeningSettings: null, // settings/screening — khung giờ gửi Telegram
-  manualScreening: null, // kết quả xem nhanh trên máy; không lưu Firestore
-  tcbsConnection: null,
-  tcbsPositions: [],
-  tcbsBalances: [],
-  tcbsTrades: []
+  manualScreening: null // kết quả xem nhanh trên máy; không lưu Firestore
 };
 let priceKey = "";        // khoá tập mã đang hiện ở ô nhập giá
 let oversellAck = false;  // xác nhận bán vượt số đang giữ — reset sau mỗi lần ghi
@@ -1682,7 +1649,6 @@ const tickerOrders = {};
 let pnlRange = "month";
 let hidePnl = false;
 let excludeHoldPnl = false;
-let tcbsBusy = false;
 try {
   const savedRange = localStorage.getItem(PNL_RANGE_KEY);
   if(["week", "month", "quarter", "all"].includes(savedRange)) pnlRange = savedRange;
@@ -1811,63 +1777,6 @@ function computeHoldings(transactions){
   return computeLedger(transactions).holdings;
 }
 
-function tcbsMode(){
-  return state.tcbsConnection?.mode === "tcbs";
-}
-
-function aggregateTcbsHoldings(){
-  const out = {};
-  state.tcbsPositions.forEach((r) => {
-    if(!r.ticker || !Number.isFinite(r.qty) || r.qty <= 0 || !Number.isFinite(r.avgCost) || r.avgCost < 0) return;
-    const h = out[r.ticker] || { qty:0, avgCost:0, marketValue:0 };
-    const nextQty = h.qty + r.qty;
-    h.avgCost = nextQty > 0 ? (h.qty * h.avgCost + r.qty * r.avgCost) / nextQty : 0;
-    h.qty = nextQty;
-    h.marketValue += Number(r.marketValue) || 0;
-    out[r.ticker] = h;
-  });
-  return out;
-}
-
-function tcbsTradesAfterCutover(){
-  const cutover = Date.parse(state.tcbsConnection?.cutoverAt || "");
-  if(!tcbsMode() || !Number.isFinite(cutover)) return [];
-  return state.tcbsTrades.filter((t) => Date.parse(t.execAt || "") > cutover)
-    .slice().sort((a,b) => String(a.execAt || "").localeCompare(String(b.execAt || "")));
-}
-
-function computeTcbsTradeLedger(manualLedger){
-  const holdings = {}, realizedEvents = [];
-  (state.tcbsConnection?.openingPositions || []).forEach((r) => {
-    const old = manualLedger.holdings[r.ticker];
-    holdings[r.ticker] = { qty:Number(r.qty) || 0, avgCost:Number(r.avgCost) || 0,
-      cycleRealizedPnl:0, heldSince:old?.heldSince || state.tcbsConnection.cutoverAt?.slice(0,10) || null };
-  });
-  tcbsTradesAfterCutover().forEach((t) => {
-    const h = holdings[t.ticker] || { qty:0, avgCost:0, cycleRealizedPnl:0, heldSince:null };
-    if(t.side === "buy"){
-      if(h.qty <= 0) h.heldSince = t.date || null;
-      const nextQty = h.qty + t.qty;
-      h.avgCost = nextQty > 0 ? (h.qty * h.avgCost + t.qty * t.price) / nextQty : 0;
-      h.qty = nextQty;
-    } else {
-      const pnl = t.qty * (t.price - h.avgCost) - transactionTaxVND(t) / 1000;
-      h.cycleRealizedPnl += pnl;
-      realizedEvents.push({ id:t.id || t.tradeId || "", date:t.date || "", ticker:t.ticker,
-        qty:t.qty, price:t.price, avgCost:h.avgCost, pnl, taxAmount:transactionTaxVND(t), source:"tcbs" });
-      h.qty -= t.qty;
-      if(h.qty <= 0.0001){ h.qty = 0; h.avgCost = 0; h.heldSince = null; h.cycleRealizedPnl = 0; }
-    }
-    holdings[t.ticker] = h;
-  });
-  return { holdings, realizedEvents };
-}
-
-function journalTransactions(){
-  return state.transactions.concat(tcbsTradesAfterCutover().map((t) => ({ ...t,
-    id:t.id || (t.accountNo + "_" + t.tradeId), note:"Đồng bộ từ TCBS", source:"tcbs" })));
-}
-
 /* Tiền mặt = Σ nạp − Σ rút ± Σ điều chỉnh − Σ mua + Σ bán − thuế bán.
    "adjust" = dòng đối chiếu với số dư TCBS, amount CÓ DẤU (lệch do làm tròn giá).
    amount/taxAmount là VND nguyên; price là nghìn đ → ×1000. */
@@ -1896,18 +1805,6 @@ function sellableAt(dateStr){
 }
 
 function computeSellAvailability(transactions, ticker, now){
-  if(tcbsMode()){
-    const opening = (state.tcbsConnection?.openingPositions || []).find((r) => r.ticker === ticker);
-    const rows = (opening?.qty > 0 ? [{ ticker, side:"buy", qty:opening.qty, date:"2000-01-03" }] : [])
-      .concat(tcbsTradesAfterCutover().filter((t) => t.ticker === ticker));
-    const result = computeSellAvailabilityRows(rows, ticker, now);
-    const currentQty = aggregateTcbsHoldings()[ticker]?.qty || 0;
-    const available = Math.min(currentQty, result.available);
-    return { available, pending:Math.max(0, currentQty - available) };
-  }
-  return computeSellAvailabilityRows(transactions, ticker, now);
-}
-function computeSellAvailabilityRows(transactions, ticker, now){
   let eligibleBuys = 0, totalBuys = 0, totalSells = 0;
   transactions.forEach((t) => {
     if(t.ticker !== ticker) return;
@@ -1975,29 +1872,21 @@ function currentPriceFor(ticker, avgCost){
 
 function computeSummary(){
   const ledger = computeLedger(state.transactions);
-  const tcbsLedger = tcbsMode() ? computeTcbsTradeLedger(ledger) : null;
-  const tcbsCurrent = tcbsMode() ? aggregateTcbsHoldings() : null;
-  const holdings = tcbsCurrent || ledger.holdings;
-  const cash = tcbsMode()
-    ? state.tcbsBalances.reduce((sum, row) => sum + (Number(row.cashBalance) || 0), 0)
-    : computeCashVND(state.transactions, state.cashflows);
+  const holdings = ledger.holdings;
+  const cash = computeCashVND(state.transactions, state.cashflows);
   let investedCost = 0, marketValue = 0, realizedPnl = 0;
   const held = [];
-  Object.values(ledger.holdings).forEach((h) => { realizedPnl += h.realizedPnl; });
-  if(tcbsLedger) realizedPnl += tcbsLedger.realizedEvents.reduce((sum, row) => sum + row.pnl, 0);
   Object.keys(holdings).forEach((tk) => {
     const h = holdings[tk];
+    realizedPnl += h.realizedPnl;
     if(h.qty > 0){
       const price = currentPriceFor(tk, h.avgCost);
-      const tcbsHistory = tcbsLedger?.holdings[tk];
-      const cycleRealizedPnl = tcbsMode() ? Number(tcbsHistory?.cycleRealizedPnl || 0) : h.cycleRealizedPnl;
       investedCost += h.qty * h.avgCost * 1000;
       marketValue += h.qty * price * 1000;
       held.push({
-        ticker: tk, qty: h.qty, avgCost: h.avgCost, price: price,
-        heldSince:tcbsMode() ? (tcbsHistory?.heldSince || ledger.holdings[tk]?.heldSince || null) : h.heldSince,
-        cycleRealizedPnl,
-        netCost: h.avgCost - cycleRealizedPnl / h.qty,
+        ticker: tk, qty: h.qty, avgCost: h.avgCost, price: price, heldSince: h.heldSince,
+        cycleRealizedPnl: h.cycleRealizedPnl,
+        netCost: h.avgCost - h.cycleRealizedPnl / h.qty,
         hasPrice: !!(state.tickers[tk] && isFinite(state.tickers[tk].lastPrice))
       });
     }
@@ -2007,8 +1896,7 @@ function computeSummary(){
     cash, investedCost, marketValue, realizedPnl,
     total: cash + marketValue,
     unrealizedPnl: marketValue - investedCost,
-    held, holdings, source:tcbsMode() ? "tcbs" : "manual",
-    realizedEvents:ledger.realizedEvents.concat(tcbsLedger?.realizedEvents || [])
+    held, holdings, realizedEvents:ledger.realizedEvents
   };
 }
 
@@ -2245,17 +2133,12 @@ function signalQualityAt(signal, offset){
 }
 
 function contributionRows(summary){
-  // Nguồn TCBS: holdings không có realizedPnl → cộng lãi đã chốt theo mã từ realizedEvents (sổ tay + lệnh TCBS).
-  const tcbs = summary.source === "tcbs", realizedByTicker = {};
-  if(tcbs) summary.realizedEvents.forEach((e) => { realizedByTicker[e.ticker] = (realizedByTicker[e.ticker] || 0) + e.pnl; });
-  const tickers = tcbs ? [...new Set(Object.keys(summary.holdings).concat(Object.keys(realizedByTicker)))] : Object.keys(summary.holdings);
-  const rows = tickers.map((ticker) => {
-    const h = summary.holdings[ticker] || { qty:0, avgCost:0 };
-    const realizedPnl = tcbs ? (realizedByTicker[ticker] || 0) : h.realizedPnl;
+  const rows = Object.keys(summary.holdings).map((ticker) => {
+    const h = summary.holdings[ticker];
     const meta = state.tickers[ticker] || {};
     const price = Number.isFinite(meta.lastPrice) ? meta.lastPrice : h.avgCost;
     const unrealized = h.qty > 0 ? h.qty * (price - h.avgCost) * 1000 : 0;
-    return { ticker, realized:realizedPnl * 1000, unrealized, total:realizedPnl * 1000 + unrealized };
+    return { ticker, realized:h.realizedPnl * 1000, unrealized, total:h.realizedPnl * 1000 + unrealized };
   }).filter((row) => Math.abs(row.total) >= 1)
     .sort((a,b) => Math.abs(b.total) - Math.abs(a.total) || a.ticker.localeCompare(b.ticker));
   const gross = rows.reduce((sum,row) => sum + Math.abs(row.total), 0);
@@ -2272,7 +2155,7 @@ function thesisBadge(ticker){
 function signalMatchedQty(signal){
   const id = signal.id || signalDocId(signal);
   const side = signalSide(signal);
-  return journalTransactions().filter((t) => t.signalId === id ||
+  return state.transactions.filter((t) => t.signalId === id ||
     (!t.signalId && t.date === signal.date && t.ticker === signal.ticker && t.side === side))
     .reduce((sum,t) => sum + Number(t.qty || 0), 0);
 }
@@ -3002,7 +2885,6 @@ function render(){
   renderTodayBanner(priceRows);
   renderTickerList(s.held);
   renderStrategy();
-  renderTcbs();
   renderScreeningSettings();
   renderLog();
   renderCompact(s);
@@ -3531,7 +3413,7 @@ function renderStockChart(){
   }
   if(watch && Number.isFinite(watch.targetBuy)) overlays.push({ key:"watch", label:"Kỳ vọng", price:watch.targetBuy });
   const visibleFirstTime = rows[0].t, visibleLastTime = rows[rows.length - 1].t;
-  const visibleTrades = journalTransactions().filter((t) => t.ticker === chartTicker && t.date).map((t) => ({
+  const visibleTrades = state.transactions.filter((t) => t.ticker === chartTicker && t.date).map((t) => ({
     ...t, time:new Date(t.date + "T12:00:00").getTime() / 1000
   })).filter((t) => t.time >= visibleFirstTime && t.time <= visibleLastTime && Number.isFinite(Number(t.price)));
   const prices = rows.map((x) => x.p).concat(overlays.map((x) => x.price));
@@ -3765,87 +3647,6 @@ function renderTickerList(held){
     .map((tk) => '<option value="' + esc(tk) + '"></option>').join("");
 }
 
-function fmtTcbsTime(value){
-  if(!value || !Number.isFinite(Date.parse(value))) return "—";
-  return new Date(value).toLocaleString("vi-VN", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
-}
-
-function setManualEntryLocked(locked){
-  ["tx-form", "cf-form", "order-form", "fill-form"].forEach((id) => {
-    const form = $(id);
-    if(!form) return;
-    form.classList.toggle("manual-locked", locked);
-    form.querySelectorAll("input,select,textarea,button").forEach((el) => {
-      if(locked && !el.disabled){ el.dataset.tcbsLocked = "1"; el.disabled = true; }
-      else if(!locked && el.dataset.tcbsLocked === "1"){ delete el.dataset.tcbsLocked; el.disabled = false; }
-    });
-  });
-}
-
-function renderTcbsPreview(){
-  const el = $("tcbs-preview"), connection = state.tcbsConnection;
-  if(connection?.status !== "pending_confirmation") { el.hidden = true; el.innerHTML = ""; return; }
-  const manual = computeLedger(state.transactions).holdings;
-  const broker = aggregateTcbsHoldings();
-  const tickers = [...new Set([...Object.keys(manual), ...Object.keys(broker)])].filter((ticker) =>
-    (manual[ticker]?.qty || 0) > 0 || (broker[ticker]?.qty || 0) > 0).sort();
-  const rows = tickers.map((ticker) => {
-    const oldQty = manual[ticker]?.qty || 0, nextQty = broker[ticker]?.qty || 0;
-    const oldAvg = manual[ticker]?.avgCost || 0, nextAvg = broker[ticker]?.avgCost || 0;
-    const diff = Math.abs(oldQty - nextQty) > .0001 || Math.abs(oldAvg - nextAvg) > .005;
-    return '<div class="' + (diff ? 'diff' : '') + '">' + esc(ticker) + '</div>' +
-      '<div class="value tcbs-old">' + oldQty.toLocaleString("vi-VN") + ' · ' + fmtPrice(oldAvg) + '</div>' +
-      '<div class="value">' + nextQty.toLocaleString("vi-VN") + ' · ' + fmtPrice(nextAvg) + '</div>';
-  });
-  const manualCash = computeCashVND(state.transactions, state.cashflows);
-  const tcbsCash = state.tcbsBalances.reduce((sum,row) => sum + (Number(row.cashBalance) || 0), 0);
-  el.innerHTML = '<div class="tcbs-compare">' +
-    '<div class="head">Mã · KL · Giá vốn</div><div class="head value tcbs-old">Trong tool</div><div class="head value">TCBS</div>' +
-    rows.join("") +
-    '<div class="' + (Math.abs(manualCash - tcbsCash) >= 1 ? 'diff' : '') + '">Tiền mặt</div>' +
-    '<div class="value tcbs-old">' + fmtVND(manualCash) + '</div><div class="value">' + fmtVND(tcbsCash) + '</div>' +
-    '</div>';
-  el.hidden = false;
-}
-
-function tcbsSessionValid(){
-  const expiry = Date.parse(state.tcbsConnection?.sessionExpiresAt || "");
-  return Number.isFinite(expiry) && expiry > Date.now();
-}
-
-function renderTcbs(){
-  const connection = state.tcbsConnection || { status:"disconnected", mode:"manual" };
-  const sessionValid = tcbsSessionValid(), pending = connection.status === "pending_confirmation";
-  const connected = tcbsMode();
-  let title = "Chưa kết nối", meta = "", dot = "";
-  if(pending){ title = "Chờ xác nhận"; meta = "Đọc lúc " + fmtTcbsTime(connection.lastSyncAt); dot = "ok"; }
-  else if(connected){
-    title = connection.stale ? "Dữ liệu TCBS đang cũ" : "Đang lấy từ TCBS";
-    meta = "Đồng bộ " + fmtTcbsTime(connection.lastSyncAt);
-    dot = connection.stale ? "bad" : "ok";
-  }
-  else if(connection.error){ title = "Chưa đồng bộ được"; dot = "bad"; }
-  if(connected && connection.historyComplete === false) meta += " · Lịch sử chưa đầy đủ";
-  if(connection.stale && connection.error) meta += (meta ? " · " : "") + connection.error;
-  $("tcbs-status-title").textContent = title;
-  $("tcbs-status-meta").textContent = meta;
-  $("tcbs-status-dot").className = "dot" + (dot ? " " + dot : "");
-  $("tcbs-session-meta").textContent = sessionValid ? "Phiên đến " + fmtTcbsTime(connection.sessionExpiresAt) : "";
-  $("tcbs-confirm").hidden = !pending;
-  $("tcbs-disconnect").hidden = !pending && !connected && !sessionValid;
-  ["tcbs-confirm","tcbs-disconnect","tcbs-btn","tcbs-connect"].forEach((id) => { $(id).disabled = tcbsBusy; });
-
-  const btn = $("tcbs-btn");
-  const label = "Đồng bộ TCBS" + (connection.lastSyncAt ? " · lần cuối " + fmtTcbsTime(connection.lastSyncAt) : "") +
-    (sessionValid ? " · phiên đến " + fmtTcbsTime(connection.sessionExpiresAt) : " · cần iOTP");
-  btn.title = label;
-  btn.setAttribute("aria-label", label);
-  btn.classList.toggle("loading", tcbsBusy);
-  btn.classList.toggle("warn", connected && !!connection.stale);
-  renderTcbsPreview();
-  setManualEntryLocked(connected);
-}
-
 
 function renderStrategy(){
   const st = activeStrategy(todayStr());
@@ -3905,7 +3706,7 @@ function renderLog(){
   const list = $("log-list"), empty = $("log-empty"), count = $("log-count");
   const rowByDate = {};
   state.snapshots.forEach((r) => { rowByDate[r.date] = r; });
-  journalTransactions().concat(state.cashflows, state.watchPrices, state.orders.map((o) => ({ ...o, date:o.orderDate }))).forEach((x) => {
+  state.transactions.concat(state.cashflows, state.watchPrices, state.orders.map((o) => ({ ...o, date:o.orderDate }))).forEach((x) => {
     if(x.date && !rowByDate[x.date]) rowByDate[x.date] = { date:x.date };
   });
   const rows = Object.values(rowByDate).sort((a, b) => a.date < b.date ? 1 : -1);
@@ -3917,7 +3718,7 @@ function renderLog(){
   }
   empty.hidden = true;
   list.innerHTML = rows.map((r) => {
-    const tx = journalTransactions().filter((t) => t.date === r.date);
+    const tx = state.transactions.filter((t) => t.date === r.date);
     const cf = state.cashflows.filter((c) => c.date === r.date);
     const orders = state.orders.filter((o) => o.orderDate === r.date);
     const watch = state.watchPrices.filter((p) => p.date === r.date).map((p) => {
@@ -3931,7 +3732,7 @@ function renderLog(){
     const chips = tx.map((t) =>
       '<span class="chip ' + (t.side === "buy" ? "buy" : "sell") + '">' +
       (t.side === "buy" ? "Mua" : "Bán") + " " + t.qty + " " + esc(t.ticker) + " @" + fmtPrice(t.price) +
-      (t.source === "tcbs" ? ' · TCBS' : '<button class="chip-delete" type="button" data-delete-tx="' + esc(t.id) + '" aria-label="Xóa giao dịch ' + esc(t.ticker) + '">Xóa</button>') +
+      '<button class="chip-delete" type="button" data-delete-tx="' + esc(t.id) + '" aria-label="Xóa giao dịch ' + esc(t.ticker) + '">Xóa</button>' +
       '</span>'
     ).concat(cf.map((c) =>
       '<span class="chip">' + (c.type === "adjust" ? "Điều chỉnh " + (c.amount > 0 ? "+" : "") : c.type === "deposit" ? "Nạp " : "Rút ") + fmtVND(c.amount) + '</span>'
@@ -4180,7 +3981,6 @@ function removeWatch(ticker){
 
 function removeTransaction(id, btn){
   if(!ready) return;
-  if(tcbsMode()){ toast("Danh mục đang lấy từ TCBS"); return; }
   const t = state.transactions.find((x) => x.id === id);
   if(!t){ toast("Giao dịch không còn tồn tại"); return; }
   const label = (t.side === "buy" ? "Mua " : "Bán ") +
@@ -4258,13 +4058,12 @@ function reservedSellQty(ticker, excludeId){
     .reduce((sum,o) => sum + remainingOrderQty(o), 0);
 }
 function validateOrderSell(ticker, qty, excludeId){
-  const held = (computeSummary().holdings[ticker] || { qty:0 }).qty;
+  const held = (computeHoldings(state.transactions)[ticker] || { qty:0 }).qty;
   const sellable = computeSellAvailability(state.transactions, ticker, new Date()).available;
   const available = Math.max(0, sellable - reservedSellQty(ticker, excludeId));
   return { held, available, ok:qty <= available };
 }
 async function createOrder(data){
-  if(tcbsMode()) throw new Error("tcbs-connected");
   const ticker = String(data.ticker || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
   const side = data.side === "sell" ? "sell" : "buy";
   const qty = Number(data.qty), limitPrice = Number(data.limitPrice), orderDate = data.orderDate;
@@ -4317,7 +4116,6 @@ function openFillDialog(order){
   $("fill-qty").focus();
 }
 async function fillOrder(order, qty, price, date){
-  if(tcbsMode()) throw new Error("tcbs-connected");
   const remaining = remainingOrderQty(order);
   if(!(qty > 0) || qty > remaining || !(price > 0) || !date) throw new Error("invalid-fill");
   if(order.side === "sell"){
@@ -4368,7 +4166,6 @@ function initDecisionTools(){
     if(fill){ const order = state.orders.find((o) => o.id === fill.dataset.fillOrder); if(order) openFillDialog(order); return; }
     const cancel = e.target.closest("[data-cancel-order]");
     if(cancel){
-      if(tcbsMode()){ toast("Danh mục đang lấy từ TCBS"); return; }
       const order = state.orders.find((o) => o.id === cancel.dataset.cancelOrder);
       if(!order || !window.confirm("Hủy lệnh " + orderSideLabel(order.side).toLowerCase() + " " + remainingOrderQty(order).toLocaleString("vi-VN") + " " + order.ticker + "?")) return;
       cancel.disabled = true;
@@ -4483,7 +4280,7 @@ function buildExport(days, priceHistory = {}){
     .sort((a, b) => byDate(a, b) || (a.ticker < b.ticker ? -1 : 1))
     .map((x) => {
       const side = x.kind === "sell" ? "sell" : "buy";
-      const khop = journalTransactions().filter((t) =>
+      const khop = state.transactions.filter((t) =>
         t.signalId === x.id || (!t.signalId && t.date === x.date && t.ticker === x.ticker && t.side === side));
       const lenh = state.orders.filter((o) => o.signalId === x.id);
       const soLuong = khop.reduce((n, t) => n + t.qty, 0);
@@ -4526,7 +4323,7 @@ function buildExport(days, priceHistory = {}){
           soCPMoiLenh:v.lotSize, lyDo:v.reason }))
     },
     tinHieu: tinHieu,
-    giaoDich: journalTransactions().filter((t) => inRange(t.date)).sort(byDate)
+    giaoDich: state.transactions.filter((t) => inRange(t.date)).sort(byDate)
       .map((t) => {
         const row = { ngay:t.date, ma:t.ticker, loai:t.side, soLuong:t.qty, gia:t.price, ghiChu:t.note || "" };
         if(t.side === "sell") row.thueTNCN = transactionTaxVND(t);
@@ -4793,7 +4590,6 @@ function initForms(){
   setInterval(refreshSellAvailability, 30000);
 
   $("tx-order-submit").addEventListener("click", async () => {
-    if(tcbsMode()){ setMsg("tx-msg", "err", "Danh mục đang lấy từ TCBS"); return; }
     if(!ready){ setMsg("tx-msg", "err", "Chưa kết nối"); return; }
     const ticker = $("tx-ticker").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     const side = document.querySelector('input[name="tx-side"]:checked').value;
@@ -4814,7 +4610,6 @@ function initForms(){
 
   $("tx-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    if(tcbsMode()){ setMsg("tx-msg", "err", "Danh mục đang lấy từ TCBS"); return; }
     if($("tx-submit").disabled) return;
     if(!ready){ setMsg("tx-msg", "err", "Chưa kết nối"); return; }
 
@@ -4871,7 +4666,6 @@ function initForms(){
 
   $("cf-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    if(tcbsMode()){ setMsg("cf-msg", "err", "Số dư đang lấy từ TCBS"); return; }
     if(!ready){ setMsg("cf-msg", "err", "Chưa kết nối"); return; }
     const type = document.querySelector('input[name="cf-type"]:checked').value;
     const input = parseFloat($("cf-amount").value);   // Nạp/Rút: TRIỆU đồng · Đối chiếu: VND nguyên
@@ -5168,73 +4962,140 @@ function initCollapse(){
   });
 }
 
-function tcbsErrorText(error, fallback){
-  if(error?.code === "functions/unauthenticated") return "Phiên TCBS đã hết hạn · Nhập iOTP mới";
-  if(error?.code === "functions/resource-exhausted") return "TCBS đang được đồng bộ · Thử lại sau";
-  if(error?.code === "functions/invalid-argument") return "TCBS từ chối iOTP";
-  const message = String(error?.message || "").replace(/^FirebaseError:\s*/, "").trim();
-  return message && !message.includes("INTERNAL") ? message : fallback;
+/* ================= đối chiếu TCBS ================= */
+/* Sổ tay là nguồn chính; TCBS chỉ để đối chiếu khi owner bấm. Mỗi lần đọc phải nhập iOTP, server
+   bỏ phiên ngay sau khi đọc. Xác nhận thì ghi vào sổ như nhập tay: lệnh thiếu → transactions,
+   lệch tiền → cashflows "adjust". Vị thế lệch vì lý do khác (cổ tức cổ phiếu, quyền…) chỉ hiện để xem. */
+let tcbsData = null, tcbsBusy = false;
+
+// So theo nhóm ngày·mã·chiều: sổ tay ít hơn TCBS → phần thiếu, giá = bình quân các lệnh khớp của nhóm.
+function tcbsMissingTrades(trades){
+  // Chỉ xét từ ngày đầu tiên của sổ tay — lịch sử TCBS cũ hơn lúc bắt đầu ghi sổ không phải "thiếu".
+  const since = state.transactions.reduce((min, t) => (t.date && (!min || t.date < min) ? t.date : min), "");
+  const groups = {};
+  trades.filter((t) => t.date >= since).forEach((t) => {
+    const key = t.date + "_" + t.ticker + "_" + t.side;
+    const g = groups[key] || (groups[key] = { date:t.date, ticker:t.ticker, side:t.side, qty:0, value:0, execAt:"" });
+    g.qty += t.qty; g.value += t.qty * t.price;
+    if(t.execAt > g.execAt) g.execAt = t.execAt;
+  });
+  return Object.values(groups).map((g) => {
+    const booked = state.transactions.filter((t) => t.date === g.date && t.ticker === g.ticker && t.side === g.side)
+      .reduce((sum, t) => sum + Number(t.qty || 0), 0);
+    return { ...g, price:Math.round(g.value / g.qty * 1000) / 1000, missing:g.qty - booked };
+  }).filter((g) => g.missing > 0).sort((a, b) => a.execAt.localeCompare(b.execAt));
 }
 
-// report(kind, text): nơi hiện kết quả — toast (nút header), hộp iOTP, hoặc thẻ ở tab Chiến lược.
-async function runTcbsAction(report, pendingText, action){
-  if(tcbsBusy) return;
-  tcbsBusy = true; renderTcbs(); report("", pendingText);
-  try{ report("ok", await action()); }
-  catch(error){
-    console.error("tcbs", error);
-    if(error?.code === "functions/unauthenticated") openTcbsDialog();
-    report("err", tcbsErrorText(error, "Chưa đồng bộ được TCBS"));
-  }finally{ tcbsBusy = false; renderTcbs(); }
+function tcbsTransaction(g){
+  const t = { ticker:g.ticker, side:g.side, qty:g.missing, price:g.price, date:g.date, note:"Đồng bộ TCBS", createdAt:g.execAt };
+  if(g.side === "sell"){ t.taxRate = SELL_TAX_RATE; t.taxAmount = Math.round(t.qty * t.price * 1000 * SELL_TAX_RATE); }
+  return t;
 }
 
-function tcbsDoneText(result){
-  if(!tcbsMode()) return "Đã đọc danh mục TCBS · Xác nhận ở tab Chiến lược";
-  return result?.data?.historyComplete === false ? "Đã đồng bộ · Lịch sử chưa đầy đủ" : "Đã đồng bộ TCBS";
+function tcbsSelectedTrades(){
+  return [...document.querySelectorAll("[data-tcbs-trade]")].filter((el) => el.checked)
+    .map((el) => tcbsTransaction(tcbsData.missing[Number(el.dataset.tcbsTrade)]));
+}
+
+// Tiền mặt và vị thế luôn so SAU khi tính các lệnh thiếu đang được chọn.
+function renderTcbsReview(){
+  const data = tcbsData, picked = tcbsSelectedTrades();
+  const ledger = computeLedger(state.transactions.concat(picked)).holdings;
+  const cashDiff = data.cash - Math.round(computeCashVND(state.transactions.concat(picked), state.cashflows));
+  const broker = Object.fromEntries(data.positions.map((r) => [r.ticker, r]));
+  const posDiff = [...new Set(Object.keys(ledger).concat(Object.keys(broker)))].sort().filter((tk) => {
+    const a = ledger[tk] || { qty:0, avgCost:0 }, b = broker[tk] || { qty:0, avgCost:0 };
+    return Math.abs(a.qty - b.qty) > 0.0001 || ((a.qty > 0 || b.qty > 0) && Math.abs(a.avgCost - b.avgCost) >= 0.01);
+  });
+  const cashBlock = $("tcbs-cash-block");
+  const cashChecked = cashBlock ? $("tcbs-cash").checked : true;
+  const cashHtml = Math.abs(cashDiff) < 1 ? '<div class="tcbs-muted">Khớp · ' + fmtVND(data.cash) + '</div>' :
+    '<label class="tcbs-row"><input type="checkbox" id="tcbs-cash"' + (cashChecked ? " checked" : "") + '>' +
+    '<span>Đối chiếu ' + (cashDiff > 0 ? "+" : "") + fmtVND(cashDiff) + ' <span class="tcbs-muted">· TCBS ' + fmtVND(data.cash) + '</span></span></label>';
+  const posHtml = !posDiff.length ? '<div class="tcbs-muted">Khớp</div>' :
+    '<div class="tcbs-compare"><div class="h">Mã</div><div class="h v">Tool</div><div class="h v">TCBS</div>' +
+    posDiff.map((tk) => {
+      const a = ledger[tk] || { qty:0, avgCost:0 }, b = broker[tk] || { qty:0, avgCost:0 };
+      return '<div>' + esc(tk) + '</div><div class="v">' + a.qty.toLocaleString("vi-VN") + ' · ' + fmtPrice(a.avgCost) + '</div>' +
+        '<div class="v">' + b.qty.toLocaleString("vi-VN") + ' · ' + fmtPrice(b.avgCost) + '</div>';
+    }).join("") + '</div>';
+  if(cashBlock){ $("tcbs-cash-body").innerHTML = cashHtml; $("tcbs-pos-body").innerHTML = posHtml; }
+  else {
+    const tradeHtml = !data.missing.length ? '<div class="tcbs-muted">Không thiếu lệnh</div>' : data.missing.map((g, i) =>
+      '<label class="tcbs-row"><input type="checkbox" data-tcbs-trade="' + i + '" checked>' +
+      '<span>' + (g.side === "buy" ? "Mua " : "Bán ") + g.missing.toLocaleString("vi-VN") + ' ' + esc(g.ticker) + ' @' + fmtPrice(g.price) +
+      ' <span class="tcbs-muted">· ' + fmtDateVN(g.date) + '</span></span></label>').join("");
+    $("tcbs-body").innerHTML =
+      '<div class="tcbs-block"><div class="tcbs-head">Lệnh thiếu trong sổ</div>' + tradeHtml + '</div>' +
+      '<div class="tcbs-block" id="tcbs-cash-block"><div class="tcbs-head">Tiền mặt</div><div id="tcbs-cash-body">' + cashHtml + '</div></div>' +
+      '<div class="tcbs-block"><div class="tcbs-head">Vị thế</div><div id="tcbs-pos-body">' + posHtml + '</div></div>';
+  }
+  const cashPicked = Math.abs(cashDiff) >= 1 && $("tcbs-cash")?.checked;
+  $("tcbs-apply").disabled = tcbsBusy || (!picked.length && !cashPicked);
+  tcbsData.cashDiff = cashDiff;
 }
 
 function openTcbsDialog(){
+  if(!ready){ toast("Chưa kết nối"); return; }
+  tcbsData = null;
+  $("tcbs-form").hidden = false;
+  $("tcbs-review").hidden = true;
+  $("tcbs-body").innerHTML = "";
   $("tcbs-otp").value = "";
-  setMsg("tcbs-dialog-msg", "", "");
-  if(!$("tcbs-dialog").open) $("tcbs-dialog").showModal();
+  setMsg("tcbs-msg", "", "");
+  $("tcbs-dialog").showModal();
   $("tcbs-otp").focus();
 }
 
 function initTcbs(){
-  const toastReport = (kind, text) => { if(kind) toast(text); };
-  const cardReport = (kind, text) => {
-    setMsg("tcbs-msg", kind, text);
-    if(kind === "ok") setTimeout(() => setMsg("tcbs-msg", "", ""), 2500);
-  };
-  $("tcbs-btn").addEventListener("click", () => {
-    if(!ready){ toast("Chưa kết nối"); return; }
-    if(!tcbsSessionValid()){ openTcbsDialog(); return; }
-    runTcbsAction(toastReport, "", async () => { return tcbsDoneText(await syncTcbsApi({})); });
-  });
-  $("tcbs-cancel").addEventListener("click", () => $("tcbs-dialog").close());
-  $("tcbs-form").addEventListener("submit", (event) => {
-    event.preventDefault();
+  $("tcbs-btn").addEventListener("click", openTcbsDialog);
+  $("tcbs-dialog").querySelectorAll("[data-tcbs-close]").forEach((b) => b.addEventListener("click", () => $("tcbs-dialog").close()));
+  $("tcbs-body").addEventListener("change", () => { if(tcbsData) renderTcbsReview(); });
+  $("tcbs-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
     const otp = $("tcbs-otp").value.trim();
-    if(!/^\d{4,10}$/.test(otp)){ setMsg("tcbs-dialog-msg", "err", "Kiểm tra iOTP"); return; }
-    runTcbsAction((kind, text) => setMsg("tcbs-dialog-msg", kind, text), "Đang kết nối…", async () => {
-      const result = await connectTcbsApi({ otp });
+    if(!/^\d{4,10}$/.test(otp)){ setMsg("tcbs-msg", "err", "Kiểm tra iOTP"); return; }
+    if(tcbsBusy) return;
+    tcbsBusy = true; $("tcbs-read").disabled = true; $("tcbs-btn").classList.add("loading");
+    setMsg("tcbs-msg", "", "Đang đọc TCBS…");
+    try{
+      const data = (await tcbsReadApi({ otp })).data;
       $("tcbs-otp").value = "";
+      tcbsData = { ...data, missing:tcbsMissingTrades(data.trades || []) };
+      $("tcbs-meta").textContent = "Đọc lúc " + new Date(data.readAt).toLocaleTimeString("vi-VN", { hour:"2-digit", minute:"2-digit" }) +
+        " · " + data.accounts.length + " tiểu khoản" + (data.tradesComplete ? "" : " · Danh sách lệnh chưa đầy đủ");
+      $("tcbs-form").hidden = true;
+      $("tcbs-review").hidden = false;
+      setMsg("tcbs-msg", "", "");
+      renderTcbsReview();
+    }catch(error){
+      console.error("tcbs", error);
+      const text = error?.code === "functions/invalid-argument" ? "TCBS từ chối iOTP"
+        : String(error?.message || "").replace(/^FirebaseError:\s*/, "").trim();
+      setMsg("tcbs-msg", "err", text && !text.includes("INTERNAL") ? text : "Chưa đọc được TCBS");
+    }finally{
+      tcbsBusy = false; $("tcbs-read").disabled = false; $("tcbs-btn").classList.remove("loading");
+    }
+  });
+  $("tcbs-apply").addEventListener("click", async () => {
+    if(tcbsBusy || !tcbsData) return;
+    const picked = tcbsSelectedTrades();
+    renderTcbsReview(); // tính lại lệch tiền theo sổ mới nhất
+    const cashDiff = $("tcbs-cash")?.checked ? tcbsData.cashDiff : 0;
+    if(!picked.length && Math.abs(cashDiff) < 1) return;
+    tcbsBusy = true; $("tcbs-apply").disabled = true;
+    try{
+      const batch = writeBatch(fs);
+      picked.forEach((t) => batch.set(doc(collection(fs, "transactions")), t));
+      if(Math.abs(cashDiff) >= 1) batch.set(doc(collection(fs, "cashflows")),
+        { type:"adjust", amount:Math.round(cashDiff), date:todayStr(), note:"Đối chiếu TCBS", createdAt:nowISO() });
+      await batch.commit();
       $("tcbs-dialog").close();
-      toast(tcbsDoneText(result));
-      return "";
-    });
-  });
-  $("tcbs-confirm").addEventListener("click", () => {
-    if(!window.confirm("Chuyển danh mục hiện tại sang số liệu TCBS? Form nhập tay sẽ bị khóa.")) return;
-    runTcbsAction(cardReport, "Đang chuyển nguồn…", async () => { await confirmTcbsApi({}); return "Đã chuyển sang TCBS"; });
-  });
-  $("tcbs-disconnect").addEventListener("click", () => {
-    if(!window.confirm("Ngắt kết nối TCBS và quay lại nhập tay? Lệnh khớp từ TCBS sẽ được chép vào sổ giao dịch. Nên đồng bộ lần cuối trước khi ngắt.")) return;
-    runTcbsAction(cardReport, "Đang ngắt kết nối…", async () => {
-      const result = await disconnectTcbsApi({});
-      const copied = Number(result?.data?.copied) || 0;
-      return copied ? "Đã ngắt · Chép " + copied + " lệnh vào sổ" : "Đã ngắt kết nối";
-    });
+      toast("Đã đồng bộ" + (picked.length ? " " + picked.length + " lệnh" : "") + (Math.abs(cashDiff) >= 1 ? " · đối chiếu tiền" : ""));
+    }catch(error){
+      console.error("tcbs", error);
+      setMsg("tcbs-msg", "err", "Lỗi lưu · Thử lại");
+    }finally{ tcbsBusy = false; if(tcbsData) renderTcbsReview(); }
   });
 }
 
@@ -5285,10 +5146,6 @@ function startData(){
   watch("signals",         (rows) => { state.signals = rows; });
   watch("watch_prices",    (rows) => { state.watchPrices = rows; });
   watch("orders",          (rows) => { state.orders = rows; });
-  watch("tcbs_connection", (rows) => { state.tcbsConnection = rows.find((r) => r.id === "current") || null; });
-  watch("tcbs_positions",  (rows) => { state.tcbsPositions = rows; });
-  watch("tcbs_balances",   (rows) => { state.tcbsBalances = rows; });
-  watch("tcbs_trades",     (rows) => { state.tcbsTrades = rows; });
   watch("theses",          (rows) => {
     const map = {};
     rows.forEach((t) => { map[t.id] = t; });

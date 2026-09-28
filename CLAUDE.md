@@ -74,15 +74,9 @@ decision_latest/{TICKER}    điểm quyết định gần nhất: buyScore, sell
 decision_snapshots/{runId_MÃ} · decision_runs/{ngày_post|ngày_giờ} · decision_versions/{version}
 decision_events/{ngày_MÃ_chiều_engine_version}  sự kiện vượt ngưỡng + evaluation (engine decision|legacy)
 decision_news/{hash} · decision_control/{runtime|news}   (tất cả decision_*: chỉ Cloud Function ghi, owner đọc)
-tcbs_connection/current     status "pending_confirmation"|"connected"|"disconnected", mode "manual"|"tcbs",
-                            sessionExpiresAt, lastSyncAt, cutoverAt, openingPositions[], historyComplete, stale, error,
-                            custodyCodeMasked, accounts[] (số tiểu khoản đã che), connectedAt, disconnectedAt
-tcbs_positions/{tk_MÃ}      accountNo, ticker, qty, avgCost (nghìn đ), marketValue (VND)
-tcbs_balances/{tk}          accountNo, cashBalance, bodBalance (VND)
-tcbs_trades/{tk_tradeId}    ticker, side, qty, price (nghìn đ), date, execAt (ISO UTC), taxRate/taxAmount khi bán
-tcbs_private/session · tcbs_control/runtime   JWT đã mã hoá + khoá chạy — rules chặn client HOÀN TOÀN
-                            (tất cả tcbs_*: chỉ Cloud Function ghi)
 ```
+**Đối chiếu TCBS không có collection riêng:** xác nhận thì ghi thẳng vào sổ như nhập tay — lệnh thiếu vào
+`transactions` (note "Đồng bộ TCBS", `createdAt` = giờ khớp), lệch tiền vào `cashflows` "adjust" (note "Đối chiếu TCBS").
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
 `fin2-tab` (tab đang mở) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight`
@@ -121,13 +115,6 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 - **Điểm quyết định (server) chép lại logic app:** `DEFAULT_STRATEGY` + `activeStrategy()` + `holdings()` +
   ngưỡng legacy `buyAt/sellAt` (`functions/decision-service.js`) ↔ `RULE_*` + `activeStrategy()` + `computeLedger()`
   + `strategyLevels()` (`public/index.html`). Đổi cách chọn phiên bản chiến lược hay tính giá vốn → sửa cả hai.
-- **Nguồn danh mục TCBS (khi `tcbs_connection.mode === "tcbs"`):** gộp vị thế nhiều tiểu khoản theo bình quân
-  gia quyền có 3 bản: `aggregatePositions` (`functions/tcbs-service.js`) ↔ `tcbsHoldings` (`functions/decision-service.js`)
-  ↔ `aggregateTcbsHoldings` (`public/index.html`). Thuế bán `SELL_TAX_RATE` có ở cả `tcbs-service.js` và app.
-  Lọc lệnh "sau chuyển giao" luôn so `execAt` (ISO UTC) với `cutoverAt` — TCBS trả giờ khớp không múi giờ, server
-  đã quy về giờ VN; đừng so `timeExec` thô. Đổi cách gộp/tính → sửa cả ba.
-  Điều kiện "đang lấy số từ TCBS" (`mode === "tcbs"`) có ở 4 nơi: `tcbsMode()` (app) · `runDecision` · `runSlot`
-  (mã đang giữ của bot sàng lọc) · `tcbs-service.js` (thêm `&& cutoverAt`). Chỗ nào tính "mã đang giữ" phải chuyển nguồn cùng lúc.
 - **Chuỗi cảnh báo `riskFlags`** (`functions/decision-scoring.js`) ↔ khoá của `DECISION_RISK_TEXT` (bản lời thường ở
   tab Phân tích) + chuỗi "Xu hướng yếu — nguy cơ bắt dao rơi" mà `renderDecisionPilot` dùng để đếm (`public/index.html`).
   Đổi chữ cảnh báo phía bot → sửa cả hai chỗ bên app, không thì cảnh báo hiện nguyên văn kỹ thuật và bộ đếm về 0.
@@ -184,13 +171,15 @@ Hiện **chưa có cặp nào** — app 1 người dùng, 1 màn hình. Gặp c�
   cố ý KHÔNG đọc tab Chiến lược/`settings/screening`: đang chạy bóng, đổi giữa chừng thì mẫu không so được.
   Đổi ngưỡng/công thức → nâng version, bộ đếm 20 phiên chạy lại. Sự kiện chỉ sinh ở lượt sau đóng cửa;
   đo đối xứng (Bán đúng khi giá giảm winPct trước khi tăng lossPct).
-- **Kết nối TCBS OpenAPI chỉ ĐỌC** (owner chốt 28/09/2026). Không gọi endpoint đặt/sửa/huỷ lệnh, chuyển tiền,
-  WebSocket; không đồng bộ theo lịch — chỉ khi owner bấm nút `#tcbs-btn` ở header. API Key, mã lưu ký, khoá mã hoá
-  phiên nằm trong **Secret Manager** (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`, `TCBS_SESSION_KEY`), không qua trình
-  duyệt, không lưu Firestore. Web chỉ gửi iOTP. Không App Check (kiểm email owner là hàng rào). Đã đo 28/09/2026:
-  `openapi.tcbs.com.vn` nhận kết nối từ Cloud Function (khác các API giá của TCBS).
-  Chuyển nguồn cần owner xác nhận sau bảng so sánh; **ngắt kết nối chép lệnh khớp sau chuyển giao vào
-  `transactions`** (id `tcbs_…`) rồi xoá mốc chuyển giao. Chênh lệch đã thấy ở bảng so sánh sẽ quay lại khi ngắt — đúng ý.
+- **TCBS OpenAPI chỉ dùng để ĐỐI CHIẾU, sổ tay vẫn là nguồn chính** (owner chốt 28/09/2026). Nút `#tcbs-btn` ở header →
+  nhập iOTP → `readTcbsPortfolio` đổi iOTP lấy phiên, đọc tài sản/tiền/lệnh khớp tiểu khoản NORMAL rồi **bỏ phiên ngay —
+  KHÔNG cất phiên** ở đâu cả (owner chọn để người có quyền vào Google Cloud không cầm được phiên đặt lệnh). Mỗi lần đối
+  chiếu nhập iOTP mới. API Key + mã lưu ký trong Secret Manager (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`), web chỉ gửi iOTP.
+  App so theo nhóm ngày·mã·chiều (`tcbsMissingTrades`), chỉ từ ngày đầu của sổ tay; vị thế lệch vì lý do khác (cổ tức
+  cổ phiếu, quyền, cách TCBS tính giá vốn) **chỉ hiện để xem**, không có loại "điều chỉnh vị thế". Không đồng bộ theo lịch.
+  Đã đo 28/09/2026: `openapi.tcbs.com.vn` nhận kết nối từ Cloud Function (khác các API giá của TCBS).
+- **Lệnh điều kiện qua API (đã xem 28/09/2026):** API TCBS chỉ có lệnh điều kiện cho phái sinh; tự dựng cho cổ
+  phiếu buộc phải giữ phiên có quyền đặt lệnh — trái quyết định không cất phiên. Hiện KHÔNG làm.
 - **Không có test runner, không unit test.** Kiểm bằng bấm thử thật.
 
 ---
@@ -209,7 +198,7 @@ Theo `Starter-Kit/02-ui-ux/`. Ba điều siết chặt nhất ở dự án này:
 firebase deploy --project fin2-danh-muc
 ```
 ⚠️ **Ghi CHANGELOG TRƯỚC khi deploy.** Deploy hỏng thì DỪNG, không báo "xong".
-⚠️ Từ 28/09/2026 Functions gắn 3 secret TCBS — thiếu secret nào trong Secret Manager thì deploy Functions không qua.
+⚠️ Từ 28/09/2026 Functions gắn 2 secret TCBS (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`) — thiếu thì deploy Functions không qua.
 
 ---
 

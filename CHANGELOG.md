@@ -4,30 +4,26 @@ Ngày mới nhất trên đầu.
 
 ---
 
-## 2026-09-28d (TCBS: kết nối OpenAPI, đồng bộ danh mục chỉ đọc)
+## 2026-09-28d (Đối chiếu TCBS: bấm tay, nhập iOTP, chỉ đọc)
 
-Owner muốn danh mục, giá vốn và tiền mặt lấy thẳng từ tài khoản TCBS thay vì nhập tay. Giai đoạn này **chỉ đọc**: không đặt/sửa/huỷ lệnh, không chuyển tiền, không tự chạy theo lịch — chỉ đồng bộ khi owner bấm.
+Owner muốn so sổ tay với tài khoản TCBS thật mà không phải gõ lại từng lệnh. Owner chốt: **sổ tay vẫn là nguồn chính**, TCBS chỉ để đối chiếu khi owner bấm.
 
-- **Nút mới ở header** (`#tcbs-btn`, biểu tượng ngân hàng, cạnh nút lấy giá), dùng chung cho Gọn và Đầy đủ. Chưa có phiên hoặc phiên hết hạn → mở hộp nhập iOTP (`#tcbs-dialog`). Trong phiên 8 giờ bấm là đồng bộ ngay, không hỏi lại iOTP.
-- **Thẻ "Kết nối TCBS" ở tab Chiến lược:** trạng thái, giờ đồng bộ, hạn phiên. Lần đầu có **bảng so sánh** trong tool với TCBS (mã, KL, giá vốn, tiền mặt; dòng lệch được tô), nút **Xác nhận chuyển sang TCBS** và nút **Ngắt kết nối** (`renderTcbs`, `renderTcbsPreview`, `initTcbs`).
-- **4 Cloud Function mới:** `connectTcbs` (iOTP → lấy phiên → đọc ngay), `syncTcbsPortfolio`, `confirmTcbsCutover`, `disconnectTcbs` (`functions/tcbs-service.js`). Chỉ đọc tiểu khoản thường (NORMAL): tài sản `/se`, số dư `/cashInvestments`, lệnh khớp `/matching-details`.
-- **Bảo mật:** API Key, mã lưu ký và khoá mã hoá phiên nằm ở Secret Manager (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`, `TCBS_SESSION_KEY`). Trình duyệt chỉ gửi iOTP. Phiên TCBS (JWT) được mã hoá AES-GCM, cất ở `tcbs_private/session`; rules chặn client đọc/ghi. Server kiểm đúng email owner đã xác minh.
-- **Collection mới:** `tcbs_connection`, `tcbs_positions`, `tcbs_balances`, `tcbs_trades` (owner chỉ đọc); `tcbs_private`, `tcbs_control` (chặn hoàn toàn). Đã thêm nhánh `firestore.rules`.
-- **Sau khi xác nhận chuyển giao** (`tcbsMode()`): danh mục, giá vốn, tiền mặt lấy từ TCBS cho dashboard, tín hiệu và Điểm quyết định (server dùng `tcbsHoldings`). Form nhập giao dịch, nạp/rút, lệnh chờ, khớp tay bị khoá. Lệnh khớp TCBS hiện trong Nhật ký và biểu đồ với nhãn "TCBS", không có nút Xoá (`journalTransactions`). Lãi/lỗ đã chốt sau chuyển giao tính từ ảnh đầu kỳ + lệnh khớp (`computeTcbsTradeLedger`).
-- **Lệnh khớp không giải thích được vị thế** (ảnh đầu kỳ + lệnh khớp ≠ số TCBS đang báo) → hiện "Lịch sử chưa đầy đủ", **không tự sinh bút toán bù**.
-- **Ngắt kết nối:** chép lệnh khớp sau chuyển giao vào `transactions` (id `tcbs_…`, chép lại không bị trùng), xoá phiên và mốc chuyển giao. Lần kết nối sau phải so sánh + xác nhận lại. Chênh lệch đã thấy ở bảng so sánh sẽ quay lại khi ngắt — đúng ý.
-- **Mỗi lượt đồng bộ ghi 1 batch.** Lỗi thì giữ bản tốt gần nhất, đánh dấu "Dữ liệu TCBS đang cũ". Lệnh khớp thiếu trường chỉ bị bỏ riêng lệnh đó + đánh dấu chưa đầy đủ.
-- **Đã đo 28/09/2026:** `openapi.tcbs.com.vn` nhận kết nối từ Cloud Function (trả 400 "API key is invalid" với key giả, ~0,1 giây, không bị Cloudflare chặn) — khác các API giá của TCBS.
-- **Sửa so với bản nháp trước** (làm với ChatGPT, chưa từng deploy):
-  - ~~Ô nhập API Key trên web~~, ~~Cloud KMS~~, ~~thư viện `google-auth-library`~~ — **bỏ hết**. API Key chỉ ở Secret Manager, trình duyệt không bao giờ thấy.
-  - Giờ khớp lệnh TCBS trả về không kèm múi giờ → giờ quy về giờ VN (`execIso`) trước khi so với mốc chuyển giao.
-  - Thuế bán luôn 0,1% (`SELL_TAX_RATE`).
-  - Bảng so sánh trên điện thoại không còn ẩn cột "Trong tool".
-  - Khôi phục `deploy.bat` (bản nháp đã đổi tên thành `deploy.txt`).
-  - Soát nhân bản (sync-agent) bắt thêm 2 lỗi: **bot sàng lọc** vẫn lấy "mã đang giữ" từ sổ tay → giờ đọc `tcbs_positions` khi đang dùng TCBS (`runSlot`), khớp nút Quét ngay; **bảng đóng góp lãi/lỗ** bị trống khi dùng TCBS → giờ cộng lãi đã chốt theo mã từ `realizedEvents` (`contributionRows`).
-- **Chưa kiểm với tài khoản thật** — cần owner tạo 3 secret + nhập iOTP. Hai điểm còn chưa rõ theo dõi ở ISSUES #015, #016.
+- **Nút mới ở header** (`#tcbs-btn`, biểu tượng ngân hàng, cạnh nút lấy giá) → mở hộp **Đối chiếu TCBS** (`#tcbs-dialog`): nhập iOTP → bấm **Đọc TCBS** → hiện 3 phần:
+  1. **Lệnh thiếu trong sổ** — có ô chọn, mặc định chọn hết.
+  2. **Tiền mặt** — lệch thì có ô chọn; đồng bộ sẽ ghi một dòng "Đối chiếu" (`cashflows` type `adjust`, note "Đối chiếu TCBS").
+  3. **Vị thế** — bảng Tool / TCBS các mã lệch số lượng hoặc giá vốn. **Chỉ để xem**, không ghi gì (lệch vì cổ tức cổ phiếu, quyền mua, cách TCBS tính giá vốn…).
+  Bấm **Đồng bộ mục đã chọn** → ghi một lần duy nhất (1 batch).
+- **Cách tìm lệnh thiếu** (`tcbsMissingTrades`): gom theo ngày · mã · chiều mua/bán. Sổ tay ít hơn TCBS thì đề xuất đúng phần thiếu, giá = bình quân các lệnh khớp của nhóm đó. Chỉ xét từ ngày giao dịch đầu tiên trong sổ tay — lịch sử TCBS cũ hơn không tính là "thiếu". Đọc lại lần 2 không đề xuất trùng vì phần đã ghi được trừ ra.
+- **Lệnh ghi vào sổ giống nhập tay** (`tcbsTransaction`): note "Đồng bộ TCBS", thời điểm ghi = giờ khớp thật, lệnh bán tự gắn thuế 0,1%.
+- **Tiền mặt và vị thế luôn so SAU các lệnh đang chọn** (`renderTcbsReview`): bỏ chọn một lệnh thì số lệch tiền/vị thế tự tính lại ngay.
+- **Phía server:** một hàm `readTcbsPortfolio` (`functions/tcbs-service.js` → `readPortfolio`). Chỉ chạy khi đúng email owner đã xác minh. Đổi iOTP lấy phiên TCBS → đọc tiểu khoản cổ phiếu thường (bỏ margin, phái sinh): tài sản, số dư tiền, lệnh khớp → trả về app rồi **bỏ phiên ngay**. Không cất phiên, không ghi Firestore, **không collection mới, không đổi `firestore.rules`**. Nhiều tiểu khoản thì cộng dồn, giá vốn bình quân gia quyền. Giá TCBS tính bằng đồng → đổi sang nghìn đồng cho khớp app. Giờ khớp TCBS không ghi múi giờ → hiểu là giờ Việt Nam (`execIso`).
+- **Bảo mật:** API Key và mã lưu ký nằm trong Secret Manager (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`); web chỉ gửi iOTP. **Vì sao không cất phiên để khỏi nhập iOTP mỗi lần:** phiên TCBS có quyền đặt lệnh; ai có quyền quản trị Google Cloud project đều lấy được phiên nếu nó được cất. (API TCBS không có chuyển tiền ra ngoài, chỉ chuyển giữa các tiểu khoản của chính owner.)
+- **Đã đo 28/09/2026:** `openapi.tcbs.com.vn` nhận kết nối từ Cloud Function (trả 400 "API key is invalid" với key giả, ~0,1 giây, không bị Cloudflare chặn như các API giá của TCBS).
+- **Lệnh điều kiện — đã xem, KHÔNG làm:** API TCBS chỉ có lệnh điều kiện cho phái sinh; tự dựng cho cổ phiếu thì phải giữ phiên TCBS lâu dài, trái nguyên tắc bảo mật ở trên.
+- ~~Bản nháp trước đó (chế độ "nguồn TCBS" thay cho sổ tay)~~ — **đã bỏ hoàn toàn**, thay bằng đối chiếu bấm tay ở trên.
+- **Chưa kiểm với tài khoản thật.** Việc của owner: tạo 2 secret `TCBS_API_KEY`, `TCBS_CUSTODY_CODE` (thiếu thì deploy Functions không qua), rồi thử một lượt với iOTP thật. Còn 3 điểm chưa rõ ghi ở #015, #016, #017.
 
-· `public/index.html` · `functions/tcbs-service.js` (mới) · `functions/index.js` · `functions/decision-service.js` · `firestore.rules` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `ISSUES.md` · `CHANGELOG.md`
+· `public/index.html` (khối "đối chiếu TCBS": `tcbsMissingTrades`, `tcbsTransaction`, `tcbsSelectedTrades`, `renderTcbsReview`, `openTcbsDialog`, `initTcbs`; `tcbsReadApi`) · `functions/tcbs-service.js` (mới) · `functions/index.js` · `CLAUDE.md` · `AGENTS.md` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
 
 ## 2026-09-28c (Tab Phân tích viết lời thường)
 

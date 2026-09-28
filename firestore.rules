@@ -35,13 +35,6 @@ service cloud.firestore {
     match /decision_versions/{id} { allow read: if isOwner(); allow write: if false; }
     match /decision_news/{id}     { allow read: if isOwner(); allow write: if false; }
     match /decision_control/{id}  { allow read: if isOwner(); allow write: if false; }
-    // Đồng bộ TCBS: trình duyệt chỉ đọc kết quả; credential và khoá chạy chỉ ở server.
-    match /tcbs_connection/{id} { allow read: if isOwner(); allow write: if false; }
-    match /tcbs_positions/{id}  { allow read: if isOwner(); allow write: if false; }
-    match /tcbs_balances/{id}   { allow read: if isOwner(); allow write: if false; }
-    match /tcbs_trades/{id}     { allow read: if isOwner(); allow write: if false; }
-    match /tcbs_private/{id}    { allow read, write: if false; }
-    match /tcbs_control/{id}    { allow read, write: if false; }
     // Cấu hình owner chỉnh trong app (khung giờ nhận tin sàng lọc).
     match /settings/{id}          { allow read, write: if isOwner(); }
 
