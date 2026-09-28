@@ -6,8 +6,11 @@
 public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                         ├── firebase-app.js       initializeApp
                         ├── firebase-auth.js      Google Sign-In
-                        └── firebase-firestore.js đọc 13 collection;
-                            2 collection screening chỉ đọc
+                        ├── firebase-firestore.js đọc 13 collection;
+                        │   2 collection screening chỉ đọc; 4 collection tcbs_* chỉ đọc
+                        └── firebase-functions.js gọi refreshDecisionScores + 4 callable TCBS
+                            (connectTcbs, syncTcbsPortfolio, confirmTcbsCutover, disconnectTcbs);
+                            trình duyệt chỉ gửi iOTP, không bao giờ thấy API Key
                       Google Fonts (Inter 400/500)
                       bgapidatafeed.vps.com.vn   giá thị trường (chỉ đọc,
                         chỉ gửi đi danh sách MÃ — không gửi SL hay số dư)
@@ -33,6 +36,10 @@ functions/index.js ──> Firebase Functions v2 · Node.js 22
                         │    ├── decision-scoring.js: công thức độc lập decision-v1.1.0 + rổ ngành
                         │    ├── scoring.js decisionInputs: dùng chung phép tính OHLCV, không đổi sàng lọc
                         │    └── decision-news.js: HNX RSS → nội dung → AI tùy chọn → tác động giới hạn
+                        ├── tcbs-service.js: connectTcbs, syncTcbsPortfolio, confirmTcbsCutover, disconnectTcbs
+                        │    ├── openapi.tcbs.com.vn  CHỈ ĐỌC: hồ sơ/tiểu khoản, /se, /cashInvestments,
+                        │    │                        /matching-details. Không đặt lệnh, không chuyển tiền
+                        │    └── Secret Manager       TCBS_API_KEY, TCBS_CUSTODY_CODE, TCBS_SESSION_KEY
                         ├── lịch mỗi 30 phút 8:00–20:30 T2–T6, Asia/Ho_Chi_Minh;
                         │   chỉ chạy thật ở khung giờ owner bật (settings/screening)
                         ├── functions/scoring.js  chấm điểm + đánh giá 20 phiên
@@ -47,6 +54,16 @@ firestore.rules   ──  hàng rào thật. Không file nào import, nhưng
 
 Không có bundler. Logic danh mục vẫn ở `public/index.html`.
 
+### Kết nối TCBS (28/09/2026) — chỉ đọc
+
+- **Luồng:** nút `#tcbs-btn` ở header (dùng chung Gọn + Đầy đủ). Chưa có phiên → hộp iOTP `#tcbs-dialog` → `connectTcbs` đổi iOTP lấy JWT, đọc ngay, cất phiên 8 giờ. Còn phiên → `syncTcbsPortfolio`. Lần đầu trạng thái `pending_confirmation`: thẻ "Kết nối TCBS" ở tab Chiến lược hiện bảng so sánh (`renderTcbsPreview`); owner bấm Xác nhận → `confirmTcbsCutover` chụp **ảnh đầu kỳ** `openingPositions` + mốc `cutoverAt` = lượt đồng bộ vừa xem, đổi `mode` sang `"tcbs"`.
+- **Server (`functions/tcbs-service.js`):** mọi callable qua `assertOwner` (đúng email + `email_verified`) và `withLock` (khoá `tcbs_control/runtime`, 2 phút). `loadData` → `activeNormalAccounts` (chỉ tiểu khoản NORMAL) → `readAccount` đọc `/se`, `/cashInvestments`, `readTrades`. Giá TCBS là VND, đổi sang nghìn đ ngay ở `normalizeAssets`/`normalizeTrade`. Giờ khớp không múi giờ → `execIso` coi là giờ VN, lưu `execAt` ISO UTC. `persistSync` ghi MỘT batch (thay hết `tcbs_positions`/`tcbs_balances`, thêm `tcbs_trades` bằng `merge`); lỗi TCBS thì không ghi gì, `withLock` đánh dấu `stale` + `error`. `historyComplete` = mọi tiểu khoản đọc đủ lệnh khớp **và** `quantitiesMatch` (ảnh đầu kỳ + lệnh khớp sau chuyển giao = số TCBS đang báo). Không khớp → "Lịch sử chưa đầy đủ", không sinh bút toán bù.
+- **Phiên:** JWT mã hoá AES-GCM bằng `TCBS_SESSION_KEY` (`sealToken`/`openToken`), cất ở `tcbs_private/session`. TCBS trả 401 → xoá phiên, app mở lại hộp iOTP.
+- **Ngắt (`disconnect`):** chép lệnh khớp sau `cutoverAt` vào `transactions/tcbs_{tk_tradeId}` (id tất định → chép lại không trùng, tối đa 480 lệnh/lượt), xoá phiên, xoá `cutoverAt`/`openingPositions`, `mode` về `"manual"`.
+- **Client:** `tcbsMode()` là công tắc duy nhất. Bật thì `computeSummary` lấy vị thế từ `aggregateTcbsHoldings`, tiền mặt = Σ `tcbs_balances.cashBalance`, lãi/lỗ đã chốt cộng thêm `computeTcbsTradeLedger`; `computeSellAvailability` tính T+2 từ ảnh đầu kỳ + lệnh khớp; `setManualEntryLocked` khoá `tx-form`, `cf-form`, `order-form`, `fill-form`. Nhật ký, biểu đồ, xuất dữ liệu đọc qua `journalTransactions`.
+- **Thiết lập (việc của owner):** tạo 3 secret `TCBS_API_KEY`, `TCBS_CUSTODY_CODE`, `TCBS_SESSION_KEY` (khoá phiên 32 byte viết dạng hex = 64 ký tự) trong project `fin2-danh-muc`. Không đặt trong HTML, Firestore, git hay chat.
+- Còn chưa rõ: phân trang `matching-details` (#015), `/se` có tính mua T0 không (#016).
+
 ### Điểm quyết định (27/09/2026)
 
 - Client import thêm Firebase Functions SDK, gọi `refreshDecisionScores` sau nút lấy giá chung; server xác thực email owner + email_verified. Công thức chỉ server, không có bản sao ở client.
@@ -57,6 +74,7 @@ Không có bundler. Logic danh mục vẫn ở `public/index.html`.
 - `decision_news/{hashUrl}` tin công khai + nguồn/thời gian/nội dung/chứng cứ/phân loại; `decision_control/news` cache 1 giờ, trạng thái AI và độ phủ. Nguồn hiện có: RSS công bố tổ chức phát hành và công bố từ Sở của HNX. Lỗi tin = tác động 0; chưa có AI không đoán cảm xúc bằng từ khóa. Chưa bao phủ hết HOSE/ngành (#014).
 - Client hiển thị thang 10 (`score10`, lưu vẫn 0–100). Tầng 2 bảng mã: `decisionScoreLine` (điểm + trạng thái từ `decisionStatus`); bấm → `openAnalysis` sang tab **Phân tích** (`panel-phan-tich`, `renderAnalysis`, `analysisItem`, `analysisDetail`, `renderDecisionPilot`). Chi tiết chỉ dựng khi mở mã (`analysisOpen`). `analysisDetail` viết lời thường: mỗi thành phần = mức Tốt/Vừa/Kém (Bán: Cao/Vừa/Thấp/Không) + một câu dựng từ `market`/`sector`/ngưỡng `strategyLevels`; cảnh báo dịch qua `DECISION_RISK_TEXT`. `renderDecisionPilot` (mục "Chạy thử") cũng viết lời thường. Điểm cũ/thiếu dữ liệu/danh mục đổi có nhãn; tiền mặt, mã Giữ và T+2 là điều kiện đứng riêng. Không tạo lệnh. `buildExport` có `diemQuyetDinh` (kết quả hiện tại + sự kiện trong kỳ).
 - Các collection mới đều chỉ cho owner đọc, client không được ghi. Cloud Functions Admin SDK ghi. Scheduler độc lập với bot Telegram, không gửi thông báo.
+- Khi `tcbs_connection/current.mode === "tcbs"`, `runDecision` lấy vị thế từ `tcbs_positions` qua `tcbsHoldings` (gộp nhiều tiểu khoản theo bình quân gia quyền) thay vì `holdings(transactions)`.
 - **Thiết lập AI:** tạo secret `DECISION_OPENAI_API_KEY` trong project `fin2-danh-muc`, cấp `roles/secretmanager.secretAccessor` trên đúng secret cho service account chạy `refreshDecisionScores`/`closeDecisionScores`. Module đọc Secret Manager bằng credential server; không bind secret bắt buộc nên điểm kỹ thuật deploy được khi chưa có khóa. Model `gpt-4.1-mini`, `store:false`; chỉ gửi tối đa 10 tin/lần và 50 tin mới/lượt. Không đặt khóa trong HTML, Firestore, git hay chat. Môi trường giả lập có thể dùng biến môi trường cùng tên.
 `public/install.js` xử lý nút Cài đặt độc lập với Firebase; `manifest.webmanifest`
 khai tên Danh Mục, scope `/`, chế độ standalone và icon trong `public/icons/`.
@@ -89,6 +107,12 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | **Tính toán** | `transactionTaxVND(t)` | đọc thuế TNCN đã lưu trên lệnh bán; giao dịch cũ thiếu `taxAmount` trả 0 để không hồi tố |
 | | `computeLedger(transactions)` `computeHoldings(transactions)` | duyệt giao dịch theo thứ tự `date_createdAt`, trả vị thế và từng sự kiện lãi/lỗ bán sau thuế. Mỗi vị thế giữ `cycleRealizedPnl`; bán hết đặt lại chu kỳ để tính Giá vốn sau lướt khi mua lại |
 | | `computeCashVND(transactions, cashflows)` | Σ nạp − Σ rút − Σ mua + Σ bán − thuế bán |
+| TCBS | `tcbsMode()` | **công tắc duy nhất** "danh mục đang lấy từ TCBS" (`tcbs_connection/current.mode === "tcbs"`). Mọi nhánh TCBS trong tính toán, form, nhật ký đều hỏi hàm này |
+| | `aggregateTcbsHoldings()` | gộp `tcbs_positions` nhiều tiểu khoản thành 1 dòng/mã theo bình quân gia quyền. Bản sao có chủ ý của `aggregatePositions` (server) và `tcbsHoldings` (decision-service) |
+| | `tcbsTradesAfterCutover()` `computeTcbsTradeLedger(manualLedger)` | lệnh khớp TCBS có `execAt` sau `cutoverAt`; dựng lại vị thế từ ảnh đầu kỳ `openingPositions` + lệnh khớp để tính lãi/lỗ đã chốt, `cycleRealizedPnl`, `heldSince` sau chuyển giao |
+| | `journalTransactions()` | `transactions` + lệnh khớp TCBS sau chuyển giao (gắn `source:"tcbs"`). Nhật ký, biểu đồ, đối chiếu tín hiệu và `buildExport` đọc qua hàm này; dòng TCBS không có nút Xoá |
+| | `renderTcbs()` `renderTcbsPreview()` `tcbsSessionValid()` `setManualEntryLocked(locked)` | thẻ "Kết nối TCBS" ở tab Chiến lược + trạng thái nút header; bảng so sánh tool ↔ TCBS khi `pending_confirmation`; khoá 4 form nhập tay khi `tcbsMode()`. Gọi từ `render()` |
+| | `initTcbs()` `openTcbsDialog()` `runTcbsAction(report,pendingText,action)` `tcbsErrorText` `tcbsDoneText` | gắn nút `#tcbs-btn`, hộp iOTP, Xác nhận, Ngắt; gọi 4 callable qua `httpsCallable`. Hết phiên (`unauthenticated`) → tự mở lại hộp iOTP |
 | | `sellableAt(dateStr)` `computeSellAvailability(transactions,ticker,now)` | tính số CP được bán từ 11:35 ngày làm việc thứ hai sau ngày mua; chỉ loại T7/CN. Trừ mọi lệnh bán đã ghi và không chặn submit |
 | | `currentPriceFor(ticker, avgCost)` | lấy `tickers.lastPrice`, **không có thì rơi về avgCost** (⇒ lãi/lỗ = 0, không phải lỗi) |
 | | `computeSummary()` | gộp tất cả, trả tiền mặt, tổng tài sản, lãi/lỗ chưa bán, vị thế kèm `netCost` và danh sách sự kiện bán để dashboard lọc theo kỳ |
@@ -142,11 +166,11 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | | `initScreening()` `openScreeningWatch(ticker,price)` | bắt sự kiện một lần trên khối dùng chung; “Đưa vào theo dõi” chỉ điền mã và hiện giá lúc đề cử, còn giá muốn mua do owner nhập rồi tự Lưu |
 | | `pendingDrafts` trong `initCompact` | ghi cờ form giao dịch / giá chưa lưu để `beforeunload` yêu cầu cảnh báo khi rời trang. `refreshAllPrices` cũng đặt cờ khi điền giá; lưu giao dịch hoặc `saveTodaySnapshot` thành công xoá cờ tương ứng. Không lưu bản nháp vào localStorage |
 | Thu gọn | `initCollapse()` `setCollapsed(head,on)` `readCollapsed()` `writeCollapsed(list)` hằng `CHEVRON` | chèn mũi tên vào mọi `.sec-head[data-sec]`; bấm đầu đề thì gắn class `collapsed` lên **thẻ cha** (section hoặc .card), CSS `.collapsed > *:not(.sec-head)` giấu phần thân — **không bọc thêm thẻ nào**. Phần đang gập nhớ ở localStorage `fin2-collapsed` (mảng khoá). Section mới muốn gập được thì chỉ cần thêm `data-sec`. Muốn hiện số tóm tắt lúc gập thì đặt `class="only-collapsed"` lên ô đó — thuần CSS, `render()` không cần biết đang gập hay mở |
-| Dữ liệu | `setSync` `watch(name, apply)` `watchRef(ref,name,apply)` `startData()` | 11 listener collection (gồm `settings`) và 2 query screening; mỗi lần có dữ liệu đều gọi `render()` |
+| Dữ liệu | `setSync` `watch(name, apply)` `watchRef(ref,name,apply)` `startData()` | 11 listener collection (gồm `settings`) + 4 listener `tcbs_*` và 2 query screening; mỗi lần có dữ liệu đều gọi `render()` |
 | Cổng | `showGate` `initGate()` | `onAuthStateChanged` → 3 nhánh: chưa đăng nhập · sai email · đúng email |
 
-**Boot:** đúng 11 lời gọi ở cấp module, cuối file, theo thứ tự
-`initTabs() → initDashboard() → initCollapse() → initForms() → initDecisionTools() → initScreening() → initSorting() → initCompact() → initStockChart() → render() → initGate()`.
+**Boot:** đúng 12 lời gọi ở cấp module, cuối file, theo thứ tự
+`initTabs() → initDashboard() → initCollapse() → initForms() → initTcbs() → initDecisionTools() → initScreening() → initSorting() → initCompact() → initStockChart() → render() → initGate()`.
 ⚠️ Đừng thêm lời gọi cấp module đọc biến khai phía dưới — cả khối script sẽ chết im lặng (bài học mục 12).
 
 ---
@@ -170,6 +194,13 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | `universe.js` | `UNIVERSE` | danh sách khoảng 100 mã thanh khoản cao dùng làm tập ứng viên ban đầu; watchlist và mã cũ đang chờ đánh giá được ghép thêm lúc chạy |
 | `smoke.js` | các ca kiểm nhanh | kiểm bứt phá, thanh khoản yếu, mã ngoài vùng 40–70 vẫn được xét, hai ngưỡng cùng phiên, không nhìn dữ liệu tương lai, chọn theo từng nhóm, dòng khoảng cách giá kỳ vọng, thông số sai rơi về mặc định, ngưỡng đo đọc từ kết quả |
 | `backtest.js` | `main()` | walk-forward lịch sử để đo công thức trước khi bật; chỉ dùng dữ liệu có tại ngày chấm, nhưng vẫn có sai lệch sống sót vì dùng universe hiện tại |
+| `index.js` | `connectTcbs` `syncTcbsPortfolio` `confirmTcbsCutover` `disconnectTcbs` | 4 callable (timeout 90 giây, 256 MiB) gắn 3 secret TCBS qua `defineSecret`; chỉ chuyển tiếp sang `tcbs-service.js` |
+| `tcbs-service.js` (mới 28/09/2026) | `connect` `sync` `confirmCutover` `disconnect` | thân 4 callable; mỗi hàm qua `assertOwner` + `withLock`. Xem mục "Kết nối TCBS" ở phần 1 |
+| | `exchangeToken(apiKey,otp)` `tokenExpiry` `sealToken` `openToken` `sessionKey` | đổi iOTP lấy JWT; mã hoá/giải mã phiên AES-256-GCM bằng `TCBS_SESSION_KEY` |
+| | `fetchJson(path,token)` `loadData(token,custodyCode)` `activeNormalAccounts` `readAccount` `readTrades` | gọi `openapi.tcbs.com.vn` (timeout 20 giây); chỉ tiểu khoản NORMAL; `readTrades` đọc từng trang `matching-details`, gộp theo `tradeId`, tối đa 20 trang (#015) |
+| | `normalizeAssets` `normalizeBalance` `normalizeTrade` `execIso` `vnDate` | kiểm từng trường, đổi giá VND → nghìn đ, giờ khớp không múi giờ → giờ VN; lệnh bán gắn `taxRate`/`taxAmount` theo `SELL_TAX_RATE` 0,1%. Lệnh khớp thiếu trường bị bỏ riêng + đánh dấu chưa đầy đủ |
+| | `aggregatePositions` `tradesAfter` `quantitiesMatch` `persistSync` | gộp tiểu khoản; lọc lệnh sau `cutoverAt`; kiểm vị thế có giải thích được không (`historyComplete`); ghi một batch |
+| `decision-service.js` | `tcbsHoldings(rows)` | khi `mode === "tcbs"`, `runDecision` lấy vị thế từ `tcbs_positions` qua hàm này thay cho `holdings(transactions)` |
 
 **Trạng thái production:** `screenShortTermOpportunities` v2 đã deploy tại
 `asia-southeast1`, Node.js 22, 512 MB. Hai secret Telegram đang ở Secret Manager phiên bản 1;
@@ -183,7 +214,7 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 
 | Collection | Đọc ở | Ghi ở | Nhánh rules |
 |---|---|---|---|
-| `transactions` | `watch("transactions")` → `computeHoldings`, `computeCashVND`, `renderLog`, `renderTickerList`, `buildExport` (đối chiếu `daLamTheo`) | `tx-form` submit (`addDoc`); `fillOrder` (`batch.set`); `removeTransaction` (`deleteDoc`) | ✅ |
+| `transactions` | `watch("transactions")` → `computeHoldings`, `computeCashVND`, `renderLog`, `renderTickerList`, `buildExport` (đối chiếu `daLamTheo`); Nhật ký/biểu đồ/xuất đọc qua `journalTransactions` | `tx-form` submit (`addDoc`); `fillOrder` (`batch.set`); `removeTransaction` (`deleteDoc`); Cloud Function `disconnectTcbs` chép lệnh khớp TCBS (id `tcbs_…`) | ✅ |
 | `cashflows` | `watch("cashflows")` → `computeCashVND`, `renderLog`, `buildExport` | `cf-form` submit (`addDoc`) | ✅ |
 | `tickers` | `watch("tickers")` → `currentPriceFor`, `renderCompact`, `renderPriceInputs`, `buildSignals` | `toggleHold`, `saveTodaySnapshot`, `refreshAllPrices`, `addWatch`, `tx-form` submit, `fillOrder` | ✅ |
 | `daily_snapshots` | `watch("daily_snapshots")` → `renderTodayBanner`, `renderLog`, `buildExport` (`giaSauDo`) | `saveTodaySnapshot` (`setDoc` id = ngày) | ✅ |
@@ -196,6 +227,12 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 | `screening_runs` | `watchRef` query 40 lần gần nhất → `renderScreeningHub` | Cloud Function `screenShortTermOpportunities`; client không được ghi | ✅ chỉ owner đọc |
 | `screening_results` | `watchRef` query 250 kết quả gần nhất → `renderScreeningHub` | Cloud Function `recordOfficialRun`, `updateEvaluations`; client không được ghi | ✅ chỉ owner đọc |
 | `screening_slots` | (client chưa đọc) | Cloud Function `acquireSlot`, `runSlot`, `markFailure` | ✅ chỉ owner đọc |
+| `tcbs_connection` | `watch("tcbs_connection")` (doc `current`) → `tcbsMode`, `renderTcbs`, `computeTcbsTradeLedger`; server `runDecision` | Cloud Function `persistSync`, `confirmCutover`, `disconnect`, `withLock` | ✅ chỉ owner đọc |
+| `tcbs_positions` | `watch("tcbs_positions")` → `aggregateTcbsHoldings`, `renderTcbsPreview`; server `runDecision` (`tcbsHoldings`), `confirmCutover` | Cloud Function `persistSync` (id `tiểukhoản_MÃ`, thay toàn bộ mỗi lượt) | ✅ chỉ owner đọc |
+| `tcbs_balances` | `watch("tcbs_balances")` → `computeSummary` (tiền mặt), `renderTcbsPreview` | Cloud Function `persistSync` (id = tiểu khoản) | ✅ chỉ owner đọc |
+| `tcbs_trades` | `watch("tcbs_trades")` → `tcbsTradesAfterCutover`, `journalTransactions`; server `persistSync`, `disconnect` | Cloud Function `persistSync` (id `tiểukhoản_tradeId`, `merge`) | ✅ chỉ owner đọc |
+| `tcbs_private` | không ai đọc từ trình duyệt; server `sync` đọc doc `session` | Cloud Function `connect`, `disconnect`, `withLock` (xoá khi hết phiên) | ✅ chặn hoàn toàn |
+| `tcbs_control` | server `withLock` (doc `runtime`) | Cloud Function `withLock` | ✅ chặn hoàn toàn |
 | `settings` | `watch("settings")` → `screeningSlotOn`, `renderScreeningSlots`, `screeningConfig`, `renderScreeningSettings`; bot đọc trong `screenShortTermOpportunities` | `toggleScreeningSlot`, `saveScreeningSettings` (`setDoc settings/screening`, `merge`) | ✅ |
 
 ⚠️ **Thêm collection mới = thêm 1 dòng bảng này + 1 nhánh trong `firestore.rules` NGAY.**
@@ -217,6 +254,7 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 - **Vòng đời lệnh.** `orders` dùng auto id và đi qua `pending` → `partial` → `filled`, hoặc sang `cancelled`. Chỉ số lượng xác nhận khớp mới sinh `transactions`; mỗi giao dịch khớp giữ `orderId` và `signalId` để tra ngược. Lệnh chờ/hủy vẫn ở Nhật ký nhưng không đổi tiền mặt hay vị thế. `theses` dùng id = mã CP viết hoa.
 - **KHÔNG lưu trạng thái suy ra được.** `signals` cố ý không có cờ "đã làm theo hay chưa" — `buildExport` đối chiếu với `transactions` cùng ngày/mã/chiều ngay lúc xuất. Thêm cờ vào là tự tạo một bản sao dễ lệch.
 - **`daily_snapshots.prices` chứa cả mã KHÔNG nắm giữ** (mã watchlist). `computeSummary` bỏ qua mã không giữ nên số liệu không đổi — nhưng snapshot ghi trước 10/09/2026 chỉ có mã đang giữ, hai giai đoạn khác phạm vi.
+- **Nguồn danh mục có 2 chế độ.** `mode "manual"` (mặc định): mọi thứ tính từ `transactions` + `cashflows`. `mode "tcbs"` (sau khi owner xác nhận chuyển giao): vị thế + giá vốn từ `tcbs_positions`, tiền mặt từ `tcbs_balances`, lệnh mới từ `tcbs_trades` sau `cutoverAt`; form nhập tay bị khoá. Gộp tiểu khoản có 3 bản phải khớp: `aggregatePositions` ↔ `tcbsHoldings` ↔ `aggregateTcbsHoldings`. Lọc "sau chuyển giao" luôn so `execAt` (ISO UTC) với `cutoverAt`, không so `timeExec` thô. Không bao giờ tự sinh bút toán bù khi lệch — chỉ báo "Lịch sử chưa đầy đủ".
 - **Mọi chuỗi người dùng gõ chèn vào HTML phải qua `esc()`.** Không có ngoại lệ.
 - **Mọi thay đổi dữ liệu đều đi qua `render()`, gồm cả `renderCompact`.** Chuyển view cũng gọi `renderCompact(computeSummary())` để lấy thứ tự mã mới nhất; không mở listener riêng.
 - **Một nút lấy giá chung (từ 24/09/2026) — owner chốt.** `#global-price-refresh` ghi thẳng giá hiện tại vào `tickers` cho mọi mã, nhưng **không thay bước chốt nhật ký**: `daily_snapshots` và `signals` vẫn chỉ sinh khi bấm Lưu ở tab Danh mục. Các nút cũ `#fetch-price`, `#wl-fetch`, `#compact-prices` đã bỏ. Phần đọc datafeed chỉ được có MỘT chỗ là `fetchQuotes` (hiện 2 nơi gọi: nút chung và nút xem giá trong form thêm mã).
@@ -225,4 +263,4 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 
 ---
 
-_Cập nhật lần cuối: 2026-09-27 — Điểm Quyết định chạy bóng, chấm điểm phía server, lưu sự kiện so sánh và nguồn tin chính thức có kiểm chứng._
+_Cập nhật lần cuối: 2026-09-28 — Kết nối TCBS OpenAPI chỉ đọc: file `functions/tcbs-service.js`, 4 callable, 6 collection `tcbs_*`, hàm client `tcbsMode`/`aggregateTcbsHoldings`/`computeTcbsTradeLedger`/`journalTransactions`/`renderTcbs`/`initTcbs`._

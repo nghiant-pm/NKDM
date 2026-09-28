@@ -4,6 +4,31 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-28d (TCBS: kết nối OpenAPI, đồng bộ danh mục chỉ đọc)
+
+Owner muốn danh mục, giá vốn và tiền mặt lấy thẳng từ tài khoản TCBS thay vì nhập tay. Giai đoạn này **chỉ đọc**: không đặt/sửa/huỷ lệnh, không chuyển tiền, không tự chạy theo lịch — chỉ đồng bộ khi owner bấm.
+
+- **Nút mới ở header** (`#tcbs-btn`, biểu tượng ngân hàng, cạnh nút lấy giá), dùng chung cho Gọn và Đầy đủ. Chưa có phiên hoặc phiên hết hạn → mở hộp nhập iOTP (`#tcbs-dialog`). Trong phiên 8 giờ bấm là đồng bộ ngay, không hỏi lại iOTP.
+- **Thẻ "Kết nối TCBS" ở tab Chiến lược:** trạng thái, giờ đồng bộ, hạn phiên. Lần đầu có **bảng so sánh** trong tool với TCBS (mã, KL, giá vốn, tiền mặt; dòng lệch được tô), nút **Xác nhận chuyển sang TCBS** và nút **Ngắt kết nối** (`renderTcbs`, `renderTcbsPreview`, `initTcbs`).
+- **4 Cloud Function mới:** `connectTcbs` (iOTP → lấy phiên → đọc ngay), `syncTcbsPortfolio`, `confirmTcbsCutover`, `disconnectTcbs` (`functions/tcbs-service.js`). Chỉ đọc tiểu khoản thường (NORMAL): tài sản `/se`, số dư `/cashInvestments`, lệnh khớp `/matching-details`.
+- **Bảo mật:** API Key, mã lưu ký và khoá mã hoá phiên nằm ở Secret Manager (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`, `TCBS_SESSION_KEY`). Trình duyệt chỉ gửi iOTP. Phiên TCBS (JWT) được mã hoá AES-GCM, cất ở `tcbs_private/session`; rules chặn client đọc/ghi. Server kiểm đúng email owner đã xác minh.
+- **Collection mới:** `tcbs_connection`, `tcbs_positions`, `tcbs_balances`, `tcbs_trades` (owner chỉ đọc); `tcbs_private`, `tcbs_control` (chặn hoàn toàn). Đã thêm nhánh `firestore.rules`.
+- **Sau khi xác nhận chuyển giao** (`tcbsMode()`): danh mục, giá vốn, tiền mặt lấy từ TCBS cho dashboard, tín hiệu và Điểm quyết định (server dùng `tcbsHoldings`). Form nhập giao dịch, nạp/rút, lệnh chờ, khớp tay bị khoá. Lệnh khớp TCBS hiện trong Nhật ký và biểu đồ với nhãn "TCBS", không có nút Xoá (`journalTransactions`). Lãi/lỗ đã chốt sau chuyển giao tính từ ảnh đầu kỳ + lệnh khớp (`computeTcbsTradeLedger`).
+- **Lệnh khớp không giải thích được vị thế** (ảnh đầu kỳ + lệnh khớp ≠ số TCBS đang báo) → hiện "Lịch sử chưa đầy đủ", **không tự sinh bút toán bù**.
+- **Ngắt kết nối:** chép lệnh khớp sau chuyển giao vào `transactions` (id `tcbs_…`, chép lại không bị trùng), xoá phiên và mốc chuyển giao. Lần kết nối sau phải so sánh + xác nhận lại. Chênh lệch đã thấy ở bảng so sánh sẽ quay lại khi ngắt — đúng ý.
+- **Mỗi lượt đồng bộ ghi 1 batch.** Lỗi thì giữ bản tốt gần nhất, đánh dấu "Dữ liệu TCBS đang cũ". Lệnh khớp thiếu trường chỉ bị bỏ riêng lệnh đó + đánh dấu chưa đầy đủ.
+- **Đã đo 28/09/2026:** `openapi.tcbs.com.vn` nhận kết nối từ Cloud Function (trả 400 "API key is invalid" với key giả, ~0,1 giây, không bị Cloudflare chặn) — khác các API giá của TCBS.
+- **Sửa so với bản nháp trước** (làm với ChatGPT, chưa từng deploy):
+  - ~~Ô nhập API Key trên web~~, ~~Cloud KMS~~, ~~thư viện `google-auth-library`~~ — **bỏ hết**. API Key chỉ ở Secret Manager, trình duyệt không bao giờ thấy.
+  - Giờ khớp lệnh TCBS trả về không kèm múi giờ → giờ quy về giờ VN (`execIso`) trước khi so với mốc chuyển giao.
+  - Thuế bán luôn 0,1% (`SELL_TAX_RATE`).
+  - Bảng so sánh trên điện thoại không còn ẩn cột "Trong tool".
+  - Khôi phục `deploy.bat` (bản nháp đã đổi tên thành `deploy.txt`).
+  - Soát nhân bản (sync-agent) bắt thêm 2 lỗi: **bot sàng lọc** vẫn lấy "mã đang giữ" từ sổ tay → giờ đọc `tcbs_positions` khi đang dùng TCBS (`runSlot`), khớp nút Quét ngay; **bảng đóng góp lãi/lỗ** bị trống khi dùng TCBS → giờ cộng lãi đã chốt theo mã từ `realizedEvents` (`contributionRows`).
+- **Chưa kiểm với tài khoản thật** — cần owner tạo 3 secret + nhập iOTP. Hai điểm còn chưa rõ theo dõi ở ISSUES #015, #016.
+
+· `public/index.html` · `functions/tcbs-service.js` (mới) · `functions/index.js` · `functions/decision-service.js` · `firestore.rules` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `ISSUES.md` · `CHANGELOG.md`
+
 ## 2026-09-28c (Tab Phân tích viết lời thường)
 
 Owner thấy phần chi tiết chấm điểm quá kỹ thuật. Chỉ đổi cách hiển thị; công thức, điểm và bot giữ nguyên.

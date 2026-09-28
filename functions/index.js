@@ -381,16 +381,22 @@ async function runSlot(db, slot, date, token, chatId, settings) {
   if (lock.skip) { logger.info(`Bỏ qua ${date} ${slot.time}: ${lock.reason}`); return; }
   const runRef = slot.phase === "post" ? db.collection("screening_runs").doc(date) : null;
   try {
-    const [transactionsSnap, watchlistSnap, oldResultsSnap] = await Promise.all([
+    const [transactionsSnap, watchlistSnap, oldResultsSnap, tcbsConnectionSnap, tcbsPositionsSnap] = await Promise.all([
       db.collection("transactions").get(),
       db.collection("watchlist").get(),
-      db.collection("screening_results").get()
+      db.collection("screening_results").get(),
+      db.collection("tcbs_connection").doc("current").get(),
+      db.collection("tcbs_positions").get()
     ]);
+    // Nguồn TCBS: mã đang giữ lấy từ vị thế TCBS, cùng điều kiện với app (tcbsMode) và decision-service.
+    const held = tcbsConnectionSnap.data()?.mode === "tcbs"
+      ? new Set(tcbsPositionsSnap.docs.map((item) => item.data()).filter((row) => row.qty > 0).map((row) => row.ticker))
+      : heldTickers(transactionsSnap.docs.map((item) => item.data()));
     const pendingTickers = oldResultsSnap.docs.filter((item) => item.data()?.evaluation?.complete !== true).map((item) => item.data().ticker);
     const scan = await scanMarket({
       phase: slot.phase,
       date,
-      held: heldTickers(transactionsSnap.docs.map((item) => item.data())),
+      held,
       watchlist: new Map(watchlistSnap.docs.map((item) => [item.id, item.data().targetBuy])),
       extraTickers: slot.phase === "post" ? pendingTickers : [],
       config
@@ -459,3 +465,17 @@ exports.closeDecisionScores = onSchedule({ schedule: "30 9-15 * * 1-5", timeZone
   timeoutSeconds: 540, memory: "512MiB", retryCount: 0 }, async () => {
   await runDecision(getFirestore(), decisionHelpers, { scheduled: true });
 });
+
+// TCBS OpenAPI: chỉ đọc danh mục. API Key, mã lưu ký, khoá mã hoá phiên nằm trong Secret Manager.
+const tcbs = require("./tcbs-service");
+const TCBS_API_KEY = defineSecret("TCBS_API_KEY");
+const TCBS_CUSTODY_CODE = defineSecret("TCBS_CUSTODY_CODE");
+const TCBS_SESSION_KEY = defineSecret("TCBS_SESSION_KEY");
+const tcbsCallable = { timeoutSeconds: 90, memory: "256MiB", cors: true,
+  secrets: [TCBS_API_KEY, TCBS_CUSTODY_CODE, TCBS_SESSION_KEY] };
+const tcbsSecrets = () => ({ apiKey: TCBS_API_KEY.value(), custodyCode: TCBS_CUSTODY_CODE.value(),
+  sessionKey: TCBS_SESSION_KEY.value() });
+exports.connectTcbs = onCall(tcbsCallable, (request) => tcbs.connect(getFirestore(), request, tcbsSecrets()));
+exports.syncTcbsPortfolio = onCall(tcbsCallable, (request) => tcbs.sync(getFirestore(), request, tcbsSecrets()));
+exports.confirmTcbsCutover = onCall(tcbsCallable, (request) => tcbs.confirmCutover(getFirestore(), request));
+exports.disconnectTcbs = onCall(tcbsCallable, (request) => tcbs.disconnect(getFirestore(), request));

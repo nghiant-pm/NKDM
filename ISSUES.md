@@ -6,6 +6,40 @@ Mã tăng dần. 🔴 đang mở · 🟢 đã fix.
 
 ## Đang mở
 
+### 🔴 #016 — Chưa rõ TCBS `/se` có tính cổ phiếu mua trong ngày (T0) chưa về không
+**Triệu chứng (dự kiến, chưa gặp thật):** ngày có lệnh mua khớp, thẻ Kết nối TCBS có thể báo
+"Lịch sử chưa đầy đủ" dù không thiếu lệnh nào.
+
+**Bug gốc:** chưa xác định. Tài liệu TCBS không nói rõ số lượng trong `/se` (tài sản) có gồm CP mua
+hôm nay chưa về tài khoản hay không. Nếu KHÔNG gồm, thì ảnh đầu kỳ + lệnh khớp (đã có lệnh mua hôm nay)
+sẽ lớn hơn số `/se` báo → `quantitiesMatch` trả sai → `historyComplete = false`.
+
+**Cần kiểm khi đồng bộ thật:** đồng bộ vào một ngày có lệnh mua khớp, so KL mã đó ở `tcbs_positions`
+với KL trên app TCBS và với tổng lệnh khớp. Nếu lệch đúng bằng lượng mua hôm nay thì cần cách so khác
+(chưa chốt — hỏi owner trước khi sửa). Nếu hôm sau tự hết cảnh báo thì chỉ là lệch trong ngày.
+
+**Cần làm (việc của owner):** tạo 3 secret TCBS trong Secret Manager, nhập iOTP và đồng bộ ít nhất một
+lần vào ngày có lệnh mua.
+
+**File:** `functions/tcbs-service.js` — `normalizeAssets`, `quantitiesMatch`, `persistSync`;
+`public/index.html` — `renderTcbs`, `computeSellAvailability`.
+
+### 🔴 #015 — Chưa rõ cách phân trang lệnh khớp TCBS (`matching-details`)
+**Triệu chứng (dự kiến, chưa gặp thật):** tài khoản có nhiều lệnh khớp thì có thể thiếu lệnh trong
+`tcbs_trades`, dẫn tới "Lịch sử chưa đầy đủ" hoặc lãi/lỗ đã chốt sau chuyển giao bị thiếu.
+
+**Bug gốc:** chưa xác định. Tài liệu TCBS không nêu tham số phân trang. Code tạm gửi
+`pageSize=50&pageIndex=…`, đọc lần lượt từng trang, gộp theo `tradeId`, dừng khi hết dữ liệu, đủ
+`totalCount`, hoặc 2 trang liền không có lệnh mới (dấu hiệu TCBS bỏ qua tham số). Tối đa 20 trang/tiểu khoản.
+Ngắt kết nối từ chối nếu phải chép quá 480 lệnh một lượt.
+
+**Cần kiểm khi đồng bộ thật:** so số lệnh trong `tcbs_trades` với lịch sử khớp trên app TCBS cùng khoảng
+ngày; xem TCBS có trả `totalCount` không và trang 2 có khác trang 1 không.
+
+**Cần làm (việc của owner):** như #016 — tạo secret + nhập iOTP để có lượt đồng bộ thật.
+
+**File:** `functions/tcbs-service.js` — `readTrades`, `normalizeTrade`, `disconnect`.
+
 ### 🔴 #014 — Lớp tin của Điểm quyết định chưa đủ khóa AI và độ phủ nguồn
 **Triệu chứng:** điểm kỹ thuật chạy được nhưng tin chưa được AI phân tích; nguồn HNX RSS không bao phủ toàn bộ HOSE và tin ngành. Không được coi tính năng tin đã hoàn tất.
 

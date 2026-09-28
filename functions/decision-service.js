@@ -38,6 +38,18 @@ function holdings(rows) {
     });
   return out;
 }
+function tcbsHoldings(rows) {
+  const out = {};
+  rows.forEach((r) => {
+    if (!r.ticker || !Number.isFinite(r.qty) || r.qty <= 0 || !Number.isFinite(r.avgCost) || r.avgCost < 0) return;
+    const h = out[r.ticker] || { qty: 0, avgCost: 0 };
+    const nextQty = h.qty + r.qty;
+    h.avgCost = nextQty > 0 ? (h.qty * h.avgCost + r.qty * r.avgCost) / nextQty : 0;
+    h.qty = nextQty;
+    out[r.ticker] = h;
+  });
+  return out;
+}
 function vnClock(now) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now)
@@ -89,10 +101,13 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
   });
   if (!acquired) return { status: "busy" };
   try {
-    const names = ["transactions", "watchlist", "tickers", "strategies", "decision_latest", "decision_events"];
+    const names = ["transactions", "watchlist", "tickers", "strategies", "decision_latest", "decision_events",
+      "tcbs_connection", "tcbs_positions"];
     const reads = await Promise.all(names.map((n) => db.collection(n).get()));
     const docs = (i) => reads[i].docs.map((d) => ({ ...d.data(), id: d.id }));
-    const positions = holdings(docs(0)), watch = Object.fromEntries(docs(1).map((r) => [r.id, r]));
+    const tcbsConnection = docs(6).find((r) => r.id === "current");
+    const positions = tcbsConnection?.mode === "tcbs" ? tcbsHoldings(docs(7)) : holdings(docs(0));
+    const watch = Object.fromEntries(docs(1).map((r) => [r.id, r]));
     const prices = Object.fromEntries(docs(2).map((r) => [r.id, r]));
     const prior = Object.fromEntries(docs(4).map((r) => [r.id, r]));
     const targets = [...new Set([...Object.keys(positions).filter((tk) => positions[tk].qty > 0), ...Object.keys(watch)])].sort();
@@ -203,4 +218,4 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     throw error;
   }
 }
-module.exports = { runDecision, activeStrategy, holdings, makeEvents, aboveFlags, vnClock };
+module.exports = { runDecision, activeStrategy, holdings, tcbsHoldings, makeEvents, aboveFlags, vnClock };
