@@ -4,6 +4,22 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-09-28b (File xuất cho AI đầy đủ hơn)
+
+Owner muốn file "Xuất nhật ký" đủ dữ liệu để đem đi phân tích, vẫn giữ cách tải file về như cũ.
+
+- **Vị thế hiện tại** (`viTheHienTai`) thêm: số CP bán được (T+2), ngày giá, % trong ngày, lãi/lỗ chưa chốt (đ và %), tỷ trọng trên tổng tài sản, nắm từ ngày nào/bao nhiêu ngày, ngưỡng mua/bán đang áp dụng và còn cách bao xa, trạng thái (đã chạm / gần / bình thường), điểm quyết định. Mã "Giữ" không có ngưỡng bán.
+- **Watchlist** (`dangTheoDoi`) thêm: giá mới nhất, cách giá kỳ vọng (điểm và %), đã chạm chưa, theo dõi bao nhiêu ngày.
+- **Mục mới `homNay`:** tiền mặt, giá vốn, giá trị thị trường, tổng tài sản, lãi/lỗ, tỷ lệ tiền mặt so với mục tiêu, tín hiệu tính theo giá hiện tại (chỉ để xem, không ghi vào log tín hiệu), lệnh đang chờ.
+- **Mục mới `lichSuGiaDongCua`:** ~1 năm giá đóng cửa từng phiên cho mọi mã giữ + theo dõi (cùng nguồn VPS với biểu đồ). Trước đây file chỉ có giá ở những ngày owner bấm Lưu nhật ký. Mã nào lấy không được thì ghi tên, không chặn cả file.
+- **Mục mới `sangLoc`:** bộ thông số đang dùng, khung giờ Telegram, các lượt quét và mã được đề cử kèm kết quả chấm.
+- **`diemQuyetDinh.lichSuTheoNgay`:** điểm Mua/Bán từng mã qua các lượt sau đóng cửa.
+- Hướng dẫn cho AI trong file có thêm ý (7)–(9) giải thích các mục mới.
+- Nút Xuất giờ chờ lấy lịch sử giá (~1 giây) rồi mới tải file; lúc chờ hiện "Đang lấy lịch sử giá…".
+- **Kiểm:** chạy app với dữ liệu giả (3 mã giữ, 2 mã theo dõi, có mã Giữ, lệnh chờ, sàng lọc): file ra đủ các mục, ngưỡng khớp với tín hiệu app tính, lịch sử giá thật 251 phiên/mã. Popup biểu đồ vẫn chạy. Kiểm cú pháp qua; `npm run smoke` qua. Chưa xuất với dữ liệu thật.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-28 (Tên công ty trong popup biểu đồ)
 
 - Bấm mã mở biểu đồ → dưới tiêu đề hiện **tên công ty + sàn** (VD "Công ty Cổ phần FPT · HOSE") để chắc đang xem đúng mã. Tên dài tự xuống dòng, không bị cắt.

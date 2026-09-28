@@ -3240,13 +3240,13 @@ let chartHistory = [], chartRenderedPoints = [], chartCanvasWidth = 640, chartCa
 function chartDateLabel(timestamp){
   return new Date(timestamp * 1000).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"numeric" });
 }
-async function fetchPriceHistory(ticker){
+/* Giá đóng cửa ~370 ngày. Dùng chung cho biểu đồ và file xuất cho AI;
+   biểu đồ truyền controller riêng để đóng popup là huỷ được. */
+async function fetchPriceHistory(ticker, controller = new AbortController()){
   const to = Math.floor(Date.now() / 1000);
   const from = to - 370 * 86400;
   const url = PRICE_HISTORY_API + "?symbol=" + encodeURIComponent(ticker) +
     "&resolution=D&from=" + from + "&to=" + to;
-  const controller = new AbortController();
-  chartAbort = controller;
   const timer = setTimeout(() => controller.abort(), 15000);
   let data;
   try{
@@ -3417,7 +3417,8 @@ async function openStockChart(ticker, trigger){
   dialog.showModal();
   $("chart-close").focus();
   try{
-    chartHistory = await fetchPriceHistory(ticker);
+    chartAbort = new AbortController();
+    chartHistory = await fetchPriceHistory(ticker, chartAbort);
     if(chartTicker !== ticker || !dialog.open) return;
     renderStockChart();
   }catch(e){
@@ -4134,15 +4135,34 @@ const HUONG_DAN_AI =
   "(3) ngưỡng giảm/tăng nào cho kết quả tốt hơn ngưỡng đang dùng, " +
   "(4) nếu có nhiều phiên bản chiến lược thì so sánh hiệu quả từng giai đoạn, " +
   "(5) đánh giá thời gian và biến động của các mã theo dõi trước khi đạt hoặc rời xa giá muốn mua, " +
-  "(6) đối chiếu luận điểm, điều kiện sai và lý do lệnh không khớp hoặc bị hủy. " +
+  "(6) đối chiếu luận điểm, điều kiện sai và lý do lệnh không khớp hoặc bị hủy, " +
+  "(7) mục homNay là ảnh chụp lúc xuất: vị thế, khoảng cách tới ngưỡng, tỷ trọng, tiền mặt so với mục tiêu — dùng để nói rõ hiện trạng, " +
+  "(8) lichSuGiaDongCua là giá đóng cửa từng phiên thật (không phụ thuộc ngày lưu nhật ký) — ưu tiên dùng để đo tín hiệu và watchlist, " +
+  "(9) sangLoc là đề cử của bot kèm kết quả chấm sau đó; diemQuyetDinh đang chạy bóng, chỉ để tham khảo độ tin cậy. " +
   "Trả lời bằng tiếng Việt, ngắn gọn, kèm số liệu cụ thể và một đề xuất điều chỉnh chiến lược.";
 
-function buildExport(days){
+/* Firestore Timestamp → chuỗi ISO để file JSON đọc được. */
+function exportClean(v){
+  if(v && typeof v.toDate === "function") return v.toDate().toISOString();
+  if(Array.isArray(v)) return v.map(exportClean);
+  if(v && typeof v === "object"){
+    const out = {};
+    Object.keys(v).forEach((k) => { out[k] = exportClean(v[k]); });
+    return out;
+  }
+  return v;
+}
+
+function buildExport(days, priceHistory = {}){
   const today = todayStr();
   const from = days > 0 ? daysAgoStr(days - 1) : "";
   const inRange = (d) => !from || (d && d >= from);
   const byDate = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
   const allSnaps = state.snapshots.slice().sort(byDate);
+  const summary = computeSummary(), strategy = activeStrategy(today), cashRatio = cashRatioFor(summary);
+  const r2 = (n) => Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+  const dayCount = (from) => from ? Math.round((new Date(today + "T12:00:00") - new Date(from + "T12:00:00")) / 86400000) : null;
+  const dayPct = (tk, price) => { const ref = dayMove(tk, price).ref; return ref && price !== null ? r2((price - ref) / ref * 100) : null; };
 
   // giá của mã đó ở các phiên có nhật ký SAU ngày ra tín hiệu
   function giaSauDo(ticker, afterDate){
@@ -4183,7 +4203,7 @@ function buildExport(days){
     tuNgay: from || (allSnaps[0] ? allSnaps[0].date : null),
     denNgay: today,
     luuY: "giaSauDo đếm theo SỐ LẦN LƯU NHẬT KÝ sau ngày ra tín hiệu, không phải số phiên giao dịch — ngày nào không lưu thì không có mặt. Mỗi mốc kèm ngày thật, hãy dùng ngày đó để tính khoảng cách.",
-    donViTien: "giá, giá vốn và ngưỡng: NGHÌN ĐỒNG mỗi cổ phiếu. tienMat, giaVon, giaTriThiTruong, tongTaiSan, soTien, thueTNCN: ĐỒNG.",
+    donViTien: "giá, giá vốn, ngưỡng và khoảng cách tới ngưỡng: NGHÌN ĐỒNG mỗi cổ phiếu. tienMat, giaVon, giaTriThiTruong, tongTaiSan, soTien, thueTNCN, laiLo…: ĐỒNG. Trường có đuôi Pct là %.",
     huongDanChoAI: HUONG_DAN_AI,
     chienLuoc: {
       dangApDung: activeStrategy(today),
@@ -4219,24 +4239,106 @@ function buildExport(days){
       .map((r) => ({ ngay:r.date, ma:r.ticker, soLuong:r.qty, giaBan:r.price, giaVonTB:r.avgCost,
         laiLoSauThue:r.pnl * 1000, thueTNCN:r.taxAmount })),
     dangTheoDoi: Object.keys(state.watchlist).sort()
-      .map((tk) => ({ ma:tk, giaMuonMua:state.watchlist[tk].targetBuy, themLuc:state.watchlist[tk].addedAt || null })),
+      .map((tk) => {
+        const w = state.watchlist[tk], meta = state.tickers[tk] || {};
+        const price = isFinite(meta.lastPrice) ? meta.lastPrice : null;
+        const target = isFinite(w.targetBuy) ? w.targetBuy : null;
+        const added = w.addedAt ? String(w.addedAt).slice(0, 10) : null;
+        return { ma:tk, giaMuonMua:w.targetBuy, themLuc:w.addedAt || null, soNgayTheoDoi:dayCount(added),
+          giaHienTai:price, ngayGia:meta.lastPriceDate || null, thayDoiTrongNgayPct:dayPct(tk, price),
+          cachGiaMuonMua:price !== null && target !== null ? r2(price - target) : null,
+          cachGiaMuonMuaPct:price !== null && target ? r2((price - target) / target * 100) : null,
+          daChamGiaMuonMua:price !== null && target !== null ? price <= target : null,
+          dangNamGiu:summary.held.some((h) => h.ticker === tk) };
+      }),
     luanDiem: Object.keys(state.theses).sort().map((tk) => ({ ma:tk, lyDo:state.theses[tk].thesis || "",
       dieuKienSai:state.theses[tk].invalidation || "", ngayXemLai:state.theses[tk].reviewDate || null })),
     diemQuyetDinh: { mode:'shadow', thangDiem:'0–100 (app hiển thị ÷10)', tienDo:decisionState.control?.trialSession || 0,
-      hienTai:Object.values(decisionState.latest), suKien:decisionState.events.filter((r) => inRange(r.date)) },
-    viTheHienTai: computeSummary().held
-      .map((h) => ({
-        ma:h.ticker, soLuong:h.qty, giaVonTB:h.avgCost, giaVonSauLuot:h.netCost,
-        laiLoDaChotTrongChuKy:h.cycleRealizedPnl * 1000, giaThiTruong:h.price,
-        nhom:(state.tickers[h.ticker] || {}).hold ? "giu-dai-han" : "giao-dich"
-      }))
+      hienTai:exportClean(Object.values(decisionState.latest)), suKien:exportClean(decisionState.events.filter((r) => inRange(r.date))),
+      // Lượt sau đóng cửa mỗi ngày (app chỉ tải 100 lượt gần nhất).
+      lichSuTheoNgay:decisionState.runs.filter((r) => r.phase === "post" && inRange(r.date))
+        .sort((a, b) => a.date < b.date ? -1 : 1)
+        .map((r) => ({ ngay:r.date, phienBan:r.scoreVersion, trangThai:r.status, thieuMa:r.missing || [],
+          diem:(r.rows || []).map((x) => ({ ma:x.ticker, mua:x.buyScore, ban:x.sellScore })) })) },
+    viTheHienTai: summary.held
+      .map((h) => {
+        const meta = state.tickers[h.ticker] || {};
+        const levels = strategyLevels(h.avgCost, strategy);
+        const alert = strategyAlert(h, strategy, meta);
+        const value = h.qty * h.price * 1000, cost = h.qty * h.avgCost * 1000;
+        const decision = decisionState.latest[h.ticker];
+        return {
+          ma:h.ticker, soLuong:h.qty, coTheBan:computeSellAvailability(state.transactions, h.ticker, new Date()).available,
+          giaVonTB:h.avgCost, giaVonSauLuot:h.netCost,
+          laiLoDaChotTrongChuKy:h.cycleRealizedPnl * 1000, giaThiTruong:h.price,
+          ngayGia:meta.lastPriceDate || null, coGiaThat:h.hasPrice, thayDoiTrongNgayPct:dayPct(h.ticker, h.price),
+          laiLoChuaChot:Math.round(value - cost), laiLoChuaChotPct:cost ? r2((value - cost) / cost * 100) : null,
+          tyTrongPct:summary.total > 0 ? r2(value / summary.total * 100) : null,
+          namTu:h.heldSince, soNgayNam:dayCount(h.heldSince),
+          nguongMua:r2(levels.buyAt), nguongBan:meta.hold ? null : r2(levels.sellAt),
+          cachNguongMua:r2(h.price - levels.buyAt), cachNguongBan:meta.hold ? null : r2(levels.sellAt - h.price),
+          trangThaiNguong:!alert ? "binh-thuong" : (alert.reached ? "da-cham-" : "gan-") + (alert.kind === "buy" ? "mua" : "ban"),
+          diemQuyetDinh:decision ? { mua:decision.buyScore, ban:decision.sellScore, cu:!!decision.stale } : null,
+          nhom:meta.hold ? "giu-dai-han" : "giao-dich"
+        };
+      }),
+    homNay: {
+      ngay: today,
+      tienMat: Math.round(summary.cash), giaVon: Math.round(summary.investedCost),
+      giaTriThiTruong: Math.round(summary.marketValue), tongTaiSan: Math.round(summary.total),
+      laiLoChuaChot: Math.round(summary.unrealizedPnl), laiLoDaChotLuyKe: Math.round(summary.realizedPnl * 1000),
+      tyLeTienMatPct: cashRatio === null ? null : r2(cashRatio),
+      mucTieuTienMatPct: { toiThieu:strategy.minCashRatio, toiDa:strategy.maxCashRatio, danhGia:cashRatioStatus(cashRatio, strategy).label },
+      maChuaCoGiaThat: summary.held.filter((h) => !h.hasPrice).map((h) => h.ticker),
+      // Tính lại theo giá hiện có lúc xuất, CHƯA ghi vào signals (chỉ ghi khi bấm Lưu nhật ký).
+      tinHieuTheoGiaHienTai: buildSignals(today, summary).map((x) => ({ ma:x.ticker, loai:x.kind, gia:x.price, soLuong:x.qty,
+        giaVonTB:x.avgCost, giaMuonMua:x.targetBuy })),
+      lenhDangCho: openOrders().map((o) => ({ ngayDat:o.orderDate, ma:o.ticker, loai:o.side, soLuong:o.qty,
+        daKhop:o.filledQty || 0, giaDat:o.limitPrice, trangThai:o.status }))
+    },
+    lichSuGiaDongCua: {
+      nguon: "VPS, giá đóng cửa theo phiên, ~1 năm gần nhất, đơn vị nghìn đồng. Mỗi dòng [ngày, giá].",
+      theoMa: priceHistory.theoMa || {},
+      khongLayDuoc: priceHistory.loi || []
+    },
+    sangLoc: {
+      caiDat: screeningConfig(),
+      khungGioTelegram: exportClean(state.screeningSettings?.slots || null),
+      // App chỉ tải 40 lượt và 250 kết quả gần nhất.
+      cacLuot: exportClean(state.screeningRuns.filter((r) => inRange(r.date)).sort(byDate)),
+      deCu: exportClean(state.screeningResults.filter((r) => inRange(r.date)).sort(byDate))
+    }
   };
 }
 
-function downloadExport(){
+/* Lịch sử giá đóng cửa cho mọi mã nắm giữ + theo dõi. Lỗi mã nào thì ghi tên, không chặn cả file. */
+async function exportPriceHistory(){
+  const syms = priceTickers(computeSummary().held);
+  const theoMa = {}, loi = [];
+  await Promise.all(syms.map(async (tk) => {
+    try{
+      const rows = await fetchPriceHistory(tk);
+      if(rows.length) theoMa[tk] = rows.map((x) => [dateStrOf(new Date(x.t * 1000)), x.p]);
+      else loi.push(tk);
+    }catch(e){ console.error(tk, e); loi.push(tk); }
+  }));
+  return { theoMa, loi:loi.sort() };
+}
+
+async function downloadExport(){
+  const btn = $("ex-btn");
+  if(btn.disabled) return;
   const days = parseInt($("ex-range").value, 10) || 0;
-  const data = buildExport(days);
-  const totalRows = data.tinHieu.length + data.giaoDich.length + data.lenhDat.length + data.nhatKyNgay.length + data.lichSuGiaTheoDoi.length;
+  btn.disabled = true;
+  setMsg("ex-msg", "", "Đang lấy lịch sử giá…");
+  let data;
+  try{
+    data = buildExport(days, await exportPriceHistory());
+  }finally{
+    btn.disabled = false;
+  }
+  const totalRows = data.tinHieu.length + data.giaoDich.length + data.lenhDat.length + data.nhatKyNgay.length + data.lichSuGiaTheoDoi.length +
+    data.viTheHienTai.length + data.dangTheoDoi.length;
   if(totalRows === 0){
     setMsg("ex-msg", "err", "Chưa có dữ liệu trong kỳ");
     return;
@@ -4250,7 +4352,8 @@ function downloadExport(){
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  setMsg("ex-msg", "ok", "Đã xuất " + totalRows + " bản ghi");
+  const missingHistory = data.lichSuGiaDongCua.khongLayDuoc;
+  setMsg("ex-msg", "ok", "Đã xuất " + totalRows + " bản ghi" + (missingHistory.length ? " · thiếu lịch sử giá " + missingHistory.join(", ") : ""));
   setTimeout(() => setMsg("ex-msg", "", ""), 4000);
 }
 
