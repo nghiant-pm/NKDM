@@ -6,6 +6,56 @@ Mã tăng dần. 🔴 đang mở · 🟢 đã fix.
 
 ## Đang mở
 
+### 🔴 #017 — Đối chiếu TCBS: phần lệnh thiếu lấy giá bình quân cả nhóm, có thể lệch nhẹ
+**Triệu chứng (dự kiến):** sổ tay đã ghi một phần lệnh trong ngày (VD sổ 100 CP, TCBS khớp 300 CP cùng mã,
+cùng chiều) → hộp Đối chiếu đề xuất thêm 200 CP, nhưng giá là bình quân của **cả 300 CP**, không phải giá khớp
+thật của 200 CP còn thiếu. Giá vốn trong sổ có thể lệch nhẹ so với TCBS.
+
+**Bug gốc:** `tcbsMissingTrades` so theo nhóm ngày · mã · chiều bằng **số lượng**, không ghép từng lệnh sổ tay
+với từng lệnh khớp TCBS (sổ tay không lưu mã lệnh TCBS để ghép). Đây là giới hạn của cách so, đã biết khi làm.
+
+**Tạm xử lý:** bảng Vị thế trong hộp Đối chiếu sẽ hiện giá vốn lệch nếu có. Owner có thể bỏ chọn lệnh đó và
+nhập tay đúng giá.
+
+**File:** `public/index.html` — `tcbsMissingTrades`, `tcbsTransaction`.
+
+### 🔴 #016 — Đối chiếu TCBS: chưa rõ số dư tiền có gồm tiền bán chờ về (T+2) không
+**Triệu chứng (dự kiến):** trong ~2 ngày sau khi bán, mục Tiền mặt có thể báo lệch dù sổ tay đúng.
+
+**Bug gốc:** chưa xác định. Tài liệu TCBS không nói `cashBalance` (từ `/cashInvestments`) có tính tiền bán chưa về
+hay không. Sổ tay thì cộng tiền bán ngay ngày bán (`computeCashVND`).
+
+**Cần làm (việc của owner):** lần đầu đọc TCBS sau một lệnh bán, xem mục Tiền mặt có lệch đúng bằng tiền bán
+chưa về không. Nếu có: **bỏ chọn mục Tiền mặt** trong những ngày đó, đừng ghi dòng Đối chiếu — không thì 2 ngày
+sau lại lệch ngược. Báo lại kết quả để quyết định có cần sửa cách so.
+
+**File:** `functions/tcbs-service.js` — `normalizeCash`; `public/index.html` — `renderTcbsReview`.
+
+### 🔴 #015 — Đối chiếu TCBS: chưa rõ danh sách lệnh khớp trả về bao xa
+**Triệu chứng (dự kiến):** lệnh của ngày trước bị thiếu trong sổ có thể **không hiện** ở mục "Lệnh thiếu trong sổ";
+chỉ thấy gián tiếp qua bảng Vị thế lệch số lượng.
+
+**Bug gốc:** chưa xác định. Tài liệu TCBS không nêu cách phân trang hay khoảng thời gian của `matching-details`.
+Nếu nó chỉ trả lệnh trong ngày thì lệnh cũ không đến được app. Code đang đọc lần lượt từng trang (tối đa 20 trang
+× 50 lệnh), dừng khi hết dữ liệu hoặc 2 trang liền không có lệnh mới; lệnh thiếu trường thì bỏ và hiện dòng
+"Danh sách lệnh chưa đầy đủ".
+
+**Cần làm (việc của owner):** lần đọc TCBS thật đầu tiên, xem mục Lệnh thiếu có hiện được lệnh của các ngày trước
+không. Nếu không, báo lại để tìm tham số ngày của TCBS.
+
+**File:** `functions/tcbs-service.js` — `readTrades`, `normalizeTrade`; `public/index.html` — `tcbsMissingTrades`.
+
+### 🔴 #014 — Lớp tin của Điểm quyết định chưa đủ khóa AI và độ phủ nguồn
+**Triệu chứng:** điểm kỹ thuật chạy được nhưng tin chưa được AI phân tích; nguồn HNX RSS không bao phủ toàn bộ HOSE và tin ngành. Không được coi tính năng tin đã hoàn tất.
+
+**Nguyên nhân:** dự án chưa được cung cấp khóa `DECISION_OPENAI_API_KEY`; kết nối máy đọc đã kiểm chứng mới có hai RSS HNX, chưa có luồng tin HOSE/ngành ổn định. Các tin chỉ có PDF đính kèm không đủ nội dung để suy luận từ tiêu đề.
+
+**Đã xử lý an toàn:** tin thiếu AI hoặc lấy lỗi tác động bằng 0; app báo rõ nguồn/độ phủ và trạng thái. Có sẵn bộ thu thập + phân loại, bằng chứng nguyên văn, gộp tin, giảm ảnh hưởng theo tuổi và giới hạn ±5. Không tự đoán thông tin trong PDF.
+
+**Cần làm:** owner cấu hình khóa trong Firebase Secret Manager (không gửi qua chat); cho tài khoản chạy hai function quyền đọc đúng secret. Sau đó kiểm một lượt AI thật; bổ sung và kiểm chứng nguồn HOSE/ngành trước khi đóng issue. Hướng dẫn ở CODEMAP, mục Điểm quyết định.
+
+**File:** `functions/decision-news.js` — `apiKey`, `collectNews`, `classify`.
+
 ### 🔴 #013 — Xoá giao dịch sinh từ “Khớp” không cập nhật lại lệnh
 **Triệu chứng:** xoá trong Nhật ký một giao dịch được tạo khi bấm Khớp lệnh thì giao dịch mất,
 nhưng lệnh gốc vẫn hiện “Đã khớp” / “Khớp một phần” với số lượng cũ. Hai nguồn lệch nhau.
@@ -119,6 +169,20 @@ theo ngày lịch thay vì theo số bản ghi. Cần owner chọn.
 ---
 
 ## Đã fix
+
+### 🟢 #014 — View Gọn trên iPhone tốn chiều cao và filter cần hai bước `fix 2026-09-25`
+**Triệu chứng:** header xuống hai hàng; mỗi mã chiếm nhiều chiều cao; Highlight đẩy danh sách xuống sâu;
+filter phải mở menu rồi mới chọn; nút cập nhật giá chỉ ở đầu trang nên phải cuộn ngược lên.
+
+**Bug gốc:** bố cục mobile kế thừa padding của bảng desktop; filter dùng select trong suốt phủ lên icon;
+mọi Highlight xếp dọc và nút cập nhật giá nằm trong flow của header.
+
+**Fix:** mobile ≤430px dùng header một hàng, filter chip một chạm có nhớ lựa chọn, Highlight hiện 2 mục
+rồi mở rộng, dòng mã hai tầng gọn hơn và chính `#global-price-refresh` trở thành nút nổi 52px có safe-area.
+Không thêm luồng lấy giá hay dữ liệu Firestore mới.
+
+**File:** `public/index.html` — `initCompact`, `renderCompact`, `renderCompactToday`,
+`refreshAllPrices`; `AGENTS.md`; `CODEMAP.md`.
 
 ### 🟢 #010 — Bot sàng lọc chưa thể chạy thật vì project chưa ở gói Blaze `fix 2026-09-24`
 **Triệu chứng:** code, rules và giao diện đã có nhưng lịch 16:10 chưa chạy; Telegram chưa

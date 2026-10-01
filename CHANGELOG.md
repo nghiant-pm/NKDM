@@ -4,6 +4,208 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-01 (Đối chiếu TCBS: hiện nguyên văn lỗi của TCBS)
+
+Lần thử thật đầu tiên: owner nhập đúng iOTP vẫn báo "TCBS từ chối iOTP", vì app gộp mọi lỗi đổi token thành một câu chung — không biết lỗi nằm ở iOTP hay API Key.
+- Hộp Đối chiếu giờ hiện nguyên văn câu báo + mã lỗi của TCBS (VD "TCBS từ chối: The API key is invalid (203074)").
+- Server ghi log cảnh báo kèm mã lỗi TCBS và **hình dạng** API Key (độ dài, có dấu cách/ký tự lạ không) — không ghi nội dung key hay iOTP.
+- Kết quả: key lần đầu bị dính 4 khoảng trắng giữa chuỗi khi dán → TCBS báo `User not found (203007)`. Owner nhập lại key sạch → đổi token thành công.
+- **Tài liệu TCBS sai với thực tế ở `/se`:** thật ra trả `stock[]` với `totalQtty` + `costPrice` (tài liệu ghi `assets[]`, `quantity`, `avgPrice`) → báo "TCBS không trả tài sản". Sửa `normalizeAssets` đọc theo bản thật (giữ tên theo tài liệu làm dự phòng); mã lạ (quyền mua…) chỉ bị bỏ riêng. Số dư `/cashInvestments` đúng tài liệu.
+- Tạm ghi log **hình dạng** câu trả lời TCBS (tên trường + kiểu, không giá trị) để soát nốt lệnh khớp khi có dữ liệu.
+
+· `functions/tcbs-service.js` · `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CHANGELOG.md`
+
+## 2026-09-28d (Đối chiếu TCBS: bấm tay, nhập iOTP, chỉ đọc)
+
+Owner muốn so sổ tay với tài khoản TCBS thật mà không phải gõ lại từng lệnh. Owner chốt: **sổ tay vẫn là nguồn chính**, TCBS chỉ để đối chiếu khi owner bấm.
+
+- **Nút mới ở header** (`#tcbs-btn`, biểu tượng ngân hàng, cạnh nút lấy giá) → mở hộp **Đối chiếu TCBS** (`#tcbs-dialog`): nhập iOTP → bấm **Đọc TCBS** → hiện 3 phần:
+  1. **Lệnh thiếu trong sổ** — có ô chọn, mặc định chọn hết.
+  2. **Tiền mặt** — lệch thì có ô chọn; đồng bộ sẽ ghi một dòng "Đối chiếu" (`cashflows` type `adjust`, note "Đối chiếu TCBS").
+  3. **Vị thế** — bảng Tool / TCBS các mã lệch số lượng hoặc giá vốn. **Chỉ để xem**, không ghi gì (lệch vì cổ tức cổ phiếu, quyền mua, cách TCBS tính giá vốn…).
+  Bấm **Đồng bộ mục đã chọn** → ghi một lần duy nhất (1 batch).
+- **Cách tìm lệnh thiếu** (`tcbsMissingTrades`): gom theo ngày · mã · chiều mua/bán. Sổ tay ít hơn TCBS thì đề xuất đúng phần thiếu, giá = bình quân các lệnh khớp của nhóm đó. Chỉ xét từ ngày giao dịch đầu tiên trong sổ tay — lịch sử TCBS cũ hơn không tính là "thiếu". Đọc lại lần 2 không đề xuất trùng vì phần đã ghi được trừ ra.
+- **Lệnh ghi vào sổ giống nhập tay** (`tcbsTransaction`): note "Đồng bộ TCBS", thời điểm ghi = giờ khớp thật, lệnh bán tự gắn thuế 0,1%.
+- **Tiền mặt và vị thế luôn so SAU các lệnh đang chọn** (`renderTcbsReview`): bỏ chọn một lệnh thì số lệch tiền/vị thế tự tính lại ngay.
+- **Phía server:** một hàm `readTcbsPortfolio` (`functions/tcbs-service.js` → `readPortfolio`). Chỉ chạy khi đúng email owner đã xác minh. Đổi iOTP lấy phiên TCBS → đọc tiểu khoản cổ phiếu thường (bỏ margin, phái sinh): tài sản, số dư tiền, lệnh khớp → trả về app rồi **bỏ phiên ngay**. Không cất phiên, không ghi Firestore, **không collection mới, không đổi `firestore.rules`**. Nhiều tiểu khoản thì cộng dồn, giá vốn bình quân gia quyền. Giá TCBS tính bằng đồng → đổi sang nghìn đồng cho khớp app. Giờ khớp TCBS không ghi múi giờ → hiểu là giờ Việt Nam (`execIso`).
+- **Bảo mật:** API Key và mã lưu ký nằm trong Secret Manager (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`); web chỉ gửi iOTP. **Vì sao không cất phiên để khỏi nhập iOTP mỗi lần:** phiên TCBS có quyền đặt lệnh; ai có quyền quản trị Google Cloud project đều lấy được phiên nếu nó được cất. (API TCBS không có chuyển tiền ra ngoài, chỉ chuyển giữa các tiểu khoản của chính owner.)
+- **Đã đo 28/09/2026:** `openapi.tcbs.com.vn` nhận kết nối từ Cloud Function (trả 400 "API key is invalid" với key giả, ~0,1 giây, không bị Cloudflare chặn như các API giá của TCBS).
+- **Lệnh điều kiện — đã xem, KHÔNG làm:** API TCBS chỉ có lệnh điều kiện cho phái sinh; tự dựng cho cổ phiếu thì phải giữ phiên TCBS lâu dài, trái nguyên tắc bảo mật ở trên.
+- ~~Bản nháp trước đó (chế độ "nguồn TCBS" thay cho sổ tay)~~ — **đã bỏ hoàn toàn**, thay bằng đối chiếu bấm tay ở trên.
+- **Chưa kiểm với tài khoản thật.** Việc của owner: tạo 2 secret `TCBS_API_KEY`, `TCBS_CUSTODY_CODE` (thiếu thì deploy Functions không qua), rồi thử một lượt với iOTP thật. Còn 3 điểm chưa rõ ghi ở #015, #016, #017.
+
+· `public/index.html` (khối "đối chiếu TCBS": `tcbsMissingTrades`, `tcbsTransaction`, `tcbsSelectedTrades`, `renderTcbsReview`, `openTcbsDialog`, `initTcbs`; `tcbsReadApi`) · `functions/tcbs-service.js` (mới) · `functions/index.js` · `CLAUDE.md` · `AGENTS.md` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-28c (Tab Phân tích viết lời thường)
+
+Owner thấy phần chi tiết chấm điểm quá kỹ thuật. Chỉ đổi cách hiển thị; công thức, điểm và bot giữ nguyên.
+
+- **Từng thành phần điểm** đổi tên dễ hiểu (VD "Giá–khối lượng" → "Phiên gần nhất", "Phân phối" → "Có người bán ra mạnh"), thay con số x/y bằng mức **Tốt / Vừa / Kém** (áp lực Bán: **Cao / Vừa / Thấp / Không**), kèm một câu dựng từ số liệu thật: VD "Giá cao hơn 7,4% so với giá trung bình 1 tháng — đang tăng nóng", "Còn cao hơn mức mua thêm 59.00 khoảng 10,2%".
+- **Dòng đầu mỗi điểm:** "Điểm Mua 5,2/10 · trung bình · giảm 0,3 so với lần trước".
+- **Cảnh báo** dịch sang lời thường dưới mục "Cần lưu ý" (VD "Biến động ATR14 trên 6%" → "Giá lên xuống rất mạnh (hơn 6% mỗi phiên)"). Điểm Mua bị giữ ở 7,5 thì có câu giải thích.
+- Bỏ các chữ kỹ thuật: tên phiên bản công thức, "OHLCV", "TB20", "±0,5". Tin tức ghi rõ có tính vào điểm hay không.
+- **Mục "Chạy bóng" đổi tên "Chạy thử"**, viết lại: cách chấm đúng/sai một câu, kết quả dạng "đúng 1/2 lần (50%)", tách "Điểm chấm" và "Quy tắc giá vốn của anh", phần khác biệt chỉ hiện khi có.
+- File xuất cho AI không đổi (vẫn giữ số gốc).
+- **Kiểm:** chạy app với 3 mã dữ liệu giả (đang lãi có áp lực bán cao, đang lỗ có cảnh báo, mã theo dõi chấm trong phiên) ở 375px: đủ câu, mức đánh giá khớp câu mô tả, không tràn ngang, không lỗi JS. Kiểm cú pháp qua; `npm run smoke` qua. Chưa xem với điểm thật.
+
+· `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-28b (File xuất cho AI đầy đủ hơn)
+
+Owner muốn file "Xuất nhật ký" đủ dữ liệu để đem đi phân tích, vẫn giữ cách tải file về như cũ.
+
+- **Vị thế hiện tại** (`viTheHienTai`) thêm: số CP bán được (T+2), ngày giá, % trong ngày, lãi/lỗ chưa chốt (đ và %), tỷ trọng trên tổng tài sản, nắm từ ngày nào/bao nhiêu ngày, ngưỡng mua/bán đang áp dụng và còn cách bao xa, trạng thái (đã chạm / gần / bình thường), điểm quyết định. Mã "Giữ" không có ngưỡng bán.
+- **Watchlist** (`dangTheoDoi`) thêm: giá mới nhất, cách giá kỳ vọng (điểm và %), đã chạm chưa, theo dõi bao nhiêu ngày.
+- **Mục mới `homNay`:** tiền mặt, giá vốn, giá trị thị trường, tổng tài sản, lãi/lỗ, tỷ lệ tiền mặt so với mục tiêu, tín hiệu tính theo giá hiện tại (chỉ để xem, không ghi vào log tín hiệu), lệnh đang chờ.
+- **Mục mới `lichSuGiaDongCua`:** ~1 năm giá đóng cửa từng phiên cho mọi mã giữ + theo dõi (cùng nguồn VPS với biểu đồ). Trước đây file chỉ có giá ở những ngày owner bấm Lưu nhật ký. Mã nào lấy không được thì ghi tên, không chặn cả file.
+- **Mục mới `sangLoc`:** bộ thông số đang dùng, khung giờ Telegram, các lượt quét và mã được đề cử kèm kết quả chấm.
+- **`diemQuyetDinh.lichSuTheoNgay`:** điểm Mua/Bán từng mã qua các lượt sau đóng cửa.
+- Hướng dẫn cho AI trong file có thêm ý (7)–(9) giải thích các mục mới.
+- Nút Xuất giờ chờ lấy lịch sử giá (~1 giây) rồi mới tải file; lúc chờ hiện "Đang lấy lịch sử giá…".
+- **Kiểm:** chạy app với dữ liệu giả (3 mã giữ, 2 mã theo dõi, có mã Giữ, lệnh chờ, sàng lọc): file ra đủ các mục, ngưỡng khớp với tín hiệu app tính, lịch sử giá thật 251 phiên/mã. Popup biểu đồ vẫn chạy. Kiểm cú pháp qua; `npm run smoke` qua. Chưa xuất với dữ liệu thật.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-28 (Tên công ty trong popup biểu đồ)
+
+- Bấm mã mở biểu đồ → dưới tiêu đề hiện **tên công ty + sàn** (VD "Công ty Cổ phần FPT · HOSE") để chắc đang xem đúng mã. Tên dài tự xuống dòng, không bị cắt.
+- Nguồn: danh sách toàn bộ mã của datafeed VPS (`getlistallstock`, ~650KB, cho gọi từ trình duyệt). Tải **1 lần mỗi phiên** ở lần mở biểu đồ đầu tiên, giữ trong bộ nhớ, không ghi Firestore/localStorage. Lỗi mạng thì chỉ không hiện dòng tên, biểu đồ vẫn chạy.
+- **Kiểm:** gọi nguồn từ đúng tên miền app (3.528 mã, ~1,3 giây); dựng popup ở 375px với tên dài nhất thường gặp — đủ chữ, nút đóng không lệch. Kiểm cú pháp script qua; `npm run smoke` qua. Chưa bấm với tài khoản đăng nhập thật.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-27c (File deploy.bat)
+
+- Thêm `deploy.bat` ở thư mục gốc: bấm đúp để deploy. Tự lấy code nhánh trên GitHub, hỏi trước khi cất tạm thay đổi chưa commit, chạy smoke nếu máy có thư viện, hỏi xác nhận rồi mới `firebase deploy`. Lỗi ở bước nào thì dừng và báo "Deploy CHƯA xong".
+- `.gitattributes` giữ file `.bat` xuống dòng kiểu Windows.
+- **Sửa sau lần chạy đầu (lỗi thật trên máy owner):** bước cất tạm bỏ sót file mới chưa được git theo dõi (`deploy.bat`, `functions/decision-*.js`) nên chuyển nhánh bị từ chối. Giờ kiểm cả file mới và cất bằng `git stash -u`; file tự chạy từ bản sao trong `%TEMP%` để việc cất tạm/chuyển nhánh thay chính nó không làm cmd đọc lệch.
+- **Kiểm:** chưa chạy thử trên Windows (máy cloud là Linux); đã kiểm định dạng file (UTF-8, CRLF).
+
+· `deploy.bat` · `.gitattributes` · `CLAUDE.md` · `AGENTS.md` · `CHANGELOG.md`
+
+## 2026-09-27b (Điểm quyết định v1.1.0: đo công bằng, thang 10, tab Phân tích)
+
+Sau buổi review tính năng, owner chọn sửa hết các điểm đã nêu, đổi sang thang 10 và tách phần chi tiết cho đỡ rối.
+
+- **Đo chiều Bán công bằng:** trước đây Bán "đúng" khi giá chỉ cần giảm 3%, còn Mua phải tăng 6% → tỷ lệ đúng của Bán bị thổi phồng. Giờ đối xứng: Bán đúng khi giảm 6% trước khi tăng 3%.
+- **Sự kiện chỉ ghi lúc đóng cửa:** vượt ngưỡng giữa phiên rồi tụt lại không còn tính là một mẫu. Lượt trong phiên vẫn chấm để xem, nhãn "Trong phiên · tạm tính".
+- **Mã ngoài rổ ngành không bị trừ 10 điểm:** thiếu dữ liệu ngành thì phần Thị trường tính trọn từ VN-Index.
+- **Ngưỡng cố định theo phiên bản** (8,0 · thanh khoản 20 tỷ · +6/−3 · 20 phiên), ghi rõ trong code và hiện ở tab Phân tích. Không đọc tab Chiến lược để mẫu chạy bóng so được với nhau.
+- **Nâng công thức lên `decision-v1.1.0`:** bộ đếm 20 phiên chạy lại từ đầu. Sự kiện bản v1.0.0 giữ nguyên kết quả cũ, không bị chấm lại, không tính vào tổng kết mới.
+- **Thang 10:** mọi điểm, thành phần, biến động và tác động tin hiện dạng 7,4 (server vẫn lưu 0–100; file xuất ghi rõ `thangDiem`). Dòng lý do từ server cũng đổi sang /10.
+- **Tầng 1 bảng mã bỏ dòng điểm.** Điểm + trạng thái chỉ hiện ở tầng 2 khi bấm mở mã; bấm vào điểm chuyển sang tab mới **Phân tích**, mở đúng mã đó.
+- **Tab Phân tích:** tổng kết chạy bóng (chuyển từ khu Quyết định) + danh sách mã nắm giữ / theo dõi xếp theo điểm Mua, mỗi mã gập/mở để xem thành phần, lý do, rủi ro, tin. Tab trên điện thoại thu gọn chữ để 4 tab không bị cắt ở 344px.
+- **CLAUDE.md:** thêm các collection `decision_*`, chỗ nhân bản server ↔ app và quyết định đã chốt.
+- **Kiểm:** `npm run smoke` qua; kiểm riêng bằng dữ liệu giả: đo đối xứng Mua/Bán, sự kiện chỉ ở lượt đóng cửa, cờ ngưỡng giữ nguyên trong phiên, thiếu ngành không bị phạt. Bấm thử app với Firebase giả lập ở 344px và 1280px: mở tầng 2 → bấm điểm → sang tab Phân tích mở đúng mã, gập/mở mã khác, không tràn ngang, không lỗi JS. Chưa bấm với dữ liệu thật.
+- **Deploy:** CHƯA. Cần owner chạy `firebase deploy --project fin2-danh-muc` (máy cloud không có quyền vào project).
+
+· `functions/decision-scoring.js` · `functions/decision-service.js` · `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-27 (Điểm quyết định: chạy bóng mua/bán trên danh mục + theo dõi)
+
+Owner yêu cầu triển khai ý tưởng sau phỏng vấn: ưu tiên tăng lợi nhuận, mua nhịp điều chỉnh trong xu hướng và bán khi xu hướng suy yếu; hệ thống chấm điểm để owner tự quyết định.
+
+- Hai điểm độc lập 0–100, xếp hạng riêng: Mua cho mã đang giữ/theo dõi; Áp lực Bán chỉ khi vị thế có lãi. Mã Giữ vẫn thấy điểm bán. Cùng một bảng ở Gọn/Đầy đủ; bấm điểm mở thành phần, biến động điểm, lý do và tin có dẫn nguồn.
+- Công thức `decision-v1.0.0` chạy ở server. Thị trường/rổ ngành có trọng số lớn; rổ ngành nội bộ ngang trọng số, loại chính mã đang chấm khỏi rổ. Thiếu ngành ghi rõ và không tự cho điểm ngành. `-2/+3` đọc phiên bản chiến lược theo ngày; tiền mặt/T+2 hiện riêng.
+- Nút lấy giá chung gọi chấm điểm sau khi lưu giá thành công. Thêm callable `refreshDecisionScores` chỉ cho email owner; scheduler `closeDecisionScores` chạy 9:30–15:30 T2–T6, độc lập với công tắc Telegram. Trong phiên có nhãn tạm tính; sau đóng cửa dùng OHLCV VNDirect.
+- Lưu mỗi lần chấm, phiên bản công thức và sự kiện vượt 80. Đo +6% trước −3% trong 20 phiên; chiều bán đảo kết quả. Hai ngưỡng cùng phiên = không xác định. Ghi cả mẫu chiến lược cũ theo cùng giai đoạn để so sánh tiến tới, không mô phỏng ngược. Không sửa tín hiệu/lệnh thật và không gửi Telegram cho điểm mới.
+- Chạy bóng ít nhất 20 phiên đóng cửa có đủ dữ liệu, ít nhất 10 sự kiện mới; đủ mẫu vẫn không tự chuyển sang cơ chế chính. Thiếu dữ liệu đánh dấu kết quả cũ; lỗi nguồn không làm mất giá đã cập nhật. File xuất Nhật ký có thêm điểm/sự kiện chạy bóng.
+- Thu thập RSS chính thức HNX, đọc phần nội dung bài thay vì menu trang; tối đa 50 bài mới mỗi lượt, cache 1 giờ. AI tùy chọn (`DECISION_OPENAI_API_KEY` ở Secret Manager), chỉ phân loại/tóm tắt, có đoạn chứng cứ và tin cậy ≥80% mới tác động. Tin trùng gộp, giảm ảnh hưởng trong 20 ngày, tổng giới hạn ±5. Chưa có khóa hoặc lỗi đọc tin = tác động 0, hiện rõ trạng thái.
+- **Giới hạn chưa hoàn tất:** chưa cấu hình khóa AI; HNX RSS chưa bao phủ đầy đủ HOSE và nguồn ngành. Ghi #014 trong ISSUES, không coi đây là lớp tin tức hoàn chỉnh theo ý tưởng.
+- **Kiểm:** cú pháp client/server; smoke sàng lọc cũ; ca dữ liệu giả vị thế lỗ, Giữ, thiếu lịch sử, trùng sự kiện, đếm phiên, so chiến lược cũ, đo phiên kế tiếp, hai ngưỡng cùng phiên. Bấm thật bản fixture 344px và 1280px, Gọn/Đầy đủ, mở/thu chi tiết, sáng/tối; không tràn ngang. Không ghi giao dịch thử vào Firestore thật.
+- **Deploy:** đã thành công lên Firebase Hosting, Firestore rules và hai Cloud Functions mới ngày 27/09/2026; callable production từ chối người chưa đăng nhập với HTTP 403. Chưa kiểm chứng AI đọc tin thật vì chưa cấu hình khóa.
+
+· `public/index.html` · `functions/index.js` · `functions/scoring.js` · `functions/decision-scoring.js` · `functions/decision-service.js` · `functions/decision-news.js` · `firestore.rules` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
+## 2026-09-25g (Sàng lọc: mỗi nhóm chọn riêng, không mua trùng, thông số chỉnh được)
+
+Làm sau buổi review cơ chế quét và khuyến nghị. Owner chọn A + B + C, thêm chỗ chỉnh thông số trong tab Chiến lược.
+
+- **A. Mã theo dõi không bị chiếm chỗ:** trước đây lấy 5 mã cao nhất chung cho cả hai nhóm rồi mới tách, nên mã theo dõi đạt chuẩn vẫn có thể biến mất và app báo "chưa có mã đạt 70 điểm". Giờ mã mới lấy tối đa N mã, mã theo dõi đạt chuẩn thì hiện hết. Áp dụng cho bot, Telegram và nút Quét ngay.
+- **B. Không ra 2 tín hiệu mua cho một mã:** mã đang nắm giữ mà vẫn nằm trong watchlist thì không ra tín hiệu "Theo dõi" và không hiện "Theo dõi … còn X điểm" ở dải Highlight nữa. Chỉ còn tín hiệu theo giá vốn.
+- **C. Khoảng cách tới giá kỳ vọng:** mỗi dòng "Đang theo dõi" (app và Telegram) ghi "Còn X điểm tới giá kỳ vọng Y", hoặc "Đã tới giá kỳ vọng Y".
+- **Khu "Sàng lọc cơ hội" trong tab Chiến lược:** chỉnh điểm tối thiểu, số mã mới tối đa, vùng giá phù hợp, thanh khoản TB20 tối thiểu, ngưỡng đạt/hỏng (%) và số phiên đo. Có nút "Về mặc định" (70 · 5 · 40–70 · 20 tỷ · +6% / −3% · 20 phiên). Lưu một bộ vào `settings/screening.analysis`, áp dụng từ lượt quét kế tiếp.
+- **Lịch sử không bị chấm lại:** mỗi `screening_runs` chép bộ thông số đã dùng (`analysis`). Mỗi `screening_results` chép ngưỡng đo (`evalWinPct`, `evalLossPct`, `evalSessions`), nên đổi ngưỡng về sau không chấm lại kết quả cũ. Kết quả cũ chưa có các trường này thì dùng mặc định +6% / −3% / 20 phiên, đúng với lúc chúng được sinh ra.
+- **Sửa kèm (bắt buộc):** bật/tắt khung giờ Telegram trước đây ghi đè cả doc `settings/screening`, nên sẽ xoá mất thông số sàng lọc. Giờ chỉ ghi phần khung giờ (`merge`).
+- Công thức chấm điểm giữ nguyên `v1.0.0`. Với thông số mặc định, điểm ra đúng như cũ.
+- **Kiểm:** `npm run smoke` qua, có thêm các ca: chọn theo nhóm, dòng khoảng cách, thông số sai thì dùng mặc định, ngưỡng đo đọc từ kết quả. Đã so bản chấm điểm của app với bot trên 240 lượt dữ liệu giả với 4 bộ thông số: lệch 0. Form mới hiển thị đúng ở 375px, không tràn ngang. Chưa bấm thử với dữ liệu thật vì cần đăng nhập Google.
+
+· `functions/scoring.js` · `functions/index.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-25f (Cột Lãi tính theo K + menu ··· đủ thao tác)
+
+- **Cột "Lãi (K)":** lãi/lỗ trong bảng mã tính theo nghìn đồng (1tr = 1.000K), VD `-6.200` thay cho `-6.2`. Dòng tóm tắt đầu trang và cột GTTT / Vốn vẫn tính theo triệu (owner chọn chỉ đổi cột Lãi).
+- **Menu ··· của mã nắm giữ:** Ghi giao dịch (mở form điền sẵn mã) · Chuyển sang Giữ dài hạn / Giao dịch · Luận điểm. Mã theo dõi: Mua mã này (form giao dịch điền sẵn mã) · Luận điểm · Sửa giá kỳ vọng · Bỏ theo dõi. Chọn xong menu tự đóng.
+- Nút Giữ / Giao dịch rời ở hàng mở được bỏ (đã vào menu); mã Giữ hiện nhãn "Giữ dài hạn" ở hàng mở.
+- Dọn 3 icon không còn dùng (lọc, sắp xếp, đặt lại) sót từ lần bỏ công cụ lọc.
+- **Kiểm:** dữ liệu giả 344 / 393px — menu đủ mục, không tràn màn, "Ghi giao dịch" mở form điền đúng mã, cột Lãi ra K, không lỗi JS.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-25e (Bảng mã mới dùng chung cho Gọn và Đầy đủ, mọi màn hình)
+
+Owner ưng giao diện bảng kiểu TCBS trên điện thoại và muốn dùng chung cho web, cả view Đầy đủ.
+
+- **Một bảng duy nhất cho hai view:** bảng Đang nắm giữ / Đang theo dõi là một DOM, đổi view thì chuyển chỗ (cùng cách khối Quyết định). Thẻ vị thế và thẻ theo dõi ở Đầy đủ bị thay; `renderPositions` / `renderWatchlist` và CSS thẻ đã xoá.
+- **Màn rộng (>768px):** thêm cột tay nắm kéo thả và cột **GTTT / Vốn (tr)** như TCBS: Mã · KL/Giá vốn · GTTT/Vốn · Mua/Bán · Lãi/Lãi%. Điện thoại giữ 4 cột.
+- **Chức năng thẻ cũ chuyển vào hàng mở của dòng:** nắm giữ X ngày · vốn sau lướt · đã chốt chu kỳ, chữ tín hiệu ("Mua thêm 100 CP"), badge luận điểm, nút **Giữ dài hạn / Giao dịch**, menu ···. Theo dõi: số ngày, % cần giảm, ngày cập nhật giá, sửa giá kỳ vọng, bỏ theo dõi.
+- **Giữ kéo thả:** máy tính có tay nắm ở cột trái; điện thoại tay nắm nằm trong hàng mở. Bấm tiêu đề cột: tăng → giảm → **bỏ sắp xếp** (về thứ tự đã kéo). Đang sắp theo cột thì ẩn tay nắm.
+- **Công cụ trên máy tính chỉ còn ô tìm mã;** bỏ bộ lọc Lãi/Lỗ, nút sắp xếp, nút đặt lại và key `fin2-filter-*`.
+- **Kiểm:** bản dữ liệu giả ở 344px và 1000–1200px, cả Gọn lẫn Đầy đủ: không lỗi JS, không tràn ngang, bảng chuyển đúng chỗ khi đổi view, kéo thả bằng phím lưu đúng thứ tự, sắp xếp 3 trạng thái, mở dòng hiện đủ thông tin.
+
+· `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-25d (Cột Mua / Bán chỉ hiện một ngưỡng theo chiều giá trong ngày)
+
+Owner thấy cột hai số (`✓ / +9.20`) khó hiểu; muốn giá đang giảm thì thấy ngưỡng mua thêm, đang tăng thì thấy ngưỡng bán.
+
+- **Một giá ngưỡng duy nhất:** giá ↓ so với tham chiếu trong ngày → hiện **giá ngưỡng mua thêm** (đỏ); giá ↑ → hiện **giá ngưỡng bán** (xanh); mã Giữ đang tăng → chữ "Giữ" (xám).
+- **Đứng giá hoặc chưa có giá tham chiếu:** so với giá vốn — đang lỗ hiện ngưỡng mua, đang lãi hiện ngưỡng bán.
+- Ngưỡng vẫn lấy từ `activeStrategy()` qua `strategyLevels`. Bấm tiêu đề "Mua / Bán" sắp xếp theo số điểm còn cách ngưỡng đang hiện (gần nhất lên đầu).
+- **Kiểm:** bản dữ liệu giả 344px — 5 trường hợp (giảm, tăng, Giữ, đứng giá, chưa tham chiếu) ra đúng ngưỡng, không tràn ngang.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-25c (View Gọn mobile theo mẫu bảng tài sản TCBS)
+
+Owner gửi ảnh màn Tài sản › Cổ phiếu của app TCBS làm mẫu: muốn lãi/lỗ hiện ngay trên dòng, và thay dãy chip lọc bằng hàng tiêu đề cột.
+
+- **Dòng mã 4 cột, mỗi cột 2 số:** Mã + ô giá · KL / Giá vốn · Mua / Bán (cách ngưỡng, thay cột GTTT/Vốn của TCBS) · Lãi (tr) / Lãi %. Watchlist: Mã + ô giá · Kỳ vọng · Cách.
+- **Ô giá có ↑↓ và % trong ngày** (xanh tăng, đỏ giảm, vàng đứng giá) so với giá tham chiếu. Nút lấy giá chung giờ ghi thêm `refPrice` / `refPriceDate` vào `tickers`; chỉ hiện % khi giá tham chiếu cùng ngày với giá hiện tại. Mã chưa lấy giá lại thì chỉ hiện giá.
+- **Hàng tiêu đề cột thay chip lọc:** `Mã (5) | KL · Giá vốn | Mua · Bán | Lãi (tr) · Lãi %`, bấm để sắp xếp, bấm lần nữa đảo chiều. Bỏ chip Lãi/Lỗ/Hòa vốn, ô tìm và nút sắp xếp trên điện thoại; máy tính vẫn giữ công cụ cũ.
+- **Bấm dòng** vẫn mở thêm: số ngày nắm giữ/theo dõi + menu ··· (menu bung sang trái để không tràn màn).
+- **Máy tính:** giữ nguyên bảng, chỉ đổi ghi chú tuổi thành "Nắm giữ 30 ngày" / "Theo dõi 12 ngày".
+- **Kiểm:** bản dữ liệu giả ở 393 / 344 / 690 / 1200px — không lỗi JS, không tràn ngang, sắp xếp theo cột, mở dòng, menu ··· đúng.
+
+· `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-25b (View Gọn mobile: mã lên đầu, dòng 1 tầng bấm ra 2 tầng)
+
+Owner mở view Gọn trên iPhone 15 Pro và Z Fold 5 (chủ yếu màn gập 344px) để xem giá từng mã. Trước đây phải cuộn ~720px mới tới mã đầu tiên; trên Fold gập chữ tín hiệu bị cắt còn "Mua t…".
+
+- **Đầu trang còn 2 dòng mảnh (≤768px):** khối 4 chỉ số thành `Chưa bán -4,2tr · Tiền mặt 25,6%`, bấm mở lại đủ 4 ô + Tuần/Tháng. Dải Highlight thu về tiêu đề + số mục, bấm mới mở (bỏ kiểu "2 mục + Xem thêm"). Mở máy là thấy ngay danh sách mã.
+- **Dòng mã 1 tầng:** Mã · Giá hiện tại · **Mua / Bán** = số điểm còn tới ngưỡng mua và ngưỡng bán (`-0.30 / +4.20`, ✓ khi đã tới; mã Giữ chỉ có vế mua). Ngưỡng lấy từ `activeStrategy()` qua `strategyLevels`, không gõ số. Watchlist: Mã · Giá · Cách kỳ vọng.
+- **Bấm dòng mở tầng 2:** số lượng, giá mua TB, lãi/lỗ tiền + %, số ngày, menu ···. Bấm tên mã vẫn mở biểu đồ.
+- **Bỏ chữ tín hiệu trong dòng, giữ vạch màu:** vạch đậm = đã tới ngưỡng, vạch mảnh = sắp tới. Tín hiệu đầy đủ vẫn ở Highlight. Watchlist đạt giá kỳ vọng giờ cũng có vạch đậm (cả desktop).
+- **Sửa lặt vặt:** nút lấy giá nổi lùi xuống khi cuộn xuống, hiện lại khi cuộn lên (hết che cột phải); hàng chip lọc mờ dần ở mép phải thay vì cắt chữ; khối lãi/lỗ hết dính thanh Tuần/Tháng; Fold mở (~690px) hết lỗi chữ tín hiệu đè vạch màu và dùng chip lọc giống điện thoại.
+- **Desktop (>768px) giữ nguyên bảng cũ.**
+- **Kiểm:** bấm thử trên bản dữ liệu giả ở 393 / 344 / 690 / 1200px — không lỗi JS, không tràn ngang, mở/đóng dòng, mở Highlight, nút nổi lùi/hiện đúng.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-09-25a (Tối ưu view Gọn trên iPhone + nút cập nhật giá nổi)
+
+Owner dùng view Gọn trên iPhone 15 Pro và cần giảm thao tác lọc, bớt xuống dòng, đồng thời bấm cập nhật giá mà không phải kéo về đầu trang.
+
+- **Header mobile còn một hàng:** nút chuyển Gọn/Đầy đủ được rút thành icon 44px; nút cập nhật giá duy nhất chuyển thành nút nổi 52px ở góc phải dưới, chừa safe-area và khoảng trống cuối trang. Desktop vẫn giữ nút ở header.
+- **Filter một chạm:** hai bảng có hàng chip cuộn ngang; lựa chọn được nhớ riêng trên máy qua `fin2-filter-positions` / `fin2-filter-watchlist`. Menu filter desktop vẫn dùng cùng trạng thái.
+- **Danh sách gọn hơn:** mobile ≤430px bỏ padding thừa trong ô, giữ lãi/lỗ nổi bật ở dải đầu và ba số lượng/giá ở dải sau; watchlist giữ giá thị trường, giá kỳ vọng và chênh lệch.
+- **Highlight mặc định hiện 2 mục:** `Xem thêm N` / `Thu gọn` chỉ thay cách hiển thị; Bỏ qua theo ngày, signals và khối Quyết định không đổi.
+- **Phản hồi cập nhật tại chỗ:** icon quay và khóa bấm lặp khi đang tải; toast báo thành công, một phần hoặc lỗi ngay tại vị trí đang cuộn. Luồng vẫn gọi duy nhất `refreshAllPrices()` → `fetchQuotes()`, không tạo snapshot hay signals.
+- **Kiểm trước deploy:** JavaScript module qua `node --check`, diff không có lỗi whitespace; bản local tải đúng nhưng Firebase từ chối xác thực trên `127.0.0.1`, nên kiểm dữ liệu thật được thực hiện sau deploy production.
+
+· `public/index.html` · `AGENTS.md` · `CODEMAP.md` · `ISSUES.md` · `CHANGELOG.md`
+
 ## 2026-09-24h (Bot sàng lọc chạy lại được + owner chọn khung giờ nhận Telegram)
 
 Owner muốn tự chọn giờ nhận tin quét mã tiềm năng, có khung trước/trong/sau phiên và bật tắt được. Điều kiện tiên quyết: bot phải lấy được dữ liệu từ máy chủ (#012).

@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { scoreTicker, evaluateCandidate } = require("./scoring");
+const { scoreTicker, evaluateCandidate, normalizeConfig, DEFAULT_CONFIG } = require("./scoring");
 const { selectResults } = require("./index")._private;
 
 function dateAt(index) {
@@ -40,14 +40,27 @@ const future = [
 const evaluation = evaluateCandidate(signal, future, benchmark);
 assert.equal(evaluation.primary, "indeterminate", "Cùng nến chạm hai ngưỡng không được tính thắng");
 
-const ranked = selectResults(Array.from({ length: 8 }, (_, index) => ({
-  ticker: `T${index}`,
-  group: index % 2 ? "watchlist" : "new",
-  totalScore: 90 - index,
-  relativeStrengthScore: 20 - index
-})));
-assert.equal(ranked.selected.length, 5, "Hai nhóm cộng lại chỉ được tối đa 5 mã");
-assert.equal(ranked.fresh.length + ranked.watched.length, 5, "Tách nhóm không được làm phát sinh thêm mã");
+const ranked = selectResults([
+  ...Array.from({ length: 7 }, (_, index) => ({ ticker: `N${index}`, group: "new", totalScore: 95 - index, relativeStrengthScore: 20 })),
+  { ticker: "W0", group: "watchlist", totalScore: 72, relativeStrengthScore: 10 },
+  { ticker: "W1", group: "watchlist", totalScore: 71, relativeStrengthScore: 10 }
+]);
+assert.equal(ranked.fresh.length, 5, "Mã mới chỉ lấy tối đa maxNew (mặc định 5)");
+assert.deepEqual(ranked.watched.map((row) => row.ticker), ["W0", "W1"], "Mã theo dõi đạt chuẩn không bị mã mới điểm cao chiếm chỗ");
+assert.equal(selectResults(ranked.selected, normalizeConfig({ minScore: 80, maxNew: 2 })).selected.length, 2, "Owner đổi điểm tối thiểu / số mã mới thì áp dụng ngay");
+
+const { watchGapText } = require("./index")._private;
+assert.match(watchGapText({ close: 52.3, targetBuy: 50 }), /Còn 2,3 điểm tới giá kỳ vọng 50/, "Mã theo dõi ghi khoảng cách tới giá kỳ vọng");
+assert.match(watchGapText({ close: 49, targetBuy: 50 }), /Đã tới giá kỳ vọng/, "Dưới giá kỳ vọng thì báo đã tới");
+assert.equal(watchGapText({ close: 49 }), "", "Không có giá kỳ vọng thì bỏ dòng");
+
+assert.deepEqual(normalizeConfig({ minScore: "abc", fitMin: 80, fitMax: 60, winPct: 8 }),
+  { ...DEFAULT_CONFIG, winPct: 8 }, "Giá trị sai rơi về mặc định từng khoá");
+const loose = scoreTicker("HIGH", bars({ start: 100, step: 0.2 }), benchmark, normalizeConfig({ fitMin: 90, fitMax: 130 }));
+assert.equal(loose.priceFitScore, 10, "Vùng giá phù hợp đọc từ thông số owner");
+const wide = evaluateCandidate({ ...signal, evalWinPct: 10, evalLossPct: 10, evalSessions: 5 }, future, benchmark);
+assert.equal(wide.primary, "timeout", "Ngưỡng đo đọc từ chính kết quả đã lưu");
+assert.equal(wide.complete, true, "Số phiên đo đọc từ chính kết quả đã lưu");
 
 // Khung giờ: giờ Việt Nam = UTC+7, Scheduler có thể trễ vài giây.
 const { slotAt, slotEnabled, marketDateFor, telegramHeader } = require("./index")._private;

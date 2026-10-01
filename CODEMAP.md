@@ -8,6 +8,8 @@ public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                         ├── firebase-auth.js      Google Sign-In
                         └── firebase-firestore.js đọc 13 collection;
                             2 collection screening chỉ đọc
+                        └── firebase-functions.js callable refreshDecisionScores,
+                            readTcbsPortfolio (tcbsReadApi — chỉ gửi iOTP)
                       Google Fonts (Inter 400/500)
                       bgapidatafeed.vps.com.vn   giá thị trường (chỉ đọc,
                         chỉ gửi đi danh sách MÃ — không gửi SL hay số dư)
@@ -20,7 +22,7 @@ public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                                                  fin2-pnl-range (Tuần/Tháng/Quý/Tất cả)
                                                  fin2-hide-pnl  (ẩn / hiện số lãi lỗ)
                                                  fin2-exclude-hold-pnl (có / không tính mã dài hạn vào lãi/lỗ tổng)
-                                                 fin2-sort-*    (cột / chiều sort 2 bảng Gọn)
+                                                 fin2-sort-*    (cột / chiều sort 2 bảng mã)
                                                  fin2-order-*   (thứ tự mã do owner kéo thả)
                                                  fin2-collapsed (section nào đang gập)
                                                  fin2-skip-highlight (mục Bỏ qua ở Highlight, hết hạn theo ngày)
@@ -29,6 +31,13 @@ public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                         đi đâu cả; owner tự đem file đi hỏi AI
 
 functions/index.js ──> Firebase Functions v2 · Node.js 22
+                        ├── decision-service.js: refreshDecisionScores (callable owner), closeDecisionScores (scheduler)
+                        │    ├── decision-scoring.js: công thức độc lập decision-v1.1.0 + rổ ngành
+                        │    ├── scoring.js decisionInputs: dùng chung phép tính OHLCV, không đổi sàng lọc
+                        │    └── decision-news.js: HNX RSS → nội dung → AI tùy chọn → tác động giới hạn
+                        ├── tcbs-service.js: readTcbsPortfolio (callable owner, CHỈ ĐỌC)
+                        │    └── openapi.tcbs.com.vn  iOTP → phiên → tài sản/tiền/lệnh khớp → bỏ phiên;
+                        │        API Key + mã lưu ký ở Secret Manager; không ghi Firestore
                         ├── lịch mỗi 30 phút 8:00–20:30 T2–T6, Asia/Ho_Chi_Minh;
                         │   chỉ chạy thật ở khung giờ owner bật (settings/screening)
                         ├── functions/scoring.js  chấm điểm + đánh giá 20 phiên
@@ -42,6 +51,18 @@ firestore.rules   ──  hàng rào thật. Không file nào import, nhưng
 ```
 
 Không có bundler. Logic danh mục vẫn ở `public/index.html`.
+
+### Điểm quyết định (27/09/2026)
+
+- Client import thêm Firebase Functions SDK, gọi `refreshDecisionScores` sau nút lấy giá chung; server xác thực email owner + email_verified. Công thức chỉ server, không có bản sao ở client.
+- `scoreDecision` trả `buyScore`, `sellScore` (null nếu chưa có lãi/chưa giữ), `buyParts`, `sellParts`, `sector`, `market`, `newsImpact`, `reasons`, `riskFlags`, ngưỡng chiến lược đã dùng. `rankDecisions` xếp riêng hai chiều; ≥`POLICY.threshold` (80) là đáng chú ý, mỗi dòng chép `threshold`. Mọi ngưỡng trong `POLICY` cố định theo version, cố ý không đọc tab Chiến lược. Thiếu rổ ngành thì phần Thị trường lấy trọn 25 từ VN-Index. `sectorContext` dùng các mã cùng rổ (trừ chính mã), tối thiểu 2 mã có đủ 60 phiên cùng ngày; đây là rổ nội bộ, không phải chỉ số ngành chính thức.
+- `runDecision` đọc vị thế/chiến lược/tin, tải lịch sử qua chính `fetchHistory` VNDirect, chấm và lưu; khoá `decision_control/runtime` chống chạy đồng thời. Mặc định và chọn phiên bản trong `decision-service.activeStrategy` phải khớp `public/index.html.activeStrategy`; `holdings` phải khớp giá vốn/số lượng của `computeLedger`. Không lưu/gửi danh mục tới AI, chỉ gửi tin công khai và danh sách mã/ngành.
+- `decision_versions/{scoreVersion}` lưu policy và rổ ngành lần đầu; đổi công thức tăng version. `decision_latest/{TICKER}` kết quả gần nhất; `decision_runs/{marketDate_time}` trạng thái/phiên thử/rank gọn; `decision_snapshots/{runId_TICKER}` đủ thành phần/bối cảnh mỗi lần chấm; doc `date_post` đầu tiên thành công được giữ nguyên, lượt sau lưu id riêng.
+- `decision_events/{date_TICKER_kind_engine_version}` lưu sự kiện mới (`engine=decision`) và mốc so sánh chiến lược cũ (`engine=legacy`), tối đa một lần/ngày/mã/chiều/engine/version. Chỉ lượt sau đóng cửa (`post`) tạo sự kiện, khi vượt ngưỡng từ dưới lên; cờ `buyAbove/sellAbove/legacyBuyAbove/legacySellAbove` trong `decision_latest` chỉ đổi ở lượt `post` (`aboveFlags`). `evaluateDecision` đo nến SAU ngày đề cử theo policy chép trong sự kiện, đối xứng hai chiều (Bán đúng khi −winPct trước +lossPct); hai ngưỡng cùng phiên không đoán đường đi. Chỉ đo/đếm sự kiện cùng `scoreVersion` hiện tại.
+- `decision_news/{hashUrl}` tin công khai + nguồn/thời gian/nội dung/chứng cứ/phân loại; `decision_control/news` cache 1 giờ, trạng thái AI và độ phủ. Nguồn hiện có: RSS công bố tổ chức phát hành và công bố từ Sở của HNX. Lỗi tin = tác động 0; chưa có AI không đoán cảm xúc bằng từ khóa. Chưa bao phủ hết HOSE/ngành (#014).
+- Client hiển thị thang 10 (`score10`, lưu vẫn 0–100). Tầng 2 bảng mã: `decisionScoreLine` (điểm + trạng thái từ `decisionStatus`); bấm → `openAnalysis` sang tab **Phân tích** (`panel-phan-tich`, `renderAnalysis`, `analysisItem`, `analysisDetail`, `renderDecisionPilot`). Chi tiết chỉ dựng khi mở mã (`analysisOpen`). `analysisDetail` viết lời thường: mỗi thành phần = mức Tốt/Vừa/Kém (Bán: Cao/Vừa/Thấp/Không) + một câu dựng từ `market`/`sector`/ngưỡng `strategyLevels`; cảnh báo dịch qua `DECISION_RISK_TEXT`. `renderDecisionPilot` (mục "Chạy thử") cũng viết lời thường. Điểm cũ/thiếu dữ liệu/danh mục đổi có nhãn; tiền mặt, mã Giữ và T+2 là điều kiện đứng riêng. Không tạo lệnh. `buildExport` có `diemQuyetDinh` (kết quả hiện tại + sự kiện trong kỳ).
+- Các collection mới đều chỉ cho owner đọc, client không được ghi. Cloud Functions Admin SDK ghi. Scheduler độc lập với bot Telegram, không gửi thông báo.
+- **Thiết lập AI:** tạo secret `DECISION_OPENAI_API_KEY` trong project `fin2-danh-muc`, cấp `roles/secretmanager.secretAccessor` trên đúng secret cho service account chạy `refreshDecisionScores`/`closeDecisionScores`. Module đọc Secret Manager bằng credential server; không bind secret bắt buộc nên điểm kỹ thuật deploy được khi chưa có khóa. Model `gpt-4.1-mini`, `store:false`; chỉ gửi tối đa 10 tin/lần và 50 tin mới/lượt. Không đặt khóa trong HTML, Firestore, git hay chat. Môi trường giả lập có thể dùng biến môi trường cùng tên.
 `public/install.js` xử lý nút Cài đặt độc lập với Firebase; `manifest.webmanifest`
 khai tên Danh Mục, scope `/`, chế độ standalone và icon trong `public/icons/`.
 Icon SVG là nguồn vector; PNG 192/512 và maskable dùng khi cài Android. Không có cache offline.
@@ -52,8 +73,8 @@ và phím mũi tên; `saveTickerOrder` ghi thứ tự. Trong khi kéo, hai grid 
 đồng bộ Firestore không làm mất thẻ đang kéo; thả/huỷ thì render dữ liệu mới nhất.
 
 View Gọn (`compact-view`) và Đầy đủ (`full-view`) dùng cùng dữ liệu. `initCompact` nhớ
-`fin2-view` và sort riêng từng bảng trên từng máy; mặc định Đầy đủ, giữ nguyên tab khi đổi view.
-Filter chỉ giữ trong phiên trang. Form giao dịch, form thêm mã và nút lấy giá watchlist được
+`fin2-view`, sort và filter riêng từng bảng trên từng máy; mặc định Đầy đủ, giữ nguyên tab khi đổi view.
+Form giao dịch, form thêm mã và nút lấy giá watchlist được
 chuyển vị trí thật trong DOM, không sao chép.
 Khối `decision-hub` (tín hiệu, lệnh chờ, chất lượng tín hiệu, đóng góp) cũng được chuyển
 giữa `compact-decision-slot` và `full-decision-slot`; hai view không có bản render riêng.
@@ -89,18 +110,19 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | | `renderCompact(s)` `compactRows(rows,group)` | dashboard Gọn gồm đúng 4 chỉ số dùng chung công thức với Đầy đủ; hai bảng tìm/lọc/sort như cũ. Tên mã mở biểu đồ. Dòng mã nắm giữ hiện tuổi vị thế, cảnh báo gần ngưỡng và hành động mua/bán khi đã đạt; watchlist giữ highlight riêng qua `watchProximity` |
 | | `renderDashboardDetails(summary,data)` `renderSellForecast(summary)` `renderRangeSwitches()` | Đầy đủ vẽ phân nhóm, lãi/lỗ đã chốt theo mã và ba kịch bản chốt lời; đồng bộ bộ chọn kỳ ở cả hai view |
 | | `renderDecisionHub(summary)` | một khối dùng chung hai view: hàng đợi tín hiệu, lệnh đang chờ, chất lượng tín hiệu và đóng góp lãi/lỗ; mua còn hiện tỷ lệ tiền mặt dự kiến |
-| | `renderScreeningHub()` `screeningRowHtml(row,canAdd)` `screeningEvaluationHtml(row)` | vẽ dữ liệu Firestore hoặc kết quả Quét ngay đang giữ tạm cho cả Gọn và Đầy đủ; tách cơ hội mới/mã theo dõi, hiện điểm thành phần, lý do và nhãn nguồn kết quả |
-| | `renderPositions(held)` | lưới thẻ vị thế + nút nhóm; tên mã mở biểu đồ; hiện Giá vốn sau lướt, thời gian nắm giữ, giá kích hoạt đã quy đổi từ điểm/% và highlight cả lúc sắp đạt lẫn đã đạt. Ngưỡng đọc từ `activeStrategy(todayStr())` |
+| | `renderScreeningHub()` `screeningRowHtml(row,canAdd)` `screeningEvaluationHtml(row)` `screeningWatchGapHtml(row)` | vẽ dữ liệu Firestore hoặc kết quả Quét ngay đang giữ tạm cho cả Gọn và Đầy đủ; tách cơ hội mới/mã theo dõi, hiện điểm thành phần, lý do và nhãn nguồn kết quả. Mã theo dõi có thêm dòng "Còn X điểm tới giá kỳ vọng" (ưu tiên giá kỳ vọng hiện tại). Ngưỡng đo đọc từ `evalWinPct/evalLossPct/evalSessions` của chính kết quả; chữ "đạt N điểm" lấy `minScore` của lượt đang hiện |
 | | `renderPriceInputs(tickers)` | ô nhập giá. Nhận **mảng MÃ** (từ `priceTickers`), không còn nhận mảng held. **Chỉ dựng lại khi tập mã đổi**; dựng lại thì chụp và trả lại chữ đang gõ |
 | | `renderTodayBanner(tickers)` | banner trạng thái ngày. Cũng nhận **mảng MÃ** |
 | | `renderTickerList(held)` | datalist gợi ý mã — gộp mã đang giữ **+** mã watchlist |
-| | `renderWatchlist()` `renderStrategy()` | thẻ Theo dõi giữ giá, mục tiêu và thời gian; tên mã mở biểu đồ qua `openStockChart`; biến động không hiện tại thẻ; "Đạt giá mua" ưu tiên hơn highlight "Chuẩn bị mua". Chiến lược hiện/lưu riêng `nearRange`, `watchNearRange` và mục tiêu tiền mặt |
+| | `renderStrategy()` | Chiến lược hiện/lưu riêng `nearRange`, `watchNearRange` và mục tiêu tiền mặt |
+| | `renderScreeningSettings()` `saveScreeningSettings(values)` `SCREENING_FIELDS` | khu "Sàng lọc cơ hội" ở tab Chiến lược: điền sẵn bộ đang chạy (`screeningConfig()`), kiểm giới hạn `SCREENING_LIMITS`, ghi `settings/screening.analysis` (`merge`); nút Về mặc định ghi lại `SCREENING_DEFAULTS` |
 | Biểu đồ | `fetchPriceHistory(ticker)` `renderStockChart()` | khi owner bấm mã mới lấy tối đa 370 ngày giá đóng cửa từ `histdatafeed.vps.com.vn`; vẽ thêm giá vốn, ngưỡng mua/bán, mục tiêu watchlist và điểm giao dịch. Giao dịch ngoài khung giá chỉ báo số lượng, không kéo méo trục |
+| | `stockCompany(ticker)` | tên công ty + sàn cho dòng phụ dưới tiêu đề popup; tải `getlistallstock` của VPS 1 lần mỗi phiên, giữ trong bộ nhớ, lỗi thì lần sau thử lại |
 | | `showChartPoint(e)` `hideChartPoint()` | chạm/rê trên biểu đồ để tìm điểm gần nhất và hiện tooltip gồm giá + ngày; rời biểu đồ thì ẩn tooltip |
 | | `openStockChart(ticker,trigger)` `initStockChart()` | mở modal cho mã được bấm ở cả Gọn và Đầy đủ, đổi kỳ xem, vẽ lại khi màn hình đổi kích thước; đóng thì huỷ yêu cầu, dọn dữ liệu tạm và trả focus về nút vừa bấm |
 | | `renderLog()` | danh sách nhật ký; hợp ngày có snapshot, giao dịch, lệnh đặt, nạp-rút và `watch_prices`. Lệnh giữ trạng thái chờ/khớp một phần/đã khớp/đã hủy |
 | Giá | `fetchQuotes(syms)` | **chỗ duy nhất đọc JSON của datafeed VPS.** Trả `{MÃ:{p,ref}}`, `ref:true` = mã chưa khớp lệnh nên đang lấy giá tham chiếu `r`. Cả hai nút lấy giá đều gọi hàm này — thêm nút thứ ba cũng gọi, đừng chép lại |
-| | `refreshAllPrices()` | **nút lấy giá DUY NHẤT** (`#global-price-refresh`, icon trên header, dùng cho cả Gọn và Đầy đủ). Gộp + loại trùng mã nắm giữ và theo dõi, gọi `fetchQuotes` **đúng 1 lần**, ghi thẳng `tickers` từng mã (mã trùng chỉ ghi 1 lần), ghi `watch_prices` cho mã watchlist, điền giá vào ô nhập nhật ký của Đầy đủ. **Không tạo `daily_snapshots` / `signals`**. Trạng thái (đang tải, số mã cập nhật, mã thiếu/giá tham chiếu, giờ) ở `#global-price-status`; lỗi một phần vẫn lưu các mã còn lại |
+| | `refreshAllPrices()` | **nút lấy giá DUY NHẤT** (`#global-price-refresh`, ở header trên màn lớn và nổi góc phải dưới trên mobile ≤430px, dùng cho cả Gọn và Đầy đủ). Gộp + loại trùng mã nắm giữ và theo dõi, gọi `fetchQuotes` **đúng 1 lần**, ghi thẳng `tickers` từng mã (mã trùng chỉ ghi 1 lần), ghi `watch_prices` cho mã watchlist, điền giá vào ô nhập nhật ký của Đầy đủ. **Không tạo `daily_snapshots` / `signals`**. Trạng thái chi tiết ở `#global-price-status`; toast báo kết quả tại vị trí đang cuộn; lỗi một phần vẫn lưu các mã còn lại |
 | Ghi | `toggleHold(ticker)` | lật cờ `hold` trên `tickers/{TICKER}` |
 | | `removeTransaction(id, btn)` | nút Xóa trên từng giao dịch trong Nhật ký; tìm lại giao dịch theo id, xác nhận đủ mã/số lượng/giá/ngày rồi xóa đúng `transactions/{id}` |
 | | `saveTodaySnapshot()` | ghi `tickers.lastPrice` → `daily_snapshots/{hôm nay}` → `watch_prices` cho mã đang theo dõi → **gọi `writeSignals(hôm nay)`** |
@@ -111,23 +133,29 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 | Lệnh | `createOrder(data)` `remainingOrderQty(order)` `reservedSellQty(ticker)` `validateOrderSell(...)` | lưu lệnh chờ riêng khỏi giao dịch; lệnh bán đang mở giữ chỗ CP và không vượt số có thể bán |
 | | `openOrderDialog(signal)` `openFillDialog(order)` `fillOrder(order,qty,price,date)` `initDecisionTools()` | đặt từ tín hiệu, khớp một phần/toàn bộ bằng batch tạo `transactions` + cập nhật `orders` + `tickers`, hoặc hủy nhưng không xóa lịch sử |
 | Luận điểm | `thesisBadge(ticker)` `openThesisDialog(ticker)` + `thesis-form` | lưu lý do, điều kiện sai và ngày xem lại theo mã; nút mở có ở thẻ/bảng của cả Gọn và Đầy đủ |
-| Tín hiệu | `buildSignals(dateStr, summary)` | dùng chung `strategyAlert`: `buy` / `sell` khi đạt ngưỡng điểm **hoặc** % đến trước (`hold` chặn bán), `watch` khi đạt `targetBuy`. Gắn `strategyId` và cả bốn ngưỡng điểm/% lúc đó |
+| Tín hiệu | `buildSignals(dateStr, summary)` | dùng chung `strategyAlert`: `buy` / `sell` khi đạt ngưỡng điểm **hoặc** % đến trước (`hold` chặn bán), `watch` khi đạt `targetBuy` — **trừ mã đang nắm giữ** (đã có tín hiệu theo giá vốn, tránh mua hai lần). Gắn `strategyId` và cả bốn ngưỡng điểm/% lúc đó |
 | | `writeSignals(dateStr)` | ghi `signals` với id tất định `ngày_MÃ_loại`; tín hiệu cùng ngày không còn thoả nữa thì **xoá doc** |
-| Xuất | `buildExport(days)` `downloadExport()` `HUONG_DAN_AI` | xuất thêm lệnh đặt, trạng thái khớp/hủy và luận điểm. `daDatLenh` suy từ `orders`; **`daLamTheo` suy tại chỗ** từ giao dịch gắn `signalId` hoặc giao dịch cũ cùng ngày/mã/chiều |
+| Xuất | `buildExport(days,priceHistory)` `downloadExport()` `HUONG_DAN_AI` | xuất thêm lệnh đặt, trạng thái khớp/hủy và luận điểm. `daDatLenh` suy từ `orders`; **`daLamTheo` suy tại chỗ** từ giao dịch gắn `signalId` hoặc giao dịch cũ cùng ngày/mã/chiều. `viTheHienTai`/`dangTheoDoi` có ngưỡng + khoảng cách + tỷ trọng tính qua `activeStrategy`/`strategyLevels`/`strategyAlert` (không gõ số); `homNay` = tổng tài sản, tiền mặt so mục tiêu, `buildSignals` theo giá hiện tại (không ghi `signals`), lệnh chờ; `sangLoc` + `diemQuyetDinh.lichSuTheoNgay` lấy từ dữ liệu app đã tải |
+| | `exportPriceHistory()` `exportClean(v)` | lấy ~1 năm giá đóng cửa cho mã giữ + theo dõi qua `fetchPriceHistory` (cùng nguồn biểu đồ), lỗi mã nào ghi vào `khongLayDuoc`; đổi Timestamp Firestore thành chuỗi ISO |
 | Form | `setupSeg` `setMsg` `clearOversellAck` `showOversellAck` `refreshSellAvailability` `initForms` | các form (`tx-form`, `cf-form`, `wl-form`, `st-form`), nút `ex-btn`, chặn bán vượt, báo số CP có thể bán theo T+2, tự gắn thuế cho lệnh bán mới, nút theme, đăng xuất |
 | Tab | `showTab(name)` `initTabs()` `initDashboard()` `renderPrivacyControl()` `renderPnlScopeControls()` | bật 1 trong 3 panel, nhớ tab; dashboard nhớ kỳ xem, trạng thái ẩn/hiện số và tuỳ chọn không tính mã dài hạn vào riêng tổng lãi/lỗ chưa bán. Bảng/thẻ vị thế và Nhật ký không bị che |
-| View | `initCompact()` `openCompactForm(kind,ticker)` `renderCompactToday(s)` `readSkippedHighlights()` `writeSkippedHighlights(keys)` `compactRowMenu(ticker,watch)` | chuyển Gọn / Đầy đủ; dải **Highlight hôm nay** chỉ tổng hợp tín hiệu đã/sắp đạt (`strategyAlert`), lệnh chờ và watchlist gần mục tiêu, không lưu gì vào Firestore. Mỗi mục có khoá ổn định (`signal_loại_MÃ`, `order_id`, `near_loại_MÃ`, `watch_MÃ`) và nút **Bỏ qua** ẩn mục tới hết ngày trên máy đó (`fin2-skip-highlight`), nút **Hiện lại** xoá danh sách; không ảnh hưởng khối Quyết định; thao tác ít dùng của từng mã (luận điểm, sửa giá kỳ vọng, bỏ theo dõi) nằm trong menu ba chấm. Mobile ≤768px bảng chuyển thành dòng thẻ hai tầng, desktop giữ dạng cột; sort/filter 2 bảng; chuyển form giao dịch hoặc thêm mã vào dialog và trả về khi đóng, giữ bản nháp. Bấm giá kỳ vọng dùng `editWatch`; `tx-submit` bị khoá trong lúc ghi để tránh gửi lặp |
-| Sàng lọc | `runManualScreening()` `screenFetchHistory(ticker,maxAttempts)` `screenMapWithConcurrency(items,limit,worker,onProgress)` | nút “Quét ngay” lấy OHLCV VNDirect trên thiết bị với concurrency 5, chấm tối đa 5 mã theo công thức v1.0.0 và chỉ giữ kết quả trong `state.manualScreening`; không ghi Firestore, không gửi Telegram |
-| | `screenScoreTicker(ticker,bars,benchmarkBars)` và nhóm hàm `screen*Score` | bản công thức chấm điểm phía client cho Quét ngay; phải cho cùng kết quả với `functions/scoring.js` khi cùng dữ liệu và `SCREENING_SCORE_VERSION` |
-| | `renderScreeningSlots()` `screeningSlotOn(id)` `toggleScreeningSlot(id,btn)` | hàng công tắc khung giờ nhận Telegram trong khối sàng lọc (dùng chung hai view); ghi cả bộ `slots` vào `settings/screening` |
+| View | `initCompact()` `openCompactForm(kind,ticker)` `renderCompactToday(s)` `readSkippedHighlights()` `writeSkippedHighlights(keys)` `compactRowMenu(ticker,watch)` `compactRowAttrs(group,ticker,classes)` `toggleCompactRow(row)` `fmtShortVND(n)` `fmtThousands(n)` `compactPriceCell(ticker,price)` `dayMove(ticker,price)` `initSorting()` | chuyển Gọn / Đầy đủ; mobile ≤430px dùng một nút chuyển view và nút lấy giá nổi (lùi xuống khi cuộn xuống); **Bảng mã dùng chung Gọn + Đầy đủ:** `#positions-body` / `#watchlist-body` là một DOM, `showView()` chuyển giữa `#compact-*-slot` và `#full-*-slot`; sự kiện bảng gắn trên hai body này. Hàng tiêu đề `.compact-mhead` (cột `compactTableColumns`) bấm để sắp xếp: tăng → giảm → bỏ (về thứ tự kéo thả `fin2-order-*`). Đang sắp theo cột thì ẩn tay nắm. Ô tìm chỉ trên máy tính (>768px). Lưới đặt ô theo vùng `a-tk/a-px/a-qty/a-val/a-edge/a-pnl/a-tgt/a-gap/a-drag/a-more`; >768px thêm cột tay nắm và GTTT / Vốn (`c-wide`). Dải **Highlight hôm nay** chỉ tổng hợp tín hiệu đã/sắp đạt (`strategyAlert`), lệnh chờ và watchlist gần mục tiêu (bỏ mã đang nắm giữ, cùng quy tắc `buildSignals`), không lưu Firestore; ≤768px dải thu thành 1 dòng (tiêu đề + số mục), bấm mới mở; khối 4 chỉ số cũng thu thành 1 dòng `Chưa bán · Tiền mặt` (`#compact-summary-toggle`). Mỗi mục có khoá ổn định và nút **Bỏ qua** ẩn tới hết ngày (`fin2-skip-highlight`), không ảnh hưởng khối Quyết định. Mobile ≤768px dòng mã theo kiểu bảng tài sản TCBS, mỗi cột 2 số: Mã + ô giá (↑↓ và % so giá tham chiếu, `compactPriceCell`) · KL / Giá vốn · **Mua / Bán** (chỉ MỘT giá ngưỡng từ `strategyLevels(avgCost, activeStrategy())`: giá đang giảm trong ngày (`dayMove`) → ngưỡng mua thêm màu đỏ, đang tăng → ngưỡng bán màu xanh, mã Giữ → "Giữ"; đứng giá / chưa có tham chiếu thì lỗ → mua, lãi → bán; sắp xếp theo `edgeGap` = điểm còn cách ngưỡng đang hiện) · Lãi (K, nghìn đồng) / Lãi %. Watchlist: Mã + ô giá · Kỳ vọng · Cách. Ô 2 số dùng `grid-template-rows:subgrid` để thẳng hàng. Bấm dòng mở hàng phụ (`a-more`): nắm giữ X ngày · vốn sau lướt · đã chốt chu kỳ, chữ tín hiệu, nhãn "Giữ dài hạn", badge luận điểm, menu ··· (Ghi giao dịch → `openCompactForm("trade", mã)`, Chuyển Giữ dài hạn / Giao dịch → `toggleHold`, Luận điểm; mã theo dõi: Mua mã này, Luận điểm, Sửa giá kỳ vọng, Bỏ theo dõi); watchlist: số ngày theo dõi · % cần giảm · ngày cập nhật. Dòng đang mở nhớ trong phiên (`compactOpenRows`). Kéo thả (`initSorting`) chạy trên `#compact-positions` / `#compact-watchlist`. Không còn chữ tín hiệu trong dòng: vạch trái đậm = đã tới ngưỡng, mảnh = sắp tới. Cột Mua / Bán là `td.compact-gap-cell`, ẩn trên desktop. Thao tác ít dùng nằm trong menu ba chấm; form dùng chung được chuyển vào dialog rồi trả về, giữ bản nháp |
+| Sàng lọc | `runManualScreening()` `screenFetchHistory(ticker,maxAttempts)` `screenMapWithConcurrency(items,limit,worker,onProgress)` | nút “Quét ngay” lấy OHLCV VNDirect trên thiết bị với concurrency 5, chấm theo công thức v1.0.0 với `screeningConfig()` (mã mới tối đa `maxNew`, mã theo dõi đạt chuẩn hiện hết — cùng cách `selectResults` của bot) và chỉ giữ kết quả trong `state.manualScreening`; không ghi Firestore, không gửi Telegram |
+| | `screeningConfig(raw)` `SCREENING_DEFAULTS` `SCREENING_LIMITS` | bộ thông số sàng lọc từ `settings/screening.analysis`; thiếu/sai khoá nào dùng mặc định khoá đó. Bản sao có chủ ý của `normalizeConfig` / `DEFAULT_CONFIG` trong `functions/scoring.js` |
+| | `screenScoreTicker(ticker,bars,benchmarkBars,config)` và nhóm hàm `screen*Score` | bản công thức chấm điểm phía client cho Quét ngay; phải cho cùng kết quả với `functions/scoring.js` khi cùng dữ liệu và `SCREENING_SCORE_VERSION` |
+| | `renderScreeningSlots()` `screeningSlotOn(id)` `toggleScreeningSlot(id,btn)` | hàng công tắc khung giờ nhận Telegram trong khối sàng lọc (dùng chung hai view); ghi cả bộ `slots` vào `settings/screening` bằng `merge` (không được xoá `analysis`) |
 | | `initScreening()` `openScreeningWatch(ticker,price)` | bắt sự kiện một lần trên khối dùng chung; “Đưa vào theo dõi” chỉ điền mã và hiện giá lúc đề cử, còn giá muốn mua do owner nhập rồi tự Lưu |
 | | `pendingDrafts` trong `initCompact` | ghi cờ form giao dịch / giá chưa lưu để `beforeunload` yêu cầu cảnh báo khi rời trang. `refreshAllPrices` cũng đặt cờ khi điền giá; lưu giao dịch hoặc `saveTodaySnapshot` thành công xoá cờ tương ứng. Không lưu bản nháp vào localStorage |
+| Đối chiếu TCBS | `tcbsMissingTrades(trades)` | gom lệnh khớp TCBS theo ngày · mã · chiều, trừ số đã có trong `transactions`; còn thiếu thì đề xuất phần thiếu, giá = bình quân các lệnh khớp của nhóm. Chỉ xét từ ngày giao dịch đầu tiên của sổ tay. Đọc lại không đề xuất trùng |
+| | `tcbsTransaction(g)` `tcbsSelectedTrades()` | dựng giao dịch giống nhập tay (note "Đồng bộ TCBS", `createdAt` = giờ khớp, lệnh bán gắn `taxRate`/`taxAmount`); lấy các lệnh đang được tích chọn |
+| | `renderTcbsReview()` | vẽ 3 phần trong `#tcbs-dialog`: Lệnh thiếu (ô chọn) · Tiền mặt (ô chọn, lệch tính qua `computeCashVND`) · Vị thế (so `computeLedger`, **chỉ xem**). Tiền và vị thế luôn tính SAU các lệnh đang chọn |
+| | `openTcbsDialog()` `initTcbs()` | nút `#tcbs-btn` ở header mở hộp; "Đọc TCBS" gọi `tcbsReadApi` (callable `readTcbsPortfolio`) với iOTP; "Đồng bộ mục đã chọn" ghi 1 batch: lệnh thiếu → `transactions`, lệch tiền → `cashflows` type `adjust` note "Đối chiếu TCBS". Không có collection riêng |
 | Thu gọn | `initCollapse()` `setCollapsed(head,on)` `readCollapsed()` `writeCollapsed(list)` hằng `CHEVRON` | chèn mũi tên vào mọi `.sec-head[data-sec]`; bấm đầu đề thì gắn class `collapsed` lên **thẻ cha** (section hoặc .card), CSS `.collapsed > *:not(.sec-head)` giấu phần thân — **không bọc thêm thẻ nào**. Phần đang gập nhớ ở localStorage `fin2-collapsed` (mảng khoá). Section mới muốn gập được thì chỉ cần thêm `data-sec`. Muốn hiện số tóm tắt lúc gập thì đặt `class="only-collapsed"` lên ô đó — thuần CSS, `render()` không cần biết đang gập hay mở |
 | Dữ liệu | `setSync` `watch(name, apply)` `watchRef(ref,name,apply)` `startData()` | 11 listener collection (gồm `settings`) và 2 query screening; mỗi lần có dữ liệu đều gọi `render()` |
 | Cổng | `showGate` `initGate()` | `onAuthStateChanged` → 3 nhánh: chưa đăng nhập · sai email · đúng email |
 
-**Boot:** đúng 11 lời gọi ở cấp module, cuối file, theo thứ tự
-`initTabs() → initDashboard() → initCollapse() → initForms() → initDecisionTools() → initScreening() → initSorting() → initCompact() → initStockChart() → render() → initGate()`.
+**Boot:** đúng 12 lời gọi ở cấp module, cuối file, theo thứ tự
+`initTabs() → initDashboard() → initCollapse() → initForms() → initTcbs() → initDecisionTools() → initScreening() → initSorting() → initCompact() → initStockChart() → render() → initGate()`.
 ⚠️ Đừng thêm lời gọi cấp module đọc biến khai phía dưới — cả khối script sẽ chết im lặng (bài học mục 12).
 
 ---
@@ -138,16 +166,21 @@ View Đầy đủ chia **3 tab** trong cùng 1 trang (`nav.tabs` + 3 `div.panel`
 |---|---|---|
 | `index.js` | `screenShortTermOpportunities` | chạy mỗi 30 phút T2–T6; `slotAt` ra khung giờ, `slotEnabled` đọc `settings/screening` (thiếu doc = chỉ 16:00). Khung tắt thì thoát ngay |
 | | `runSlot(db,slot,date,…)` `acquireSlot(db,date,slot)` | khoá `screening_slots/{ngày}_{khung}` — mỗi khung gửi Telegram đúng một lần; ngày nghỉ ghi `holiday`, không nhắn |
-| | `scanMarket({phase,date,held,watchlist,extraTickers})` `marketDateFor(phase,date,bars)` | tải + chấm, KHÔNG ghi gì. `pre` chấm theo phiên gần nhất đã đóng; `intraday`/`post` cần nến hôm nay (nến trong phiên chưa đóng → tin ghi “tạm tính”) |
-| | `recordOfficialRun(db,date,scan,oldResultsSnap)` | chỉ lượt `post` đầu tiên thành công trong ngày ghi `screening_runs`/`screening_results` + chấm tiếp đánh giá; lượt `post` sau chỉ đọc số thử nghiệm |
-| | `telegramHeader(slot,date,marketDate,trial)` `telegramText(header,fresh,watched)` | tiêu đề riêng cho Trước phiên / Trong phiên (tạm tính) / Sau phiên |
+| | `scanMarket({phase,date,held,watchlist,extraTickers,config})` `marketDateFor(phase,date,bars)` | tải + chấm, KHÔNG ghi gì. `pre` chấm theo phiên gần nhất đã đóng; `intraday`/`post` cần nến hôm nay (nến trong phiên chưa đóng → tin ghi “tạm tính”). `watchlist` là Map mã → giá kỳ vọng; dòng theo dõi mang theo `targetBuy` |
+| | `selectResults(rows,config)` `rank(rows,group,minScore)` | mỗi nhóm xếp hạng riêng: mã mới tối đa `maxNew`, mã theo dõi đạt `minScore` lấy hết |
+| | `recordOfficialRun(db,date,scan,oldResultsSnap)` | chỉ lượt `post` đầu tiên thành công trong ngày ghi `screening_runs` (kèm `analysis` = bộ thông số đã dùng)/`screening_results` (kèm `evalWinPct/evalLossPct/evalSessions`) + chấm tiếp đánh giá; lượt `post` sau chỉ đọc số thử nghiệm |
+| | `telegramHeader(slot,date,marketDate,trial)` `telegramText(header,fresh,watched,config)` `watchGapText(row)` | tiêu đề riêng cho Trước phiên / Trong phiên (tạm tính) / Sau phiên; mã theo dõi thêm dòng khoảng cách tới giá kỳ vọng |
 | | `fetchHistory(ticker,historyDays,maxAttempts)` `parseHistory(payload)` `mapWithConcurrency(items,limit,worker)` | đọc OHLCV lịch sử VNDirect (header `accept: */*`), timeout 9 giây/lần và backoff; VN-Index thử tối đa 3 lần, mã thường 2 lần. Vẫn giới hạn 5 request đồng thời; thiếu trên 20% mã thì dừng toàn bộ lần chạy |
 | | `claimNotification(db,ref,type)` `markFailure(...)` | không gửi Telegram trùng; lỗi thì đánh dấu khung (và ngày, nếu là lượt `post` chưa ghi xong) rồi gửi một cảnh báo riêng cho khung đó |
-| | `updateEvaluations(db,historyByTicker,benchmarkBars)` | chấm tiếp các đề cử cũ chưa đủ 20 phiên và ghi `evaluation` vào đúng document cũ |
-| `scoring.js` | `scoreTicker(ticker,bars,benchmarkBars)` | lọc tối thiểu 60 phiên + 20 tỷ đồng/ngày; chấm 100 điểm và lưu riêng xu hướng, sức mạnh tương đối, bứt phá, điều chỉnh, thanh khoản/rủi ro, vùng giá |
-| | `evaluateCandidate(result,bars,benchmarkBars)` | xác định +6% trước −3% trong 20 phiên; cùng một nến chạm hai mức là `indeterminate`; ghi thêm lợi nhuận phiên 20 và phần vượt/trượt VN-Index |
+| | `updateEvaluations(db,historyByTicker,benchmarkBars)` | chấm tiếp các đề cử cũ chưa đủ số phiên đo và ghi `evaluation` vào đúng document cũ |
+| `scoring.js` | `DEFAULT_CONFIG` `normalizeConfig(raw)` | thông số owner chỉnh (điểm tối thiểu, số mã mới, vùng giá, thanh khoản, ngưỡng đo); sai/thiếu thì mặc định từng khoá |
+| | `scoreTicker(ticker,bars,benchmarkBars,config)` | lọc tối thiểu 60 phiên + `minLiquidityBn` tỷ đồng/ngày; chấm 100 điểm và lưu riêng xu hướng, sức mạnh tương đối, bứt phá, điều chỉnh, thanh khoản/rủi ro, vùng giá (`fitMin`–`fitMax` được 10, rộng thêm 10 điểm mỗi bên được 6) |
+| | `evaluateCandidate(result,bars,benchmarkBars)` | xác định +`evalWinPct`% trước −`evalLossPct`% trong `evalSessions` phiên (đọc từ chính kết quả, thiếu thì +6/−3/20); cùng một nến chạm hai mức là `indeterminate`; ghi thêm lợi nhuận phiên 20 và phần vượt/trượt VN-Index |
 | `universe.js` | `UNIVERSE` | danh sách khoảng 100 mã thanh khoản cao dùng làm tập ứng viên ban đầu; watchlist và mã cũ đang chờ đánh giá được ghép thêm lúc chạy |
-| `smoke.js` | các ca kiểm nhanh | kiểm bứt phá, thanh khoản yếu, mã ngoài vùng 40–70 vẫn được xét, hai ngưỡng cùng phiên và không nhìn dữ liệu tương lai |
+| `smoke.js` | các ca kiểm nhanh | kiểm bứt phá, thanh khoản yếu, mã ngoài vùng 40–70 vẫn được xét, hai ngưỡng cùng phiên, không nhìn dữ liệu tương lai, chọn theo từng nhóm, dòng khoảng cách giá kỳ vọng, thông số sai rơi về mặc định, ngưỡng đo đọc từ kết quả |
+| `tcbs-service.js` | `readPortfolio(request,secrets)` | thân của callable `readTcbsPortfolio` (khai trong `index.js`, gắn secret `TCBS_API_KEY`, `TCBS_CUSTODY_CODE`). Chỉ đúng email owner đã xác minh. Đổi iOTP lấy phiên (`exchangeToken`), lấy tiểu khoản cổ phiếu thường `NORMAL` (`activeNormalAccounts`, bỏ margin/phái sinh), đọc `/se`, `/cashInvestments`, lệnh khớp; trả `{readAt, accounts (che số), positions, cash, trades, tradesComplete}` rồi bỏ phiên. Không ghi Firestore, không log phiên |
+| | `readTrades(token,accountNo)` `normalizeTrade(row)` `execIso(value)` | đọc `/matching-details` từng trang (tối đa 20 × 50), gộp theo `tradeId`; giá VND → nghìn đồng; giờ khớp không có múi giờ → hiểu là giờ VN. Chưa rõ TCBS trả bao xa (#015) |
+| | `normalizeAssets` `normalizeCash` `aggregatePositions(rows)` | đổi giá vốn VND → nghìn đồng; cộng nhiều tiểu khoản, giá vốn bình quân gia quyền; tiền giữ VND nguyên (#016) |
 | `backtest.js` | `main()` | walk-forward lịch sử để đo công thức trước khi bật; chỉ dùng dữ liệu có tại ngày chấm, nhưng vẫn có sai lệch sống sót vì dùng universe hiện tại |
 
 **Trạng thái production:** `screenShortTermOpportunities` v2 đã deploy tại
@@ -162,11 +195,11 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 
 | Collection | Đọc ở | Ghi ở | Nhánh rules |
 |---|---|---|---|
-| `transactions` | `watch("transactions")` → `computeHoldings`, `computeCashVND`, `renderLog`, `renderTickerList`, `buildExport` (đối chiếu `daLamTheo`) | `tx-form` submit (`addDoc`); `fillOrder` (`batch.set`); `removeTransaction` (`deleteDoc`) | ✅ |
-| `cashflows` | `watch("cashflows")` → `computeCashVND`, `renderLog`, `buildExport` | `cf-form` submit (`addDoc`) | ✅ |
-| `tickers` | `watch("tickers")` → `currentPriceFor`, `renderPositions`, `renderPriceInputs`, `buildSignals` | `toggleHold`, `saveTodaySnapshot`, `refreshAllPrices`, `addWatch`, `tx-form` submit, `fillOrder` | ✅ |
+| `transactions` | `watch("transactions")` → `computeHoldings`, `computeCashVND`, `renderLog`, `renderTickerList`, `buildExport` (đối chiếu `daLamTheo`) | `tx-form` submit (`addDoc`); `fillOrder` (`batch.set`); `removeTransaction` (`deleteDoc`); `initTcbs` nút Đồng bộ (`batch.set`, note "Đồng bộ TCBS") | ✅ |
+| `cashflows` | `watch("cashflows")` → `computeCashVND`, `renderLog`, `buildExport` | `cf-form` submit (`addDoc`); `initTcbs` nút Đồng bộ (`batch.set`, `adjust`, note "Đối chiếu TCBS") | ✅ |
+| `tickers` | `watch("tickers")` → `currentPriceFor`, `renderCompact`, `renderPriceInputs`, `buildSignals` | `toggleHold`, `saveTodaySnapshot`, `refreshAllPrices`, `addWatch`, `tx-form` submit, `fillOrder` | ✅ |
 | `daily_snapshots` | `watch("daily_snapshots")` → `renderTodayBanner`, `renderLog`, `buildExport` (`giaSauDo`) | `saveTodaySnapshot` (`setDoc` id = ngày) | ✅ |
-| `watchlist` | `watch("watchlist")` → `renderWatchlist`, `priceTickers`, `renderTickerList`, `buildSignals`, `buildExport` | `addWatch`, `removeWatch` (`setDoc` / `deleteDoc`, id = MÃ) | ✅ |
+| `watchlist` | `watch("watchlist")` → `renderCompact`, `priceTickers`, `renderTickerList`, `buildSignals`, `buildExport` | `addWatch`, `removeWatch` (`setDoc` / `deleteDoc`, id = MÃ) | ✅ |
 | `strategies` | `watch("strategies")` → `activeStrategy`, `renderStrategy`, `buildExport` | `st-form` submit (`addDoc`) | ✅ |
 | `signals` | `watch("signals")` → `writeSignals` (biết doc nào cần xoá), `buildExport` | `writeSignals` (`setDoc` / `deleteDoc`, id = `ngày_MÃ_loại`) | ✅ |
 | `watch_prices` | `watch("watch_prices")` → `watchPriceSeries`, `watchTrend`, hai view watchlist | `writeWatchPriceHistory`, `addWatch` (`setDoc`, id = `YYYY-MM-DD_MÃ`) | ✅ |
@@ -175,7 +208,7 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 | `screening_runs` | `watchRef` query 40 lần gần nhất → `renderScreeningHub` | Cloud Function `screenShortTermOpportunities`; client không được ghi | ✅ chỉ owner đọc |
 | `screening_results` | `watchRef` query 250 kết quả gần nhất → `renderScreeningHub` | Cloud Function `recordOfficialRun`, `updateEvaluations`; client không được ghi | ✅ chỉ owner đọc |
 | `screening_slots` | (client chưa đọc) | Cloud Function `acquireSlot`, `runSlot`, `markFailure` | ✅ chỉ owner đọc |
-| `settings` | `watch("settings")` → `screeningSlotOn`, `renderScreeningSlots` | `toggleScreeningSlot` (`setDoc settings/screening`) | ✅ |
+| `settings` | `watch("settings")` → `screeningSlotOn`, `renderScreeningSlots`, `screeningConfig`, `renderScreeningSettings`; bot đọc trong `screenShortTermOpportunities` | `toggleScreeningSlot`, `saveScreeningSettings` (`setDoc settings/screening`, `merge`) | ✅ |
 
 ⚠️ **Thêm collection mới = thêm 1 dòng bảng này + 1 nhánh trong `firestore.rules` NGAY.**
 
@@ -199,9 +232,10 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 - **Mọi chuỗi người dùng gõ chèn vào HTML phải qua `esc()`.** Không có ngoại lệ.
 - **Mọi thay đổi dữ liệu đều đi qua `render()`, gồm cả `renderCompact`.** Chuyển view cũng gọi `renderCompact(computeSummary())` để lấy thứ tự mã mới nhất; không mở listener riêng.
 - **Một nút lấy giá chung (từ 24/09/2026) — owner chốt.** `#global-price-refresh` ghi thẳng giá hiện tại vào `tickers` cho mọi mã, nhưng **không thay bước chốt nhật ký**: `daily_snapshots` và `signals` vẫn chỉ sinh khi bấm Lưu ở tab Danh mục. Các nút cũ `#fetch-price`, `#wl-fetch`, `#compact-prices` đã bỏ. Phần đọc datafeed chỉ được có MỘT chỗ là `fetchQuotes` (hiện 2 nơi gọi: nút chung và nút xem giá trong form thêm mã).
-- **localStorage chỉ giữ thứ thuộc về MÁY.** `fin2-theme` · `fin2-tab` · `fin2-collapsed` · `fin2-skip-highlight` · `fin2-view` · `fin2-pnl-range` · `fin2-hide-pnl` · `fin2-exclude-hold-pnl` · `fin2-order-positions` · `fin2-order-watchlist`. Đây là sở thích hiển thị, không phải dữ liệu — mất cũng không sao, và cố ý KHÔNG đồng bộ giữa thiết bị. Dữ liệu thật luôn nằm ở Firestore.
+- **localStorage chỉ giữ thứ thuộc về MÁY.** `fin2-theme` · `fin2-tab` · `fin2-collapsed` · `fin2-skip-highlight` · `fin2-view` · `fin2-pnl-range` · `fin2-hide-pnl` · `fin2-exclude-hold-pnl` · `fin2-sort-*` · `fin2-order-*`. Đây là sở thích hiển thị, không phải dữ liệu — mất cũng không sao, và cố ý KHÔNG đồng bộ giữa thiết bị. Dữ liệu thật luôn nằm ở Firestore.
 - **Nút icon phải có `aria-label`.** Nút bật/tắt trạng thái thêm `aria-pressed`.
+- **Đối chiếu TCBS: sổ tay là nguồn chính, TCBS chỉ đọc khi owner bấm.** Không collection mới, không đổi rules: xác nhận thì ghi thẳng vào `transactions` / `cashflows` như nhập tay. Phiên TCBS không được cất ở đâu (có quyền đặt lệnh) — mỗi lần đối chiếu nhập iOTP mới. Dữ liệu `readTcbsPortfolio` trả về đã theo đơn vị app: giá nghìn đồng, tiền VND nguyên. Vị thế lệch chỉ hiện để xem, không có loại "điều chỉnh vị thế".
 
 ---
 
-_Cập nhật lần cuối: 2026-09-24 — một nút lấy giá chung ở header, view Gọn tối ưu mobile (Việc cần làm, dòng thẻ hai tầng, menu ba chấm)._
+_Cập nhật lần cuối: 2026-09-28 — Đối chiếu TCBS: file `functions/tcbs-service.js`, callable `readTcbsPortfolio`, khối hàm `tcbs*` phía app; không collection mới._

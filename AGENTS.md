@@ -23,6 +23,8 @@ Không realtime nhiều người cùng sửa → **không cần merge 3 chiều,
 public/index.html    Toàn bộ app: markup + style + logic. Nguồn sự thật duy nhất.
 firestore.rules      Hàng rào bảo mật THẬT (server-side).
 firebase.json        Cấu hình hosting + rules.
+deploy.bat           Deploy 1 chạm trên Windows: lấy nhánh từ GitHub → smoke → hỏi xác nhận → deploy.
+                     Biến BRANCH đầu file: đổi thành main sau khi PR #1 được gộp.
 artifact-da-doi.html Trang "đã dời" đã publish đè lên Artifact cũ. KHÔNG phải app.
 portfolio-tracker.html   Bản app CŨ chạy trên Artifact, đã ngưng. Giữ làm lịch sử
                      vì chưa có git. Có git rồi thì xoá được.
@@ -53,7 +55,8 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
 transactions/{autoId}       ticker, side "buy"|"sell", qty, price (nghìn đ), date, note, createdAt,
                             taxRate?, taxAmount? (VND nguyên; chỉ lệnh bán mới từ 15/09/2026)
 cashflows/{autoId}          type "deposit"|"withdraw", amount (VND nguyên), date, note, createdAt
-tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, hold?, updatedAt
+tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, refPrice? (giá tham chiếu, nghìn đ), refPriceDate?, hold?, updatedAt
+                            (refPrice chỉ ghi ở nút lấy giá chung; % trong ngày chỉ tính khi refPriceDate = lastPriceDate)
 daily_snapshots/{YYYY-MM-DD}  date, cash, investedCost, marketValue, totalAssets, prices{}, createdAt, updatedAt
 watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
 strategies/{autoId}         buyDrop, sellRise, buyDropPct?, sellRisePct?, nearRange, watchNearRange, lotSize,
@@ -72,13 +75,26 @@ screening_results/{YYYY-MM-DD_TICKER}  date, ticker, group, rank, close, totalSc
                             scoreVersion, trialSession, isTrial, evaluation{}, createdAt, updatedAt
 settings/screening          slots { "0830"|"1030"|"1330"|"1530"|"1600"|"2000": bool }, updatedAt
                             (không có doc = chỉ bật 16:00). Owner bật/tắt khung giờ nhận tin Telegram
+                            analysis { minScore, maxNew, minLiquidityBn (tỷ đ), fitMin, fitMax (nghìn đ),
+                            winPct, lossPct, evalSessions }, analysisUpdatedAt — thông số sàng lọc chỉnh ở
+                            tab Chiến lược (thiếu = mặc định 70·5·20·40–70·6·3·20). Ghi doc này LUÔN `merge`
+screening_runs/{YYYY-MM-DD}      …, analysis (chép bộ thông số đã dùng lượt đó)
+screening_results/{YYYY-MM-DD_MÃ}  …, targetBuy? (mã theo dõi), evalWinPct, evalLossPct, evalSessions
+                            (chép ngưỡng đo lúc đề cử — đổi thông số không chấm lại kết quả cũ)
 screening_slots/{YYYY-MM-DD_HHMM}  khoá mỗi khung giờ: status, phase, marketDate, notificationAttemptedAt…
                             (chỉ Cloud Function ghi)
+decision_latest/{TICKER}    điểm quyết định gần nhất: buyScore, sellScore (0–100), buyParts, sellParts, threshold,
+                            phase, scoreVersion, buyAbove/sellAbove/legacyBuyAbove/legacySellAbove…
+decision_snapshots/{runId_MÃ} · decision_runs/{ngày_post|ngày_giờ} · decision_versions/{version}
+decision_events/{ngày_MÃ_chiều_engine_version}  sự kiện vượt ngưỡng + evaluation (engine decision|legacy)
+decision_news/{hash} · decision_control/{runtime|news}   (tất cả decision_*: chỉ Cloud Function ghi, owner đọc)
 ```
+**Đối chiếu TCBS không có collection riêng:** xác nhận thì ghi thẳng vào sổ như nhập tay — lệnh thiếu vào
+`transactions` (note "Đồng bộ TCBS", `createdAt` = giờ khớp), lệch tiền vào `cashflows` "adjust" (note "Đối chiếu TCBS").
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
 `fin2-tab` (tab đang mở) · `fin2-view` (Gọn/Đầy đủ) · `fin2-sort-positions` / `fin2-sort-watchlist`
-(cột và chiều sort view Gọn) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (mục đã Bỏ qua ở dải Highlight,
+(cột và chiều sort bảng mã) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (mục đã Bỏ qua ở dải Highlight,
 tự hết hạn khi sang ngày) · `fin2-pnl-range`
 (Tuần/Tháng/Quý/Tất cả) · `fin2-hide-pnl` (ẩn/hiện lãi lỗ) · `fin2-exclude-hold-pnl`
 (có/không tính mã dài hạn vào tổng lãi/lỗ chưa bán). Đây là sở thích hiển thị,
@@ -100,7 +116,7 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   gọi `activeStrategy(ngày)`. `buyDropPct` / `sellRisePct` thiếu hoặc null nghĩa là chỉ dùng điểm.
   `strategyLevels()` quy đổi điểm + % theo luật mức nào đến trước; `strategyAlert()` là nguồn
   chung cho highlight và tín hiệu. Ba nơi dùng phải
-  ra cùng một số cho cùng một ngày: `renderPositions` (chip gợi ý), `buildSignals` (ghi log
+  ra cùng một số cho cùng một ngày: `renderCompact` (cột Mua / Bán + tầng mở của bảng mã), `buildSignals` (ghi log
   tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"). **Thêm chỗ dùng mới thì gọi
   `activeStrategy()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
   Phiên bản chiến lược **chỉ thêm, không sửa đè** — sửa đè là tín hiệu cũ mất ngưỡng gốc.
@@ -119,6 +135,16 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   bản sao có chủ ý, cùng id/giờ/phase. Bot chạy mỗi 30 phút, chỉ làm việc khi khung đang bật trong
   `settings/screening`. **Chỉ lượt "post" (sau đóng cửa) đầu tiên thành công trong ngày ghi
   `screening_runs`/`screening_results`**; lượt trước/trong phiên chỉ gửi Telegram có nhãn.
+- **Thông số sàng lọc** `DEFAULT_CONFIG` + `normalizeConfig()` (`functions/scoring.js`) ↔
+  `SCREENING_DEFAULTS` + `SCREENING_LIMITS` + `screeningConfig()` (`public/index.html`) là bản sao có chủ ý,
+  cùng khoá/mặc định/giới hạn. Cách chọn kết quả cũng nhân bản: `selectResults` (bot) ↔ `runManualScreening`
+  (Quét ngay) — **mỗi nhóm xếp riêng**, mã mới tối đa `maxNew`, mã theo dõi đạt chuẩn hiện hết.
+  Đừng quay lại kiểu lấy top N chung rồi mới tách nhóm.
+- **Điểm quyết định (server) chép lại logic app:** `DEFAULT_STRATEGY` + `activeStrategy()` + `holdings()` +
+  ngưỡng legacy `buyAt/sellAt` (`functions/decision-service.js`) ↔ `RULE_*` + `activeStrategy()` + `computeLedger()`
+  + `strategyLevels()` (`public/index.html`). Đổi cách chọn phiên bản chiến lược hay tính giá vốn → sửa cả hai.
+- **Mã đang nắm giữ không ra tín hiệu `watch`** dù còn trong watchlist (`buildSignals` + dải Highlight
+  `renderCompactToday`) — tránh hai lệnh mua cùng mã một ngày. Mã đó chỉ theo ngưỡng giá vốn.
 - **Mỗi doc `signals` chép lại `buyDrop`/`sellRise`/`strategyId` của phiên bản lúc đó.**
   Bản sao có chủ ý, cùng bản chất với `daily_snapshots`: đổi ngưỡng về sau thì tín hiệu cũ
   **vẫn giữ ngưỡng cũ** — đúng ý, vì đó mới là cái đã thực sự sinh ra tín hiệu hôm đó.
@@ -136,7 +162,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 
 ## Các cặp VIEW SONG SONG (hỏi phạm vi trước khi code)
 - **Gọn ↔ Đầy đủ:** cùng dữ liệu Firestore, `computeSummary()` và thứ tự mã qua `sortTickers()`.
-  `renderCompact()` phải giữ công thức lãi/lỗ và % tương ứng `renderPositions()`, chênh lệch điểm tương ứng `renderWatchlist()`.
+  Bảng mã nắm giữ / theo dõi là MỘT DOM (`#positions-body`, `#watchlist-body`) do `renderCompact()` dựng, `showView()` chuyển
+  qua lại giữa slot Gọn và slot Đầy đủ — không có bản thứ hai để giữ khớp.
   Gọn dùng vốn nạp ròng (tổng nạp − tổng rút); Đầy đủ giữ Tổng tài sản. Đây là khác biệt đã chốt.
   Gọn có highlight mua/bán khi sắp đạt hoặc đã đạt ngưỡng, dùng chung `strategyAlert()` với
   Đầy đủ; thiếu giá phải hiện rõ, tổng dùng giá vốn thay thế có nhãn tạm tính.
@@ -166,7 +193,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   cross-origin (`Access-Control-Allow-Origin: *`) nên nút Quét ngay dùng CÙNG nguồn với bot.
   Gửi header `accept: */*` — chỉ `application/json` thì VNDirect trả 406. DNSE là nguồn dự phòng
   đã đo được nếu VNDirect hỏng. Giá hiện tại và biểu đồ vẫn dùng VPS.
-- **Một nút lấy giá chung ở header** (`#global-price-refresh` → `refreshAllPrices()`), owner chốt 24/09/2026.
+- **Một nút lấy giá chung** (`#global-price-refresh` → `refreshAllPrices()`), owner chốt 24/09/2026;
+  từ 25/09/2026 nút nằm ở header trên màn lớn và nổi góc phải dưới trên mobile ≤430px.
   Ghi THẲNG giá hiện tại vào `tickers` cho mọi mã nắm giữ + theo dõi, ghi `watch_prices` cho mã
   watchlist và điền sẵn ô giá ở tab Danh mục. **Không tạo `daily_snapshots` hay `signals`** — hai
   thứ này vẫn chỉ sinh khi owner bấm **Lưu** nhật ký. Các nút cũ `#fetch-price`, `#wl-fetch`,
@@ -182,6 +210,23 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   Firestore, không đụng `signals`, lệnh hay khối Quyết định. Đừng biến nó thành cờ lưu vào tín hiệu.
 - **Không có mô phỏng ngược** (tính lại "nếu dùng ngưỡng khác từ đầu thì sao"). Owner chọn
   cách so sánh theo giai đoạn hiệu lực thật. Đừng tự thêm.
+- **Điểm quyết định hiển thị thang 10** (7,4), server vẫn lưu 0–100. Điểm chỉ hiện ở **tầng 2** bảng mã
+  (điểm + trạng thái); phân tích chi tiết + tổng kết chạy bóng nằm ở **tab Phân tích**. Owner chốt 27/09/2026.
+- **Ngưỡng của Điểm quyết định cố định theo `scoreVersion`** (`POLICY` trong `functions/decision-scoring.js`),
+  cố ý KHÔNG đọc tab Chiến lược/`settings/screening`: đang chạy bóng, đổi giữa chừng thì mẫu không so được.
+  Đổi ngưỡng/công thức → nâng version, bộ đếm 20 phiên chạy lại. Sự kiện chỉ sinh ở lượt sau đóng cửa;
+  đo đối xứng (Bán đúng khi giá giảm winPct trước khi tăng lossPct).
+- **TCBS OpenAPI chỉ dùng để ĐỐI CHIẾU, sổ tay vẫn là nguồn chính** (owner chốt 28/09/2026). Nút `#tcbs-btn` ở header →
+  nhập iOTP → `readTcbsPortfolio` đổi iOTP lấy phiên, đọc tài sản/tiền/lệnh khớp tiểu khoản NORMAL rồi **bỏ phiên ngay —
+  KHÔNG cất phiên** ở đâu cả (owner chọn để người có quyền vào Google Cloud không cầm được phiên đặt lệnh). Mỗi lần đối
+  chiếu nhập iOTP mới. API Key + mã lưu ký trong Secret Manager (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`), web chỉ gửi iOTP.
+  App so theo nhóm ngày·mã·chiều (`tcbsMissingTrades`), chỉ từ ngày đầu của sổ tay; vị thế lệch vì lý do khác (cổ tức
+  cổ phiếu, quyền, cách TCBS tính giá vốn) **chỉ hiện để xem**, không có loại "điều chỉnh vị thế". Không đồng bộ theo lịch.
+  Đã đo 28/09/2026: `openapi.tcbs.com.vn` nhận kết nối từ Cloud Function (khác các API giá của TCBS).
+  ⚠️ **Tài liệu developers.tcbs.com.vn lệch thực tế** (đo 01/10/2026): `/se` trả `stock[]`·`totalQtty`·`costPrice`, không phải
+  `assets[]`·`quantity`·`avgPrice`. Tin log hình dạng dữ liệu thật hơn tài liệu. API Key hết hạn sau 12 tháng (FAQ TCBS).
+- **Lệnh điều kiện qua API (đã xem 28/09/2026):** API TCBS chỉ có lệnh điều kiện cho phái sinh; tự dựng cho cổ
+  phiếu buộc phải giữ phiên có quyền đặt lệnh — trái quyết định không cất phiên. Hiện KHÔNG làm.
 - **Không có test runner, không unit test.** Kiểm bằng bấm thử thật.
 
 ---
@@ -200,6 +245,7 @@ Theo `Starter-Kit/02-ui-ux/`. Ba điều siết chặt nhất ở dự án này:
 firebase deploy --project fin2-danh-muc
 ```
 ⚠️ **Ghi CHANGELOG TRƯỚC khi deploy.** Deploy hỏng thì DỪNG, không báo "xong".
+⚠️ Từ 28/09/2026 Functions gắn 2 secret TCBS (`TCBS_API_KEY`, `TCBS_CUSTODY_CODE`) — thiếu thì deploy Functions không qua.
 
 ---
 
