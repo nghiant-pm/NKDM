@@ -65,7 +65,10 @@ async function exchangeToken(apiKey, otp) {
       // Log chỉ hình dạng key (độ dài, có ký tự lạ không), KHÔNG log nội dung key/iOTP.
       const key = String(apiKey);
       logger.warn("TCBS từ chối đổi token", { status: error.status, tcbsCode: error.tcbsCode, tcbsMessage: error.tcbsMessage,
-        keyLength: key.length, keyTrimmedLength: key.trim().length, keyOddChars: (key.match(/[^A-Za-z0-9._~+/=-]/g) || []).length });
+        keyLength: key.length, keyTrimmedLength: key.trim().length, keyOddChars: (key.match(/[^A-Za-z0-9._~+/=-]/g) || []).length,
+        keyHyphens: (key.match(/-/g) || []).length, keyAsciiPunct: (key.match(/[!-/:-@[-`{-~]/g) || []).length,
+        keyNonAscii: (key.match(/[^\x00-\x7F]/g) || []).length, keyWhitespace: (key.match(/\s/g) || []).length,
+        keyQuoted: /^["'`].*["'`]$/.test(key.trim()) });
       throw new HttpsError("invalid-argument", "TCBS từ chối: " + (error.tcbsMessage || "iOTP hoặc API Key") +
         (error.tcbsCode ? " (" + error.tcbsCode + ")" : ""));
     }
