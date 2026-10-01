@@ -4,6 +4,14 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-01 (Đối chiếu TCBS: hiện nguyên văn lỗi của TCBS)
+
+Lần thử thật đầu tiên: owner nhập đúng iOTP vẫn báo "TCBS từ chối iOTP", vì app gộp mọi lỗi đổi token thành một câu chung — không biết lỗi nằm ở iOTP hay API Key.
+- Hộp Đối chiếu giờ hiện nguyên văn câu báo + mã lỗi của TCBS (VD "TCBS từ chối: The API key is invalid (203074)").
+- Server ghi log cảnh báo kèm mã lỗi TCBS và **hình dạng** API Key (độ dài, có dấu cách/ký tự lạ không) — không ghi nội dung key hay iOTP.
+
+· `functions/tcbs-service.js` · `public/index.html` · `CHANGELOG.md`
+
 ## 2026-09-28d (Đối chiếu TCBS: bấm tay, nhập iOTP, chỉ đọc)
 
 Owner muốn so sổ tay với tài khoản TCBS thật mà không phải gõ lại từng lệnh. Owner chốt: **sổ tay vẫn là nguồn chính**, TCBS chỉ để đối chiếu khi owner bấm.

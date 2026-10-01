@@ -5070,8 +5070,7 @@ function initTcbs(){
       renderTcbsReview();
     }catch(error){
       console.error("tcbs", error);
-      const text = error?.code === "functions/invalid-argument" ? "TCBS từ chối iOTP"
-        : String(error?.message || "").replace(/^FirebaseError:\s*/, "").trim();
+      const text = String(error?.message || "").replace(/^FirebaseError:\s*/, "").trim();
       setMsg("tcbs-msg", "err", text && !text.includes("INTERNAL") ? text : "Chưa đọc được TCBS");
     }finally{
       tcbsBusy = false; $("tcbs-read").disabled = false; $("tcbs-btn").classList.remove("loading");

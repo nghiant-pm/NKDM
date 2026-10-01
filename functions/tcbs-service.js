@@ -5,6 +5,7 @@
    của lượt gọi đó, không cất ở đâu, không log. API Key + mã lưu ký do index.js lấy từ Secret Manager. */
 
 const { HttpsError } = require("firebase-functions/v2/https");
+const { logger } = require("firebase-functions");
 
 const OWNER_EMAIL = "nghiant@youmed.vn";
 const TCBS_BASE = "https://openapi.tcbs.com.vn";
@@ -38,6 +39,8 @@ async function fetchJson(path, token, options = {}) {
     if (!response.ok) {
       const error = new Error(`TCBS từ chối yêu cầu (${response.status})`);
       error.status = response.status;
+      error.tcbsCode = cleanText(data?.code, 20);
+      error.tcbsMessage = cleanText(data?.message, 120);
       throw error;
     }
     return data;
@@ -57,7 +60,15 @@ async function exchangeToken(apiKey, otp) {
   try {
     data = await fetchJson("/gaia/v1/oauth2/openapi/token", null, { method: "POST", body: { apiKey: cleanText(apiKey, 600), otp: code } });
   } catch (error) {
-    if (error.status === 400 || error.status === 401) throw new HttpsError("invalid-argument", "TCBS từ chối iOTP hoặc API Key");
+    if (error.status === 400 || error.status === 401) {
+      // Câu báo của TCBS không chứa bí mật → trả nguyên văn để biết lỗi ở iOTP hay API Key.
+      // Log chỉ hình dạng key (độ dài, có ký tự lạ không), KHÔNG log nội dung key/iOTP.
+      const key = String(apiKey);
+      logger.warn("TCBS từ chối đổi token", { status: error.status, tcbsCode: error.tcbsCode, tcbsMessage: error.tcbsMessage,
+        keyLength: key.length, keyTrimmedLength: key.trim().length, keyOddChars: (key.match(/[^A-Za-z0-9._~+/=-]/g) || []).length });
+      throw new HttpsError("invalid-argument", "TCBS từ chối: " + (error.tcbsMessage || "iOTP hoặc API Key") +
+        (error.tcbsCode ? " (" + error.tcbsCode + ")" : ""));
+    }
     throw error;
   }
   if (typeof data?.token !== "string" || !data.token) throw new Error("TCBS không trả access token");
