@@ -72,7 +72,7 @@ screening_runs/{YYYY-MM-DD}  date, status, trialSession, isTrial, universeCount,
 screening_results/{YYYY-MM-DD_TICKER}  date, ticker, group, rank, close, totalScore, trendScore,
                             relativeStrengthScore, breakoutScore, pullbackScore, liquidityRiskScore,
                             priceFitScore, avgValue20, atr14Pct, excess20Pct, reasons[], riskFlags[],
-                            scoreVersion, trialSession, isTrial, evaluation{}, createdAt, updatedAt
+                            scoreVersion, trialSession, isTrial, evaluation{}, fiveSessionEvaluation?, createdAt, updatedAt
 settings/screening          slots { "0830"|"1030"|"1330"|"1530"|"1600"|"2000": bool }, updatedAt
                             (không có doc = chỉ bật 16:00). Owner bật/tắt khung giờ nhận tin Telegram
                             analysis { minScore, maxNew, minLiquidityBn (tỷ đ), fitMin, fitMax (nghìn đ),
@@ -81,10 +81,15 @@ settings/screening          slots { "0830"|"1030"|"1330"|"1530"|"1600"|"2000": b
 screening_runs/{YYYY-MM-DD}      …, analysis (chép bộ thông số đã dùng lượt đó)
 screening_results/{YYYY-MM-DD_MÃ}  …, targetBuy? (mã theo dõi), evalWinPct, evalLossPct, evalSessions
                             (chép ngưỡng đo lúc đề cử — đổi thông số không chấm lại kết quả cũ)
+                            fiveSessionEvaluation? { sessions: 5, sessionsObserved, complete, entryPrice,
+                            exitDate?, exitPrice?, returnPct? } — chỉ đề cử totalScore > 90
+                            từ v1.1.0: foreignScore (0–10), foreign { status ok|missing|room-full, netBuyDays,
+                            netSellDays, netRatioPct, netValue (VND) } — khối ngoại 5 phiên
 screening_slots/{YYYY-MM-DD_HHMM}  khoá mỗi khung giờ: status, phase, marketDate, notificationAttemptedAt…
                             (chỉ Cloud Function ghi)
 decision_latest/{TICKER}    điểm quyết định gần nhất: buyScore, sellScore (0–100), buyParts, sellParts, threshold,
                             phase, scoreVersion, buyAbove/sellAbove/legacyBuyAbove/legacySellAbove…
+                            từ decision-v1.2.0: buyParts.foreign/sellParts.foreign (0–10) + foreign { …như trên }
 decision_snapshots/{runId_MÃ} · decision_runs/{ngày_post|ngày_giờ} · decision_versions/{version}
 decision_events/{ngày_MÃ_chiều_engine_version}  sự kiện vượt ngưỡng + evaluation (engine decision|legacy)
 decision_news/{hash} · decision_control/{runtime|news}   (tất cả decision_*: chỉ Cloud Function ghi, owner đọc)
@@ -94,7 +99,7 @@ decision_news/{hash} · decision_control/{runtime|news}   (tất cả decision_*
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
 `fin2-tab` (tab đang mở) · `fin2-view` (Gọn/Đầy đủ) · `fin2-sort-positions` / `fin2-sort-watchlist`
-(cột và chiều sort bảng mã) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (mục đã Bỏ qua ở dải Highlight,
+(cột và chiều sort bảng mã) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (tín hiệu đã Bỏ qua ở khối Khuyến nghị,
 tự hết hạn khi sang ngày) · `fin2-pnl-range`
 (Tuần/Tháng/Quý/Tất cả) · `fin2-hide-pnl` (ẩn/hiện lãi lỗ) · `fin2-exclude-hold-pnl`
 (có/không tính mã dài hạn vào tổng lãi/lỗ chưa bán). Đây là sở thích hiển thị,
@@ -140,11 +145,17 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   cùng khoá/mặc định/giới hạn. Cách chọn kết quả cũng nhân bản: `selectResults` (bot) ↔ `runManualScreening`
   (Quét ngay) — **mỗi nhóm xếp riêng**, mã mới tối đa `maxNew`, mã theo dõi đạt chuẩn hiện hết.
   Đừng quay lại kiểu lấy top N chung rồi mới tách nhóm.
+- **Khối ngoại** `foreignFlow()` (`functions/scoring.js`, dùng cho cả Cơ hội lẫn Điểm quyết định) ↔ `screenForeignFlow()`;
+  `fetchForeign()` + `FOREIGN_API` (`functions/index.js`) ↔ `screenFetchForeign()` + `SCREENING_FOREIGN_API` (`public/index.html`).
+  Cùng 5 phiên, cùng cách khớp ngày, trung lập 5/10 khi thiếu dữ liệu hoặc hết room. Đổi một bên → sửa bên kia + nâng version.
+- **Báo cáo đề cử trên 90 điểm sau 5 phiên** có ngưỡng/kỳ hạn lặp có chủ ý giữa
+  `evaluateFiveSession()` + chỗ chọn/backfill trong Functions và `renderFiveSessionReport()` ở client.
+  Chỉ kết quả chính thức `totalScore > 90` được đo; giá ra là đóng cửa đúng phiên thứ 5.
 - **Điểm quyết định (server) chép lại logic app:** `DEFAULT_STRATEGY` + `activeStrategy()` + `holdings()` +
   ngưỡng legacy `buyAt/sellAt` (`functions/decision-service.js`) ↔ `RULE_*` + `activeStrategy()` + `computeLedger()`
   + `strategyLevels()` (`public/index.html`). Đổi cách chọn phiên bản chiến lược hay tính giá vốn → sửa cả hai.
-- **Mã đang nắm giữ không ra tín hiệu `watch`** dù còn trong watchlist (`buildSignals` + dải Highlight
-  `renderCompactToday`) — tránh hai lệnh mua cùng mã một ngày. Mã đó chỉ theo ngưỡng giá vốn.
+- **Mã đang nắm giữ không ra tín hiệu `watch`** dù còn trong watchlist (`buildSignals`, khối Khuyến nghị
+  `renderAdvice` đọc từ đây) — tránh hai lệnh mua cùng mã một ngày. Mã đó chỉ theo ngưỡng giá vốn.
 - **Mỗi doc `signals` chép lại `buyDrop`/`sellRise`/`strategyId` của phiên bản lúc đó.**
   Bản sao có chủ ý, cùng bản chất với `daily_snapshots`: đổi ngưỡng về sau thì tín hiệu cũ
   **vẫn giữ ngưỡng cũ** — đúng ý, vì đó mới là cái đã thực sự sinh ra tín hiệu hôm đó.
@@ -164,7 +175,9 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 - **Gọn ↔ Đầy đủ:** cùng dữ liệu Firestore, `computeSummary()` và thứ tự mã qua `sortTickers()`.
   Bảng mã nắm giữ / theo dõi là MỘT DOM (`#positions-body`, `#watchlist-body`) do `renderCompact()` dựng, `showView()` chuyển
   qua lại giữa slot Gọn và slot Đầy đủ — không có bản thứ hai để giữ khớp.
-  Gọn dùng vốn nạp ròng (tổng nạp − tổng rút); Đầy đủ giữ Tổng tài sản. Đây là khác biệt đã chốt.
+  Một thanh tab chung (từ 02/10/2026): Gọn/Đầy đủ chỉ khác ở tab Danh mục + Theo dõi; tab Cơ hội (`screening-hub`),
+  Chiến lược, Phân tích (`decision-hub` = Hiệu quả tín hiệu, ở đầu) là một bản dùng chung. Ẩn/hiện chỉ qua `syncPanels()`.
+  Vốn nạp ròng (Σ nạp − Σ rút, bỏ "adjust") + Lãi/lỗ từ đầu (= Tổng tài sản − vốn nạp ròng) nằm cạnh Tổng tài sản trong `#overview-more`, dùng chung hai view (owner chốt 02/10/2026).
   Gọn có highlight mua/bán khi sắp đạt hoặc đã đạt ngưỡng, dùng chung `strategyAlert()` với
   Đầy đủ; thiếu giá phải hiện rõ, tổng dùng giá vốn thay thế có nhãn tạm tính.
   Form giao dịch và form thêm mã theo dõi được di chuyển DOM để dùng chung handler; không sao chép form hoặc tạo thêm kết nối.
@@ -193,6 +206,13 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   cross-origin (`Access-Control-Allow-Origin: *`) nên nút Quét ngay dùng CÙNG nguồn với bot.
   Gửi header `accept: */*` — chỉ `application/json` thì VNDirect trả 406. DNSE là nguồn dự phòng
   đã đo được nếu VNDirect hỏng. Giá hiện tại và biểu đồ vẫn dùng VPS.
+- **Khối ngoại lấy từ VNDirect** (`api-finfo.vndirect.com.vn/v4/foreigns`), owner chốt 06/10/2026: thành phần 10 điểm của
+  Cơ hội v1.1.0 (Xu hướng/Sức mạnh 25→20) và Điểm quyết định v1.2.0 (Mua: Thị trường 25→20, Đà tăng 20→15; Bán: Đà tăng
+  25→20, So thị trường 20→15). Đo thật từ Cloud Function 06/10/2026: 104 mã một lần gọi, <0,6 giây; cho gọi cross-origin.
+  Dữ liệu thị trường của TCBS OpenAPI (khối ngoại, mua/bán chủ động, "thông tin chứng khoán") đều cần phiên iOTP (401 nếu
+  thiếu) — trái quyết định không cất phiên, đừng dùng cho bot. "Thông tin chứng khoán" TCBS chỉ là thông tin niêm yết,
+  KHÔNG có báo cáo tài chính. **Mua/bán chủ động** chỉ TCBS có (bản công khai bị Cloudflare chặn) → để sau.
+  Mô phỏng `backtest.js` chưa có lịch sử khối ngoại: mọi mã tính trung lập 5/10.
 - **Một nút lấy giá chung** (`#global-price-refresh` → `refreshAllPrices()`), owner chốt 24/09/2026;
   từ 25/09/2026 nút nằm ở header trên màn lớn và nổi góc phải dưới trên mobile ≤430px.
   Ghi THẲNG giá hiện tại vào `tickers` cho mọi mã nắm giữ + theo dõi, ghi `watch_prices` cho mã
@@ -205,9 +225,13 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   tránh bản sao dễ lệch. Đừng thêm cột `followed`.
 - **Log tín hiệu ghi tự động khi bấm "Lưu nhật ký hôm nay"**, không có nút "đã làm / bỏ qua"
   cho owner bấm tay. Owner đã cân nhắc và chọn phương án không thêm thao tác.
-  Nút **“Bỏ qua”** ở dải *Highlight hôm nay* (view Gọn, từ 24/09/2026) KHÔNG phải nút này: nó chỉ
-  ẩn mục khỏi dải trên đúng máy đó tới hết ngày (localStorage `fin2-skip-highlight`), không ghi
-  Firestore, không đụng `signals`, lệnh hay khối Quyết định. Đừng biến nó thành cờ lưu vào tín hiệu.
+  Nút **“Bỏ qua”** ở khối *Khuyến nghị* (trước là dải Highlight, từ 24/09/2026) KHÔNG phải nút này: nó chỉ
+  ẩn tín hiệu khỏi khối trên đúng máy đó tới hết ngày (localStorage `fin2-skip-highlight`), không ghi
+  Firestore, không đụng `signals` hay lệnh. Đừng biến nó thành cờ lưu vào tín hiệu.
+- **Khuyến nghị thay Highlight + Hàng đợi tín hiệu + Lệnh đang chờ** (owner chốt 02/10/2026): một danh sách theo
+  vòng đời lệnh — tín hiệu đã đạt ngưỡng hôm nay (**Đặt** / **Bỏ qua**) → lệnh đã đặt còn chờ (**Khớp** / **Hủy**).
+  Mục "sắp tới ngưỡng" và watchlist gần giá kỳ vọng KHÔNG vào Khuyến nghị (bảng mã đã báo). Tab Phân tích chỉ
+  còn "Hiệu quả tín hiệu" (chất lượng tín hiệu + đóng góp lãi/lỗ). Đừng dựng lại hàng đợi thứ hai.
 - **Không có mô phỏng ngược** (tính lại "nếu dùng ngưỡng khác từ đầu thì sao"). Owner chọn
   cách so sánh theo giai đoạn hiệu lực thật. Đừng tự thêm.
 - **Điểm quyết định hiển thị thang 10** (7,4), server vẫn lưu 0–100. Điểm chỉ hiện ở **tầng 2** bảng mã

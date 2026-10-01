@@ -170,6 +170,23 @@ theo ngày lịch thay vì theo số bản ghi. Cần owner chọn.
 
 ## Đã fix
 
+### 🟢 #018 — Highlight báo bán nhưng cột Mua / Bán hiện ngưỡng mua `fix 2026-10-02`
+**Triệu chứng:** MSN chưa đạt mức bán đang thấy ở bảng nhưng dải Highlight vẫn hiện khuyến nghị bán,
+làm owner không biết nên tin phần nào.
+
+**Bug gốc:** `renderCompact` chọn ngưỡng cho cột Mua / Bán theo chiều tăng/giảm trong ngày,
+trong khi Highlight đọc tín hiệu chiến lược từ `strategyAlert`. Khi giá giảm trong ngày nhưng đã chạm
+ngưỡng bán theo giá vốn, hai nơi chọn hai chiều khác nhau.
+
+**Fix:** tính `strategyAlert` một lần cho từng mã và ưu tiên chiều cảnh báo đó khi chọn ngưỡng ở cột
+Mua / Bán. Chỉ khi chưa có cảnh báo mới dùng chiều giá trong ngày. Công thức mua/bán không đổi;
+giá chưa đạt ngưỡng bán không sinh “Bán”, mã Giữ vẫn chặn bán.
+
+**Ghi nhớ:** mọi chỗ nói mã đang “Mua” hay “Bán” phải lấy chiều từ `strategyAlert`; biến động trong ngày
+chỉ dùng để chọn ngưỡng hiển thị khi chưa có cảnh báo chiến lược.
+
+**File:** `public/index.html` — `renderCompact`, `strategyAlert`.
+
 ### 🟢 #014 — View Gọn trên iPhone tốn chiều cao và filter cần hai bước `fix 2026-09-25`
 **Triệu chứng:** header xuống hai hàng; mỗi mã chiếm nhiều chiều cao; Highlight đẩy danh sách xuống sâu;
 filter phải mở menu rồi mới chọn; nút cập nhật giá chỉ ở đầu trang nên phải cuộn ngược lên.
