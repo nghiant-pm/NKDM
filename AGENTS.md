@@ -223,6 +223,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   App so theo nhóm ngày·mã·chiều (`tcbsMissingTrades`), chỉ từ ngày đầu của sổ tay; vị thế lệch vì lý do khác (cổ tức
   cổ phiếu, quyền, cách TCBS tính giá vốn) **chỉ hiện để xem**, không có loại "điều chỉnh vị thế". Không đồng bộ theo lịch.
   Đã đo 28/09/2026: `openapi.tcbs.com.vn` nhận kết nối từ Cloud Function (khác các API giá của TCBS).
+  ⚠️ **Tài liệu developers.tcbs.com.vn lệch thực tế** (đo 01/10/2026): `/se` trả `stock[]`·`totalQtty`·`costPrice`, không phải
+  `assets[]`·`quantity`·`avgPrice`. Tin log hình dạng dữ liệu thật hơn tài liệu. API Key hết hạn sau 12 tháng (FAQ TCBS).
 - **Lệnh điều kiện qua API (đã xem 28/09/2026):** API TCBS chỉ có lệnh điều kiện cho phái sinh; tự dựng cho cổ
   phiếu buộc phải giữ phiên có quyền đặt lệnh — trái quyết định không cất phiên. Hiện KHÔNG làm.
 - **Không có test runner, không unit test.** Kiểm bằng bấm thử thật.

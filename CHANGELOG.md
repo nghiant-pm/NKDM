@@ -9,8 +9,11 @@ Ngày mới nhất trên đầu.
 Lần thử thật đầu tiên: owner nhập đúng iOTP vẫn báo "TCBS từ chối iOTP", vì app gộp mọi lỗi đổi token thành một câu chung — không biết lỗi nằm ở iOTP hay API Key.
 - Hộp Đối chiếu giờ hiện nguyên văn câu báo + mã lỗi của TCBS (VD "TCBS từ chối: The API key is invalid (203074)").
 - Server ghi log cảnh báo kèm mã lỗi TCBS và **hình dạng** API Key (độ dài, có dấu cách/ký tự lạ không) — không ghi nội dung key hay iOTP.
+- Kết quả: key lần đầu bị dính 4 khoảng trắng giữa chuỗi khi dán → TCBS báo `User not found (203007)`. Owner nhập lại key sạch → đổi token thành công.
+- **Tài liệu TCBS sai với thực tế ở `/se`:** thật ra trả `stock[]` với `totalQtty` + `costPrice` (tài liệu ghi `assets[]`, `quantity`, `avgPrice`) → báo "TCBS không trả tài sản". Sửa `normalizeAssets` đọc theo bản thật (giữ tên theo tài liệu làm dự phòng); mã lạ (quyền mua…) chỉ bị bỏ riêng. Số dư `/cashInvestments` đúng tài liệu.
+- Tạm ghi log **hình dạng** câu trả lời TCBS (tên trường + kiểu, không giá trị) để soát nốt lệnh khớp khi có dữ liệu.
 
-· `functions/tcbs-service.js` · `public/index.html` · `CHANGELOG.md`
+· `functions/tcbs-service.js` · `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CHANGELOG.md`
 
 ## 2026-09-28d (Đối chiếu TCBS: bấm tay, nhập iOTP, chỉ đọc)
 

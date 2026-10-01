@@ -109,17 +109,19 @@ function vnDate(iso) {
   return new Date(Date.parse(iso) + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-// Giá TCBS là VND (78500) → app dùng nghìn đồng (78,5). Tiền giữ nguyên VND.
+/* Đo thật 01/10/2026: /se trả `stock[]` với `totalQtty` + `costPrice` — KHÁC tài liệu (`assets[]`,
+   `quantity`, `avgPrice`). Đọc theo bản thật, giữ tên theo tài liệu làm dự phòng.
+   Giá TCBS là VND (78500) → app dùng nghìn đồng (78,5). Mã lạ (quyền mua…) bỏ riêng, không hỏng cả lượt. */
 function normalizeAssets(accountNo, data) {
-  if (!Array.isArray(data?.assets)) throw new Error(`TCBS không trả tài sản của ${maskAccount(accountNo)}`);
-  return data.assets.map((row) => {
+  const rows = Array.isArray(data?.stock) ? data.stock : Array.isArray(data?.assets) ? data.assets : null;
+  if (!rows) throw new Error(`TCBS không trả tài sản của ${maskAccount(accountNo)}`);
+  return rows.map((row) => {
     const ticker = cleanText(row?.symbol, 20).toUpperCase();
-    const qty = Number(row?.quantity), avgPriceVND = Number(row?.avgPrice);
-    if (!/^[A-Z0-9]+$/.test(ticker) || !Number.isFinite(qty) || qty < 0 || !Number.isFinite(avgPriceVND) || avgPriceVND < 0) {
-      throw new Error(`Tài sản TCBS không hợp lệ ở ${maskAccount(accountNo)}`);
-    }
-    return { ticker, qty, avgCost: avgPriceVND / 1000 };
-  }).filter((row) => row.qty > 0);
+    const qty = Number(row?.totalQtty ?? row?.quantity), costVND = Number(row?.costPrice ?? row?.avgPrice);
+    if (!/^[A-Z0-9]+$/.test(ticker) || !Number.isFinite(qty) || qty <= 0) return null;
+    if (!Number.isFinite(costVND) || costVND < 0) throw new Error(`Giá vốn TCBS không hợp lệ ở ${maskAccount(accountNo)}`);
+    return { ticker, qty, avgCost: costVND / 1000 };
+  }).filter(Boolean);
 }
 
 function normalizeCash(accountNo, data) {
