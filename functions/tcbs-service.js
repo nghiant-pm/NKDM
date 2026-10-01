@@ -17,6 +17,15 @@ function cleanText(value, max = 120) {
   return String(value ?? "").trim().slice(0, max);
 }
 
+// Mô tả cấu trúc JSON chỉ bằng tên trường + kiểu (mảng thì lấy phần tử đầu) — không lộ giá trị.
+function shape(value, depth = 0) {
+  if (Array.isArray(value)) return value.length ? ["array(" + value.length + ")", depth < 3 ? shape(value[0], depth + 1) : "…"] : "array(0)";
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).slice(0, 40).map(([k, v]) => [k, depth < 3 ? shape(v, depth + 1) : typeof v]));
+  }
+  return value === null ? "null" : typeof value;
+}
+
 function maskAccount(value) {
   const text = cleanText(value, 40);
   return text.length <= 4 ? text : "••••" + text.slice(-4);
@@ -134,9 +143,10 @@ function normalizeTrade(row) {
    gộp theo tradeId, dừng khi hết dữ liệu hoặc 2 trang liền không có lệnh mới (TCBS bỏ qua tham số). */
 async function readTrades(token, accountNo) {
   const encoded = encodeURIComponent(accountNo), seen = new Map(), skipped = new Set();
-  let total = NaN, idle = 0;
+  let total = NaN, idle = 0, firstShape = null;
   for (let page = 0; page < TRADE_MAX_PAGES; page++) {
     const data = await fetchJson(`/aion/v1/accounts/${encoded}/matching-details?pageSize=${TRADE_PAGE_SIZE}&pageIndex=${page}`, token);
+    if (!firstShape) firstShape = shape(data);
     if (!Array.isArray(data?.data)) throw new Error(`TCBS không trả lệnh khớp của ${maskAccount(accountNo)}`);
     if (Number.isFinite(Number(data.totalCount))) total = Number(data.totalCount);
     let added = 0;
@@ -149,7 +159,7 @@ async function readTrades(token, accountNo) {
     idle = added ? 0 : idle + 1;
     if (!data.data.length || seen.size + skipped.size >= total || idle >= 2) break;
   }
-  return { rows: [...seen.values()], complete: !skipped.size && (!Number.isFinite(total) || seen.size >= total) };
+  return { rows: [...seen.values()], complete: !skipped.size && (!Number.isFinite(total) || seen.size >= total), shape: firstShape };
 }
 
 // Gộp nhiều tiểu khoản: cộng số lượng, giá vốn bình quân gia quyền.
@@ -182,6 +192,8 @@ async function readPortfolio(request, secrets) {
         fetchJson(`/aion/v1/accounts/${encoded}/cashInvestments`, token),
         readTrades(token, accountNo)
       ]);
+      // Chẩn đoán: ghi HÌNH DẠNG câu trả lời (tên trường + kiểu), không ghi giá trị.
+      logger.info("TCBS hình dạng dữ liệu", { account: maskAccount(accountNo), se: shape(assets), cash: shape(cash), trades: trades.shape });
       return { positions: normalizeAssets(accountNo, assets), cash: normalizeCash(accountNo, cash), trades };
     }));
     return {
