@@ -4,7 +4,7 @@
    Tập mã là universe hiện tại nên kết quả có survivorship bias; chỉ dùng để bắt
    lỗi công thức và xem phân bố, không dùng như cam kết lợi nhuận. */
 const UNIVERSE = require("./universe");
-const { scoreTicker, evaluateCandidate, SCORE_VERSION } = require("./scoring");
+const { scoreTicker, evaluateCandidate, evaluateFiveSession, HOLD_MAX_SESSIONS, SCORE_VERSION } = require("./scoring");
 const { fetchHistory, mapWithConcurrency } = require("./index")._private;
 
 function average(values) {
@@ -23,6 +23,40 @@ function breakdown(rows) {
   };
 }
 
+/* Phiên chốt cho đề cử >90 điểm: mua giá đóng cửa ngày đề cử, bán giá đóng cửa phiên n.
+   Một mã lên >90 nhiều ngày liền chỉ tính lần đầu mỗi đợt n phiên — cùng cách gom và cùng
+   tiêu chí điểm ngọt với holdStats/holdSweetSpot bên public/index.html (bản sao có chủ ý). */
+const HOLD_MIN_WIN = 50;
+const HOLD_MIN_SAMPLES = 30;
+function holdStats(rows, n) {
+  const windowEnd = {};
+  const returns = [];
+  rows.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach((row) => {
+    const end = windowEnd[row.ticker];
+    if (end === "open" || (end && row.date <= end)) return;
+    const exit = row.hold.path[n - 1];
+    windowEnd[row.ticker] = exit ? exit.date : "open";
+    if (exit) returns.push((exit.close / row.hold.entryPrice - 1) * 100);
+  });
+  const sorted = returns.slice().sort((a, b) => a - b);
+  const avg = average(returns);
+  const fix = (value) => Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
+  return {
+    sessions: n,
+    samples: returns.length,
+    winPct: returns.length ? fix(returns.filter((value) => value > 0).length / returns.length * 100) : null,
+    avgPct: fix(avg),
+    medianPct: sorted.length ? fix((sorted[(sorted.length - 1) >> 1] + sorted[sorted.length >> 1]) / 2) : null,
+    worstPct: sorted.length ? fix(sorted[0]) : null,
+    perSessionPct: avg === null ? null : fix(avg / n)
+  };
+}
+// Điểm ngọt: lãi bình quân mỗi phiên cao nhất, với điều kiện ≥50% số lần có lãi và đủ mẫu.
+function holdSweetSpot(table) {
+  return table.filter((row) => row.samples >= HOLD_MIN_SAMPLES && row.winPct >= HOLD_MIN_WIN)
+    .sort((a, b) => b.perSessionPct - a.perSessionPct)[0]?.sessions ?? null;
+}
+
 async function main() {
   const benchmark = await fetchHistory("VNINDEX", 520);
   const fetched = await mapWithConcurrency(UNIVERSE, 5, (ticker) => fetchHistory(ticker, 520));
@@ -33,7 +67,9 @@ async function main() {
     else missing.push(UNIVERSE[index]);
   });
 
-  const dates = benchmark.slice(60, -20).map((bar) => bar.date).slice(-80);
+  // `node backtest.js 200` = thử trên 200 phiên gần nhất (mặc định 80; tối đa theo lịch sử 520 ngày).
+  const testSessions = Math.max(1, Number(process.argv[2]) || 80);
+  const dates = benchmark.slice(60, -HOLD_MAX_SESSIONS).map((bar) => bar.date).slice(-testSessions);
   const picks = [];
   dates.forEach((date) => {
     const benchmarkPast = benchmark.filter((bar) => bar.date <= date);
@@ -50,7 +86,8 @@ async function main() {
     });
     day.sort((a, b) => b.totalScore - a.totalScore || a.ticker.localeCompare(b.ticker));
     day.slice(0, 5).forEach((score, index) => {
-      picks.push({ ...score, rank: index + 1, marketBull, evaluation: evaluateCandidate(score, histories.get(score.ticker), benchmark) });
+      picks.push({ ...score, rank: index + 1, marketBull, evaluation: evaluateCandidate(score, histories.get(score.ticker), benchmark),
+        hold: evaluateFiveSession(score, histories.get(score.ticker)) });
     });
   });
 
@@ -82,6 +119,20 @@ async function main() {
     },
     missingTickers: missing
   }, null, 2));
+
+  // Điểm ngọt phiên chốt cho >90 điểm: cả giai đoạn + hai nửa — chỉ đáng tin khi hai nửa ra gần nhau.
+  const top = picks.filter((row) => row.hold);
+  const middle = dates[dates.length >> 1];
+  [["Cả giai đoạn", top], ["Nửa đầu", top.filter((row) => row.date < middle)], ["Nửa sau", top.filter((row) => row.date >= middle)]]
+    .forEach(([label, rows]) => {
+      const table = Array.from({ length: HOLD_MAX_SESSIONS }, (_, i) => holdStats(rows, i + 1));
+      const best = holdSweetSpot(table);
+      console.log(`\n>90 điểm · ${label} (${rows.length} đề cử) · điểm ngọt: ${best ? best + " phiên" : "chưa đủ mẫu"}`);
+      console.table(table.map((row) => ({
+        "Phiên": row.sessions, "Mẫu": row.samples, "Có lãi %": row.winPct, "Bình quân %": row.avgPct,
+        "Trung vị %": row.medianPct, "Tệ nhất %": row.worstPct, "Mỗi phiên %": row.perSessionPct
+      })));
+    });
 }
 
 main().catch((error) => {

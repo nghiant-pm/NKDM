@@ -2,13 +2,14 @@
 
 // Chỉ server chấm: client đọc kết quả, không có bản sao công thức.
 const { decisionInputs: I } = require("./scoring");
-const VERSION = "decision-v1.1.0";
+const VERSION = "decision-v1.2.0";
 /* Ngưỡng CỐ ĐỊNH theo phiên bản công thức, cố ý không đọc tab Chiến lược: đang chạy bóng, đổi giữa chừng
    thì mẫu trước/sau không so được. Muốn đổi → nâng VERSION (bộ đếm 20 phiên chạy lại).
    Điểm lưu thang 0–100; app hiển thị ÷10 (thang 10). */
 const POLICY = Object.freeze({ threshold: 80, winPct: 6, lossPct: 3, sessions: 20, minLiquidity: 20e9,
-  buyWeights: { market: 25, trend: 20, pullback: 20, confirmation: 10, price: 10, risk: 10 },
-  sellWeights: { trend: 25, relative: 20, distribution: 20, heat: 15, profit: 15 }, newsLimit: 5 });
+  // v1.2.0: thêm Khối ngoại 10 — Mua bớt Thị trường 25→20, Đà tăng 20→15; Bán bớt Đà tăng 25→20, So thị trường 20→15.
+  buyWeights: { market: 20, trend: 15, pullback: 20, confirmation: 10, price: 10, risk: 10, foreign: 10 },
+  sellWeights: { trend: 20, relative: 15, distribution: 20, heat: 15, profit: 15, foreign: 10 }, newsLimit: 5 });
 
 // Rổ ngành nội bộ, bình quân ngang trọng số; không giả danh chỉ số ngành chính thức.
 const SECTORS = {
@@ -51,7 +52,7 @@ function newsAdjustment(items, date) {
   });
   return { impact: I.round(clamp(used.reduce((sum, n) => sum + n.impact, 0), -5, 5), 1), items: used };
 }
-function scoreDecision({ ticker, bars, benchmark, sector, position, targetBuy, strategy, news = [], phase }) {
+function scoreDecision({ ticker, bars, benchmark, sector, position, targetBuy, strategy, news = [], foreignRows = null, phase }) {
   const valid = (rows) => Array.isArray(rows) && rows.length >= 60 && rows.every((b) =>
     [b.open, b.high, b.low, b.close, b.volume].every(Number.isFinite) && b.close > 0 && b.volume >= 0);
   if (!valid(bars) || !valid(benchmark) || bars.at(-1).date !== benchmark.at(-1).date) return null;
@@ -69,15 +70,17 @@ function scoreDecision({ ticker, bars, benchmark, sector, position, targetBuy, s
     strategy.sellRisePct ? avgCost * (1 + strategy.sellRisePct / 100) : Infinity) : null;
   const priceGap = Number.isFinite(buyAt) && buyAt > 0 ? (current.close / buyAt - 1) * 100 : null;
   const newsState = newsAdjustment(news, current.date);
+  const flow = I.foreignFlow(foreignRows, bars);
   const buyParts = {
-    // Thiếu dữ liệu rổ ngành: VN-Index gánh trọn 25 điểm, không phạt mã ngoài rổ.
-    market: I.round(sector.available ? marketTrend.score / 25 * 15 + sector.strength : marketTrend.score),
-    trend: I.round(trend.score / 25 * 12 + relative.score / 25 * 8),
+    // Thiếu dữ liệu rổ ngành: VN-Index gánh trọn phần thị trường, không phạt mã ngoài rổ.
+    market: I.round((sector.available ? marketTrend.score / 25 * 15 + sector.strength : marketTrend.score) * 0.8),
+    trend: I.round(trend.score / 25 * 9 + relative.score / 25 * 6),
     pullback: I.round(pullback.score / 25 * 20),
     confirmation: (current.close > prior.close ? 4 : 0) + (current.close >= current.open ? 2 : 0) +
       (breakout.volumeRatio >= 1.2 ? 4 : breakout.volumeRatio >= 0.8 ? 2 : 0),
     price: priceGap === null ? 0 : priceGap <= 0 ? 10 : priceGap <= 2 ? 8 : priceGap <= 5 ? 5 : 0,
-    risk: (liquidity >= POLICY.minLiquidity ? 5 : liquidity >= 5e9 ? 2 : 0) + (atr <= 2.5 ? 5 : atr <= 4 ? 3 : atr <= 6 ? 1 : 0)
+    risk: (liquidity >= POLICY.minLiquidity ? 5 : liquidity >= 5e9 ? 2 : 0) + (atr <= 2.5 ? 5 : atr <= 4 ? 3 : atr <= 6 ? 1 : 0),
+    foreign: flow.buyScore
   };
   const riskFlags = [];
   if (!sector.available) riskFlags.push("Chưa đủ dữ liệu rổ ngành");
@@ -85,6 +88,7 @@ function scoreDecision({ ticker, bars, benchmark, sector, position, targetBuy, s
   if (marketTrend.score < 15) riskFlags.push("VN-Index đang yếu");
   if (liquidity < POLICY.minLiquidity) riskFlags.push("Thanh khoản TB20 dưới 20 tỷ đồng");
   if (atr > 6) riskFlags.push("Biến động ATR14 trên 6%");
+  if (flow.status === "missing") riskFlags.push("Chưa có dữ liệu khối ngoại");
   let buyScore = clamp(Math.round(Object.values(buyParts).reduce((a, b) => a + b, 0) + newsState.impact));
   if (trend.score < 15 || pullback.score < 10 || liquidity < POLICY.minLiquidity) buyScore = Math.min(75, buyScore);
   const sellEligible = held && current.close > avgCost;
@@ -94,11 +98,12 @@ function scoreDecision({ ticker, bars, benchmark, sector, position, targetBuy, s
     return b.close < prev.close && b.volume >= I.average(bars.slice(-21, -1).map((x) => x.volume)) * 1.2;
   }).length;
   const sellParts = sellEligible ? {
-    trend: 25 - trend.score,
-    relative: I.round((25 - relative.score) / 25 * 20),
+    trend: I.round((25 - trend.score) * 0.8),
+    relative: I.round((25 - relative.score) / 25 * 15),
     distribution: Math.min(20, distribution * 7),
     heat: distanceMA >= 10 ? 15 : distanceMA >= 6 ? 10 : atr > 6 ? 8 : 0,
-    profit: current.close >= sellAt ? 15 : I.round(clamp((current.close - avgCost) / (sellAt - avgCost), 0, 1) * 15)
+    profit: current.close >= sellAt ? 15 : I.round(clamp((current.close - avgCost) / (sellAt - avgCost), 0, 1) * 15),
+    foreign: flow.sellScore
   } : null;
   const sellScore = sellParts ? clamp(Math.round(Object.values(sellParts).reduce((a, b) => a + b, 0) - newsState.impact)) : null;
   // Chữ hiển thị thẳng trong app → cùng thang 10 và cách viết số Việt Nam như phần điểm.
@@ -111,6 +116,8 @@ function scoreDecision({ ticker, bars, benchmark, sector, position, targetBuy, s
   ];
   return { ticker, date: current.date, phase, scoreVersion: VERSION, threshold: POLICY.threshold, buyScore, sellScore, buyParts, sellParts,
     reasons, riskFlags, newsImpact: newsState.impact, news: newsState.items, sector,
+    foreign: { status: flow.status, netBuyDays: flow.netBuyDays, netSellDays: flow.netSellDays,
+      netRatioPct: flow.netRatioPct, netValue: flow.netValue },
     close: current.close, avgCost, targetBuy: Number.isFinite(targetBuy) ? targetBuy : null,
     qty: held ? position.qty : 0, hold: !!position?.hold,
     strategy: { id: strategy.id || null, buyDrop: strategy.buyDrop, sellRise: strategy.sellRise,

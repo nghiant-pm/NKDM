@@ -4,6 +4,159 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-07 (Báo cáo >90 điểm: chọn phiên chốt 1–20, tìm điểm ngọt)
+
+Owner muốn đổi được số phiên chốt (đang cố định 5) để tìm phiên chốt cho lãi tốt nhất. Owner chốt: làm cả mô phỏng lẫn theo dõi thật, dải 1–20 phiên, điểm ngọt = lãi bình quân mỗi phiên cao nhất với ≥50% lần có lãi.
+
+- **Bot lưu đường giá:** `fiveSessionEvaluation.path` = giá đóng cửa từng phiên sau đề cử, tới phiên 20 (`pathComplete`). Các trường 5 phiên cũ giữ nguyên nghĩa. Bản ghi cũ chưa có `path` được đo bù ở lượt sau đóng cửa kế tiếp. Không đổi công thức chấm, không nâng version.
+- **App (tab Cơ hội):** thẻ "Hiệu quả >90 điểm" có ô chọn 1–20 phiên (nhớ theo máy, `fin2-hold-sessions`, mặc định 5); 4 ô số liệu và danh sách tính theo phiên đang chọn. Mục gập "So sánh 1–20 phiên" có bảng Mẫu · Có lãi · Bình quân · Mỗi phiên, đánh dấu điểm ngọt; dòng dưới 30 mẫu tô mờ. Cách gom đợt tính theo phiên đang chọn (giữ 10 phiên thì đề cử lặp trong 10 phiên đó là cùng đợt). Trước khi bot đo bù, bản cũ chỉ có kết quả phiên 5, các phiên khác hiện "Chờ bot cập nhật".
+- **Mô phỏng:** `node backtest.js [số phiên]` in thêm bảng 1–20 phiên cho đề cử >90 điểm (mẫu, % có lãi, bình quân, trung vị, tệ nhất, mỗi phiên) cho cả giai đoạn + nửa đầu + nửa sau, kèm điểm ngọt. Điểm ngọt chỉ đáng tin khi hai nửa ra gần nhau. Mô phỏng lấy top 5 mỗi ngày (không lọc vùng giá/thanh khoản như bot thật), khối ngoại trung lập, chưa tính thuế 0,1%.
+- **Kiểm:** `npm run smoke` qua (thêm phép thử đường giá: lưu cả phiên sau phiên 5, dừng ở 20, trường 5 phiên giữ nghĩa cũ). Chạy `backtest.js` với giá giả lập (cloud không gọi được VNDirect). Thử hàm gom đợt/thống kê của app với bản ghi mới, bản cũ thiếu `path`, đề cử lặp cùng đợt. Dựng thẻ báo cáo ở 390px: không lỗi, không tràn ngang.
+
+· `functions/scoring.js` · `functions/index.js` · `functions/backtest.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `CHANGELOG.md`
+
+## 2026-10-06 (Khối ngoại vào chấm điểm — Cơ hội v1.1.0, Điểm quyết định v1.2.0)
+
+Owner hỏi tài liệu TCBS OpenAPI có gì về doanh nghiệp dùng được cho chấm điểm. Đọc hết tài liệu: mục "Tra cứu thông tin chứng khoán" chỉ là thông tin niêm yết (trạng thái cảnh báo/kiểm soát, margin, room ngoại), không có báo cáo tài chính; dữ liệu thị trường hữu ích là **khối ngoại** và **mua/bán chủ động**, nhưng mọi API TCBS đều cần phiên iOTP (đo: 401 nếu thiếu) nên bot không tự gọi được. Owner chọn đưa khối ngoại vào CẢ HAI bộ điểm bằng cách **chia lại trọng số**, mua/bán chủ động để sau.
+
+- **Nguồn:** VNDirect `api-finfo.vndirect.com.vn/v4/foreigns` (cùng hãng với nguồn giá chấm điểm). Đo thật từ Cloud Function bằng hàm thử tạm (đã xoá ngay): 104 mã một lần gọi, 0,2–0,6 giây; lịch sử hơn 1 năm; cho gọi cross-origin nên nút Quét ngay dùng cùng nguồn. Mua/bán chủ động: thử 5 nguồn, chỉ TCBS có (OpenAPI cần iOTP, bản công khai bị Cloudflare chặn).
+- **Cách chấm Khối ngoại (0–10):** 5 phiên gần nhất — tỷ lệ mua ròng so với giá trị giao dịch của mã (≥5% → 6 · ≥2% → 5 · trong ±2% → 3 · đến −5% → 1 · dưới −5% → 0) + số phiên mua ròng (tối đa 4). Điểm Bán chấm ngược lại. Thiếu dữ liệu hoặc hết room ngoại (<1%) → trung lập 5, không thưởng không phạt; thiếu dữ liệu có cờ "Chưa có dữ liệu khối ngoại".
+- **Cơ hội ngắn hạn v1.0.0 → v1.1.0:** Xu hướng 25→20, Sức mạnh 25→20, thêm Khối ngoại 10. Tổng vẫn 100. Mua ròng mạnh có thêm lý do "Khối ngoại mua ròng x/5 phiên". Bot, Quét ngay và Chấm một mã cùng công thức; đã so trên dữ liệu thật 06/10: 69/69 mã được chấm ra kết quả trùng khớp giữa app và bot.
+- **Điểm quyết định decision-v1.1.0 → v1.2.0:** Mua — Thị trường 25→20, Đà tăng 20→15, thêm Khối ngoại 10. Bán — Đà tăng yếu đi 25→20, So với thị trường 20→15, thêm Khối ngoại bán ra 10. **Bộ đếm chạy bóng 20 phiên bắt đầu lại**; sự kiện bản cũ giữ nguyên kết quả.
+- **Hiển thị:** popup Chấm một mã có ô "Khối ngoại x/10" + câu "Khối ngoại mua ròng 4/5 phiên · ròng +102,6 tỷ (+19,2% giá trị giao dịch)"; tab Phân tích có dòng Khối ngoại ở cả Mua và Bán. Kết quả cũ chưa chấm lại vẫn hiện theo thang cũ.
+- **Chưa làm:** báo cáo 5 phiên (>90 điểm) chưa tách theo phiên bản công thức; mô phỏng `backtest.js` chưa có lịch sử khối ngoại (mọi mã trung lập 5/10).
+- **Kiểm:** `npm run smoke` qua (thêm phép thử khối ngoại: mua/bán ròng đều, hết room, thiếu phiên, nguồn chậm 1 phiên, trần từng phần Điểm quyết định). Dựng phần hiển thị với điểm thật của DGW ở 375px: đủ chữ, không tràn ngang — qua đó bắt và sửa lỗi "bán ròng undefined/5 phiên" và "−0%".
+
+· `functions/scoring.js` · `functions/decision-scoring.js` · `functions/decision-service.js` · `functions/index.js` · `functions/ticker-analysis.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-05b (Chấm chủ động một mã và so với mã cùng ngành)
+
+Owner muốn tự chấm một cổ phiếu HOSE bất kỳ và biết mã đó đang mạnh hay yếu hơn các mã tương đương trên thị trường, không cần đưa mã vào danh mục trước.
+
+- **Chấm một mã từ header:** nút kính lúp mở ô nhập mã; app chỉ nhận cổ phiếu HOSE đã xác nhận qua danh sách VPS. Kết quả mở trong popup Chi tiết mã. Với mã đang nắm giữ hoặc theo dõi, nút **Chấm cơ hội** chạy cùng luồng này; kết quả chỉ giữ trong bộ nhớ đến khi đóng app, bấm **Chấm lại** để lấy mới. Trên màn ≤430px ẩn chữ tiêu đề header để 5 nút vẫn giữ vùng chạm 44px và không chồng nhau.
+- **Điểm Cơ hội dùng đúng công thức Quét ngay:** callable `analyzeTicker` chỉ cho email owner đã xác minh, đọc thông số sàng lọc hiện hành rồi lấy OHLCV từ VNDirect và gọi lại `scoreTicker()`. Không tạo công thức chấm thứ ba.
+- **So với mã tương đương:** `ticker-analysis.js` dùng rổ ngành `SECTORS` hiện có, bỏ mã chính và mã thiếu 60 phiên/lệch ngày, rồi chọn tối đa 5 mã gần thanh khoản nhất theo tỷ lệ log. Popup so biến động 5/20/60 phiên, thanh khoản TB20 và ATR14 với trung vị nhóm; chưa có ngành hoặc chưa đủ 2 mã thì nói rõ giới hạn.
+- **Chỉ để xem:** kết quả không ghi Firestore, không tạo `signals`, `screening_results` hay `decision_events`. Smoke test kiểm công thức biến động, trung vị, giới hạn 5 mã, loại mã chính/lệch phiên và thứ tự gần thanh khoản.
+- **Sửa sau lần bấm production đầu tiên:** popup từng bị kẹt ở “Đang chấm…” vì gọi nhầm hàm định dạng số chỉ có trong khối Điểm quyết định. Đã tách định dạng tại đúng khối và bấm lại luồng thật.
+
+· `public/index.html` · `functions/index.js` · `functions/ticker-analysis.js` · `functions/smoke.js` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-05 (Nhật ký gọn mỗi ngày một dòng)
+
+Owner thấy Nhật ký dài vì dữ liệu nhiều.
+
+- Mỗi ngày gọn còn **một dòng**: ngày · tóm tắt (vd "Mua 2 · Bán 1 · Nạp · Đặt 1 · Theo dõi 5") · tổng tài sản · mũi tên. Bấm vào dòng mở ra chi tiết như cũ (Đầu tư / Tiền mặt / Lãi-lỗ, các giao dịch kèm nút Xóa).
+- Mặc định gập hết. Ngày đang mở được nhớ trong lúc dùng (dữ liệu về vẽ lại không bị gập), tải lại trang thì gập lại. Cùng kiểu mở/gập với tab Phân tích.
+- Chỉ đổi hiển thị, không đổi dữ liệu. Kiểm tra trên trang thử với dữ liệu giả, khổ điện thoại 375px.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-05 (Xóa được khoản nạp/rút trong Nhật ký)
+
+Owner đôi lúc nhập sai số tiền nạp/rút mà không có cách gỡ như giao dịch cổ phiếu.
+
+- Mỗi khoản Nạp / Rút / Điều chỉnh trong Nhật ký có nút **Xóa** giống giao dịch cổ phiếu. Bấm → hỏi xác nhận (số tiền + ngày) → xóa đúng khoản đó khỏi `cashflows`. Nhập sai thì xóa rồi nhập lại.
+- Tiền mặt, vốn ròng, lãi/lỗ tự tính lại ngay. Ảnh chụp `daily_snapshots` các ngày đã lưu vẫn giữ số cũ (đúng thiết kế) — muốn ảnh hôm nay đúng thì bấm Lưu nhật ký lại.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-02 (Biểu đồ mã có đường MA20 và MA50)
+
+Owner muốn thấy MA20 / MA50 khi bấm vào mã để xem xu hướng.
+
+- Popup Biểu đồ vẽ thêm 2 đường trung bình giá đóng cửa: **MA20** (liền, xám đậm) và **MA50** (chấm, xám nhạt). Chú thích dưới biểu đồ ghi giá trị MA của phiên cuối; chạm/rê vào biểu đồ thấy MA20 · MA50 của ngày đó.
+- Biểu đồ tải thêm ~80 ngày lịch sử (`fetchPriceHistory(…, 450)`) để khung 1 năm có MA50 từ đầu. File xuất cho AI vẫn 370 ngày như cũ.
+- Chỉ hiển thị, không đổi tín hiệu, điểm hay Firestore. Nguồn giá biểu đồ vẫn là VPS (sàng lọc dùng VNDirect) nên MA có thể lệch vài đồng lẻ so với số trong phần chấm điểm.
+- Kiểm tra trên bản thử với dữ liệu giả lập: 3 khung 1 tháng / 3 tháng / 1 năm, tooltip ở mép trái, khổ điện thoại.
+
+· `public/index.html` · `CHANGELOG.md`
+
+## 2026-10-02 (Khuyến nghị gập được như các section khác)
+
+Owner thấy Khuyến nghị chưa có nút thu gọn như các phần khác (cơ chế riêng chỉ chạy trên điện thoại, không có trên máy tính).
+
+- Đầu đề Khuyến nghị dùng chung `initCollapse` (`data-sec="khuyen-nghi"`): mũi tên ở mọi màn hình, cùng kiểu với Đang nắm giữ / Nhật ký, nhớ theo máy trong `fin2-collapsed`. Khi gập vẫn thấy số mục.
+- Bỏ cơ chế gập riêng cũ (`compactHighlightsExpanded`, nút `#compact-today-chevron`, CSS `.compact-today.open`). Khác trước: điện thoại không còn tự thu Khuyến nghị mỗi lần mở app — anh gập một lần là máy nhớ.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-02 (View Gọn: gập được Đang nắm giữ và Đang theo dõi)
+
+Owner muốn view Gọn có cơ chế thu gọn section như view Đầy đủ.
+
+- "Đang nắm giữ" và "Đang theo dõi" của view Gọn dùng chung `initCollapse` (đầu đề có `data-sec` `gon-nam-giu` / `gon-theo-doi`): bấm tiêu đề hoặc mũi tên để gập/mở, nhớ theo máy trong `fin2-collapsed`.
+- `initCollapse` bỏ qua cú bấm vào nút/link trong đầu đề (Lưu, Nạp/rút, Giao dịch, Thêm mã…) để thao tác không làm gập section.
+- Khuyến nghị và dòng tóm tắt vẫn giữ cách thu 1 dòng trên điện thoại như trước; Nhật ký và các tab Cơ hội/Chiến lược/Phân tích vốn đã gập được.
+- Ghi chú quy trình: lần deploy này chạy trước khi mục CHANGELOG được ghi (lệnh ghi lỗi do kiểu xuống dòng CRLF nhưng chuỗi lệnh vẫn đi tiếp); mục này ghi bù ngay sau đó.
+
+· `public/index.html` · `CHANGELOG.md`
+
+## 2026-10-02 (Khuyến nghị thay Highlight và Hàng đợi tín hiệu)
+
+Owner thấy Highlight (Danh mục) và Quyết định (Phân tích) trùng nhau, muốn gom thành Khuyến nghị có hai nút Đặt và Bỏ qua, đặt vào chỗ Highlight. Chốt thêm: lệnh đã đặt nối tiếp ngay trong Khuyến nghị (Khớp / Hủy); bỏ các mục "sắp tới ngưỡng" và watchlist gần giá kỳ vọng khỏi Khuyến nghị.
+
+- **Khuyến nghị** (`renderAdvice`, thay `renderCompactToday`): tín hiệu hôm nay đã đạt ngưỡng → **Đặt** (mở form đặt lệnh gắn tín hiệu, như nút "Đã đặt" cũ) hoặc **Bỏ qua** (ẩn tới hết ngày trên máy đó, như cũ). Đặt xong mục chuyển thành "Đã đặt" với **Khớp** / **Hủy**; khớp hoặc hủy thì rời danh sách.
+- Khối nằm chỗ Highlight ở view Gọn, và chuyển sang đầu tab Danh mục khi ở view Đầy đủ (cùng một khối, chuyển chỗ như bảng mã). Điện thoại vẫn thu thành 1 dòng "Khuyến nghị · N mục", bấm mới mở; nút nằm bên phải để mỗi mục gọn.
+- **Tab Phân tích:** khối "Quyết định" đổi tên "Hiệu quả tín hiệu", chỉ còn Chất lượng tín hiệu + Đóng góp lãi/lỗ.
+- Mục "sắp tới ngưỡng" vẫn thấy ở bảng mã (vạch trái mảnh + dòng "Sắp mua/bán" khi mở dòng). Tín hiệu, lệnh, Firestore không đổi.
+- Kiểm tra trên bản thử dữ liệu mẫu: Đặt mở form gắn đúng tín hiệu, Khớp mở form khớp, Hủy hỏi xác nhận, Bỏ qua ẩn + "Hiện lại", đổi Gọn ↔ Đầy đủ, khổ 375px.
+
+· `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-02 (Vốn nạp ròng + Lãi/lỗ từ đầu)
+
+Owner thấy thiếu thông tin tổng đầu tư. Kiểm tra: cả hai view không còn hiện tiền đã bỏ vào (ô vốn nạp ròng có từ 14/09 nhưng mất khi khối tóm tắt Gọn đổi sang Đã chốt · Tỷ lệ tiền mặt). Owner chọn A: đặt ở phần mở rộng "Tổng tài sản …".
+
+- **Vốn nạp ròng** = Σ nạp − Σ rút (`netCapitalVND`). Bỏ dòng "Điều chỉnh" đối chiếu TCBS vì không phải tiền nạp thật.
+- **Lãi/lỗ từ đầu** = Tổng tài sản − vốn nạp ròng, kèm % trên vốn nạp ròng; theo nút ẩn số lãi/lỗ như các số lãi/lỗ khác.
+- Nằm cạnh Giá trị cổ phiếu và Vốn mua trong `#overview-more`, dùng chung hai view. Dòng tóm tắt và 4 ô chỉ số giữ nguyên.
+- Sửa ghi chú cũ trong AGENTS.md ("Gọn dùng vốn nạp ròng") cho đúng hiện trạng.
+
+· `public/index.html` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-02 (Gom view — bước 1: view Gọn đủ chức năng, thêm tầng Chi tiết)
+
+Owner ít dùng view Đầy đủ, muốn lấy Gọn làm view chính theo kiểu bấm để mở rộng, bấm Chi tiết để xem đầy đủ. Chốt: dòng tóm tắt giữ như Gọn, Tổng tài sản ở phần mở rộng (1A); một bố cục cho mọi màn hình (2A). Làm 2 bước, bước 2 (gỡ view Đầy đủ) chờ owner dùng thử.
+
+- **Tổng quan 3 tầng:** dòng "Chưa bán · Tiền mặt" → 4 chỉ số → nút "Tổng tài sản …" mở giá trị cổ phiếu, vốn mua, Phân nhóm vị thế, Đã chốt theo mã, Nếu chốt các mã đang lãi. Khối có sẵn được chuyển chỗ, không chép bản thứ hai.
+- **Nút Lưu nhật ký hôm nay** cạnh nút Giao dịch, mở popup danh sách giá rồi bấm Lưu; có chấm vàng khi hôm nay chưa lưu. Cách ghi không đổi: chỉ tạo `daily_snapshots` + `signals` khi bấm Lưu. Lý do: bản xuất 28/09 thiếu ngày 18/09 và 24/09 vì nút Lưu chỉ có ở view Đầy đủ.
+- **Nút Nạp / rút vốn** cạnh nút Giao dịch, mở popup như form Giao dịch.
+- **Nhật ký + Xuất nhật ký** ở cuối tab Danh mục của view Gọn (gập được, nhớ trạng thái gập như trước).
+- **Chi tiết mã (tầng 3):** nút "Chi tiết" ở hàng mở của mã nắm giữ và mã theo dõi, hoặc bấm dòng điểm → popup gồm nút Biểu đồ / Luận điểm / Ghi giao dịch, số chính của mã, luận điểm, Điểm quyết định (cùng `analysisDetail` với tab Phân tích), lệnh đang chờ và lệnh đã ghi. Bấm điểm không còn nhảy sang tab Phân tích (`openAnalysis` bỏ).
+- **Popup dùng chung bền hơn:** form mượn vào popup được trả về chỗ ngay khi đóng hoặc khi mở popup khác, không phụ thuộc sự kiện `close` của trình duyệt (sự kiện này có thể đến trễ và kéo nhầm nội dung popup vừa mở).
+- Kiểm tra: dựng bản thử trên máy với dữ liệu mẫu (không đụng Firestore), bấm đủ 4 popup, popup Chi tiết của mã nắm giữ/theo dõi, đổi Gọn ↔ Đầy đủ, khổ 375px và máy tính.
+
+· `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-02 (Tab Cơ hội riêng, view Gọn có tab như Đầy đủ)
+
+Owner xem báo cáo cơ hội ngắn hạn thường xuyên, muốn có tab riêng thay vì gập ở cuối Danh mục; đồng thời muốn view Gọn chia tab giống view Đầy đủ.
+
+- **Thanh tab chung cho cả hai view:** Danh mục · Theo dõi · **Cơ hội** · Chiến lược · Phân tích. Gọn/Đầy đủ chỉ đổi cách hiện ở Danh mục và Theo dõi; ba tab còn lại giống hệt nhau. Owner chọn phương án này.
+- **Tab Cơ hội:** chứa Cơ hội ngắn hạn (khung giờ Telegram, Cơ hội mới, Đang theo dõi, Hiệu quả >90 điểm · 5 phiên). Cài đặt thông số sàng lọc vẫn ở Chiến lược (owner chọn).
+- **Khối Quyết định chuyển lên đầu tab Phân tích** cho cả hai view (owner chọn). View Gọn bỏ mục gập "Phân tích chi tiết".
+- **View Gọn:** tab Danh mục = tóm tắt + Highlight + bảng nắm giữ; tab Theo dõi = bảng theo dõi.
+- **Code gọn hơn:** bỏ đoạn chuyển `decision-hub`/`screening-hub` qua lại giữa hai view; ẩn/hiện tab, panel, view gom vào một hàm `syncPanels()`.
+- **Điện thoại:** ≤430px mỗi tab rộng theo độ dài chữ để 5 tab vừa khổ 375px, không bị cắt chữ.
+
+· `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-02 (Highlight và Cơ hội ngắn hạn: cùng ngưỡng, mở biểu đồ, đo sau 5 phiên)
+
+Owner báo MSN chưa đạt mục tiêu nhưng Highlight vẫn khuyến nghị bán; đồng thời muốn xem biểu đồ ngay từ Cơ hội ngắn hạn và biết các đề cử điểm rất cao thực tế lời/lỗ thế nào sau 5 phiên.
+
+- **Highlight và cột Mua / Bán nay nói cùng một chiều:** khi `strategyAlert()` đã có cảnh báo mua hoặc bán, `renderCompact()` ưu tiên hiện đúng ngưỡng đó. Nếu chưa có cảnh báo mới dùng chiều tăng/giảm trong ngày; mã Giữ vẫn không có khuyến nghị bán. Sửa bug #018.
+- **Bấm mã trong Cơ hội ngắn hạn để xem biểu đồ:** tên mã ở cả Cơ hội mới, Đang theo dõi và báo cáo 5 phiên dùng lại popup `openStockChart()` đang có. Nút “Đưa vào theo dõi” vẫn là thao tác riêng.
+- **Đo riêng đề cử trên 90 điểm:** `evaluateFiveSession()` giả định mua bằng `close` ngày đề cử, chốt bằng giá đóng cửa đúng phiên giao dịch thứ 5 sau đó và lưu `fiveSessionEvaluation` ngay trong `screening_results`. Điểm đúng 90 không tính; Quét ngay trên máy không lưu nên cũng không tính.
+- **Tự theo dõi và bù dữ liệu cũ:** `updateEvaluations()` tiếp tục đo các mẫu chưa đủ 5 phiên và tự bổ sung kết quả cũ còn thiếu trường này. Khi đã chốt phiên thứ 5 thì các phiên sau không đổi kết quả.
+- **Báo cáo dễ đọc:** `renderFiveSessionReport()` hiện số mẫu đã đủ 5 phiên, đang chờ, tỷ lệ có lãi, lãi/lỗ bình quân và từng mã trong khối Cơ hội ngắn hạn. Dữ liệu xuất cho AI nhận luôn trường đánh giá mới qua kết quả sàng lọc đã có.
+- **Mỗi đợt chỉ tính một mẫu:** mã lên trên 90 điểm nhiều ngày liền chỉ tính lần đề cử đầu tiên; đề cử lặp lại trong 5 phiên của mẫu trước không vào thống kê (`fiveSessionSamples`). Owner chọn 4B.
+- **Giá mua lấy cùng chuỗi giá với phiên 5:** `entryPrice` đọc từ lịch sử VNDirect đúng ngày đề cử, để nếu nguồn điều chỉnh giá theo cổ tức thì hai đầu cùng điều chỉnh. Vẫn là giá đóng cửa ngày đề cử (owner chọn 3A).
+- **Thống kê tính trên toàn bộ lịch sử:** báo cáo đọc query riêng `totalScore > 90`, không còn phụ thuộc 250 kết quả gần nhất.
+- **Không mở thêm nơi lưu:** giữ nguyên collection và Firestore Rules; chỉ thêm trường vào document `screening_results` hiện có.
+
+· `public/index.html` · `functions/index.js` · `functions/scoring.js` · `functions/smoke.js` · `AGENTS.md` · `CHANGELOG.md` · `ISSUES.md` · `CODEMAP.md`
+
 ## 2026-10-01 (Đối chiếu TCBS: hiện nguyên văn lỗi của TCBS)
 
 Lần thử thật đầu tiên: owner nhập đúng iOTP vẫn báo "TCBS từ chối iOTP", vì app gộp mọi lỗi đổi token thành một câu chung — không biết lỗi nằm ở iOTP hay API Key.
