@@ -82,7 +82,7 @@ screening_runs/{YYYY-MM-DD}      …, analysis (chép bộ thông số đã dùn
 screening_results/{YYYY-MM-DD_MÃ}  …, targetBuy? (mã theo dõi), evalWinPct, evalLossPct, evalSessions
                             (chép ngưỡng đo lúc đề cử — đổi thông số không chấm lại kết quả cũ)
                             fiveSessionEvaluation? { sessions: 5, sessionsObserved, complete, entryPrice,
-                            exitDate?, exitPrice?, returnPct? } — chỉ đề cử totalScore > 90
+                            exitDate?, exitPrice?, returnPct?, closes[{date,close}] (tới 20 phiên) } — chỉ đề cử totalScore > 90
                             từ v1.1.0: foreignScore (0–10), foreign { status ok|missing|room-full, netBuyDays,
                             netSellDays, netRatioPct, netValue (VND) } — khối ngoại 5 phiên
 screening_slots/{YYYY-MM-DD_HHMM}  khoá mỗi khung giờ: status, phase, marketDate, notificationAttemptedAt…
@@ -150,7 +150,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   Cùng 5 phiên, cùng cách khớp ngày, trung lập 5/10 khi thiếu dữ liệu hoặc hết room. Đổi một bên → sửa bên kia + nâng version.
 - **Báo cáo đề cử trên 90 điểm sau 5 phiên** có ngưỡng/kỳ hạn lặp có chủ ý giữa
   `evaluateFiveSession()` + chỗ chọn/backfill trong Functions và `renderFiveSessionReport()` ở client.
-  Chỉ kết quả chính thức `totalScore > 90` được đo; giá ra là đóng cửa đúng phiên thứ 5.
+  Chỉ kết quả chính thức `totalScore > 90` được đo; giá ra là đóng cửa đúng phiên thứ 5. Bot chép thêm `closes` tới
+  `FORWARD_SESSIONS` = 20 phiên; app chọn 3–20 phiên (`fiveSessionAt`) — nâng giới hạn thì sửa cả hai.
 - **Điểm quyết định (server) chép lại logic app:** `DEFAULT_STRATEGY` + `activeStrategy()` + `holdings()` +
   ngưỡng legacy `buyAt/sellAt` (`functions/decision-service.js`) ↔ `RULE_*` + `activeStrategy()` + `computeLedger()`
   + `strategyLevels()` (`public/index.html`). Đổi cách chọn phiên bản chiến lược hay tính giá vốn → sửa cả hai.

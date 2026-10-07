@@ -293,11 +293,14 @@ function evaluateCandidate(result, bars, benchmarkBars) {
 
 /* Báo cáo riêng cho đề cử trên 90 điểm: mua tại giá đóng cửa lúc đề cử và
    chốt kết quả bằng giá đóng cửa đúng phiên giao dịch thứ 5 sau đó. */
+/* Báo cáo >90 điểm: chốt phiên 5 như cũ + chép giá đóng cửa tới phiên FORWARD_SESSIONS để app
+   chọn xem 3–20 phiên. Đủ 20 phiên mới thôi đo lại (fiveSessionPending). */
+const FORWARD_SESSIONS = 20;
 function evaluateFiveSession(result, bars) {
   if (!(Number(result.totalScore) > 90)) return null;
   // Giá mua lấy cùng chuỗi giá với phiên 5: nguồn có điều chỉnh theo cổ tức thì hai đầu cùng điều chỉnh.
   const entry = Number(bars.find((bar) => bar.date === result.date)?.close ?? result.close);
-  const future = bars.filter((bar) => bar.date > result.date).slice(0, 5);
+  const future = bars.filter((bar) => bar.date > result.date).slice(0, FORWARD_SESSIONS);
   const complete = future.length >= 5;
   const end = complete ? future[4] : null;
   return {
@@ -307,8 +310,13 @@ function evaluateFiveSession(result, bars) {
     entryPrice: round(entry),
     exitDate: end?.date || null,
     exitPrice: complete ? round(end.close) : null,
-    returnPct: complete ? round(pctChange(entry, end.close)) : null
+    returnPct: complete ? round(pctChange(entry, end.close)) : null,
+    closes: future.map((bar) => ({ date: bar.date, close: round(bar.close) }))
   };
+}
+function fiveSessionPending(data) {
+  const ev = data?.fiveSessionEvaluation;
+  return Number(data?.totalScore) > 90 && !(ev?.complete === true && (ev.closes?.length || 0) >= FORWARD_SESSIONS);
 }
 
 module.exports = {
@@ -319,6 +327,8 @@ module.exports = {
   scoreTicker,
   evaluateCandidate,
   evaluateFiveSession,
+  fiveSessionPending,
+  FORWARD_SESSIONS,
   decisionInputs: { round, average, sma, pctChange, returnForBars, atrPct, valueAverage20,
     alignBenchmarkReturn, trendScore, relativeStrengthScore, breakoutScore, pullbackScore, foreignFlow }
 };

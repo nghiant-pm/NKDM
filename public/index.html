@@ -330,6 +330,9 @@
   .screening-status.loss{ background:var(--neg-soft); color:var(--neg); }
   .screening-status.trial{ background:var(--warn-soft); color:var(--warn); }
   .screening-performance-card{ margin-top:10px; }
+  .screening-performance-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .screening-performance-head h3{ margin:0; }
+  .screening-performance-head select{ width:auto; min-height:44px; padding:6px 10px; }
   .screening-performance-summary{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:10px; }
   .screening-performance-summary .quality-item{ min-width:0; }
   .screening-performance-summary .v{ overflow-wrap:anywhere; }
@@ -1286,7 +1289,10 @@
       </div>
     </div>
     <div class="card decision-card screening-performance-card">
-      <h3>Hiệu quả &gt;90 điểm · 5 phiên</h3>
+      <div class="screening-performance-head">
+        <h3>Hiệu quả &gt;90 điểm</h3>
+        <select id="screening-five-sessions" aria-label="Số phiên tính hiệu quả"></select>
+      </div>
       <div class="screening-performance-summary" id="screening-five-summary"></div>
       <div class="decision-list" id="screening-five-list"></div>
     </div>
@@ -2591,46 +2597,63 @@ function screeningRowHtml(row, canAdd){
     '<div class="decision-actions">' + action + '</div></div>';
 }
 
-/* Một mã lên >90 nhiều ngày liền chỉ tính lần đầu: đề cử lặp lại trong 5 phiên của mẫu
-   trước (tới hết exitDate, hoặc khi mẫu trước còn đang đo) là cùng một đợt, không tính thêm. */
-function fiveSessionSamples(rows){
+/* Số phiên đang xem ở báo cáo >90 điểm (3–20, bot chép sẵn giá 20 phiên). Chỉ giữ trong bộ nhớ. */
+let fiveSessionN = 5;
+/* Kết quả của một đề cử sau n phiên: mua giả định giá đóng cửa ngày đề cử, chốt giá đóng cửa phiên n.
+   Kết quả cũ chưa có chuỗi `closes` chỉ biết phiên 5 — số phiên khác chờ bot điền bù sau đóng cửa. */
+function fiveSessionAt(row, n){
+  const ev = row.fiveSessionEvaluation || {};
+  const entry = Number(ev.entryPrice ?? row.close);
+  if(!Array.isArray(ev.closes)){
+    const done = n === 5 && ev.complete === true && Number.isFinite(ev.returnPct);
+    return { entry, done, backfill:n !== 5 && ev.complete === true, observed:Math.min(Number(ev.sessionsObserved || 0), n),
+      exitDate:done ? ev.exitDate : null, exitPrice:done ? ev.exitPrice : null, returnPct:done ? ev.returnPct : null };
+  }
+  const end = ev.closes[n - 1], done = !!end && entry > 0;
+  return { entry, done, backfill:false, observed:Math.min(ev.closes.length, n),
+    exitDate:end?.date || null, exitPrice:end?.close ?? null, returnPct:done ? (end.close / entry - 1) * 100 : null };
+}
+/* Một mã lên >90 nhiều ngày liền chỉ tính lần đầu: đề cử lặp lại trong n phiên của mẫu
+   trước (tới hết phiên n, hoặc khi mẫu trước còn đang đo) là cùng một đợt, không tính thêm. */
+function fiveSessionSamples(rows, n){
   const windowEnd = {};
   return rows.slice().sort((a,b) => (a.date || '').localeCompare(b.date || '')).filter((row) => {
     const end = windowEnd[row.ticker];
     if (end === "open" || (end && row.date <= end)) return false;
-    const ev = row.fiveSessionEvaluation || {};
-    windowEnd[row.ticker] = ev.complete === true && ev.exitDate ? ev.exitDate : "open";
+    const at = fiveSessionAt(row, n);
+    windowEnd[row.ticker] = at.done && at.exitDate ? at.exitDate : "open";
     return true;
   });
 }
 
 function renderFiveSessionReport(){
-  const rows = fiveSessionSamples(state.fiveSessionResults.filter((row) => Number(row.totalScore) > 90))
-    .sort((a,b) => (b.date || '').localeCompare(a.date || '') || Number(a.rank || 0) - Number(b.rank || 0));
-  const completed = rows.filter((row) => row.fiveSessionEvaluation?.complete === true && Number.isFinite(row.fiveSessionEvaluation.returnPct));
+  const n = fiveSessionN;
+  const rows = fiveSessionSamples(state.fiveSessionResults.filter((row) => Number(row.totalScore) > 90), n)
+    .sort((a,b) => (b.date || '').localeCompare(a.date || '') || Number(a.rank || 0) - Number(b.rank || 0))
+    .map((row) => ({ row, at:fiveSessionAt(row, n) }));
+  const completed = rows.filter(({ at }) => at.done);
   const pending = rows.length - completed.length;
-  const profitable = completed.filter((row) => row.fiveSessionEvaluation.returnPct > 0).length;
+  const profitable = completed.filter(({ at }) => at.returnPct > 0).length;
   const average = completed.length
-    ? completed.reduce((sum,row) => sum + row.fiveSessionEvaluation.returnPct, 0) / completed.length
+    ? completed.reduce((sum, { at }) => sum + at.returnPct, 0) / completed.length
     : null;
   const stat = (label, value) => '<div class="quality-item"><div class="k">' + label + '</div><div class="v num">' + value + '</div></div>';
   $("screening-five-summary").innerHTML =
-    stat("Đã đủ 5 phiên", completed.length.toLocaleString("vi-VN")) +
+    stat("Đã đủ " + n + " phiên", completed.length.toLocaleString("vi-VN")) +
     stat("Đang chờ", pending.toLocaleString("vi-VN")) +
     stat("Có lãi", completed.length ? (profitable / completed.length * 100).toLocaleString("vi-VN", { maximumFractionDigits:1 }) + "%" : "—") +
     stat("Lãi/lỗ bình quân", average === null ? "—" : fmtPct(average));
-  $("screening-five-list").innerHTML = rows.length ? rows.map((row) => {
-    const ev = row.fiveSessionEvaluation || {};
-    const done = ev.complete === true && Number.isFinite(ev.returnPct);
-    const cls = done ? (ev.returnPct > 0 ? " pos" : ev.returnPct < 0 ? " neg" : "") : "";
+  $("screening-five-list").innerHTML = rows.length ? rows.map(({ row, at }) => {
+    const done = at.done;
+    const cls = done ? (at.returnPct > 0 ? " pos" : at.returnPct < 0 ? " neg" : "") : "";
     const result = done
-      ? '<span class="screening-status' + (ev.returnPct > 0 ? ' win' : ev.returnPct < 0 ? ' loss' : '') + '">' + fmtPct(ev.returnPct) + '</span>'
-      : '<span class="screening-status">Đang đo · ' + Number(ev.sessionsObserved || 0) + '/5 phiên</span>';
+      ? '<span class="screening-status' + (at.returnPct > 0 ? ' win' : at.returnPct < 0 ? ' loss' : '') + '">' + fmtPct(at.returnPct) + '</span>'
+      : '<span class="screening-status">' + (at.backfill ? 'Chờ bot cập nhật' : 'Đang đo · ' + at.observed + '/' + n + ' phiên') + '</span>';
     return '<div class="decision-row"><div class="decision-main">' +
       '<div class="screening-headline"><button class="compact-link screening-ticker" type="button" data-chart-ticker="' + esc(row.ticker) + '" aria-label="Xem biểu đồ ' + esc(row.ticker) + '">' + esc(row.ticker) + '</button>' +
       '<span class="score num">' + Number(row.totalScore).toLocaleString("vi-VN") + ' điểm</span><span class="screening-status">' + fmtDateVN(row.date) + '</span></div>' +
-      '<div class="decision-meta num' + cls + '">Mua giả định ' + fmtPrice(ev.entryPrice ?? row.close) +
-      (done ? ' · Phiên 5 ' + fmtPrice(ev.exitPrice) + ' · ' + fmtDateVN(ev.exitDate) : '') + '</div></div>' +
+      '<div class="decision-meta num' + cls + '">Mua giả định ' + fmtPrice(at.entry) +
+      (done ? ' · Phiên ' + n + ' ' + fmtPrice(at.exitPrice) + ' · ' + fmtDateVN(at.exitDate) : '') + '</div></div>' +
       '<div class="decision-actions">' + result + '</div></div>';
   }).join("") : '<div class="decision-empty">Chưa có đề cử trên 90 điểm</div>';
 }
@@ -3646,6 +3669,10 @@ function openScreeningWatch(ticker, price){
 }
 
 function initScreening(){
+  const sessions = $("screening-five-sessions");
+  sessions.innerHTML = Array.from({ length:18 }, (_, i) => i + 3)
+    .map((n) => '<option value="' + n + '"' + (n === fiveSessionN ? ' selected' : '') + '>' + n + ' phiên</option>').join("");
+  sessions.addEventListener("change", () => { fiveSessionN = Number(sessions.value) || 5; renderFiveSessionReport(); });
   $("screening-scan").addEventListener("click", (event) => {
     event.stopPropagation();
     runManualScreening();

@@ -8,7 +8,7 @@ const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const UNIVERSE = require("./universe");
-const { scoreTicker, evaluateCandidate, evaluateFiveSession, normalizeConfig, SCORE_VERSION } = require("./scoring");
+const { scoreTicker, evaluateCandidate, evaluateFiveSession, fiveSessionPending, normalizeConfig, SCORE_VERSION } = require("./scoring");
 const tickerAnalysis = require("./ticker-analysis");
 
 initializeApp();
@@ -251,7 +251,7 @@ async function updateEvaluations(db, historyByTicker, benchmarkBars) {
   const snapshot = await db.collection("screening_results").get();
   const pending = snapshot.docs.filter((item) => {
     const data = item.data();
-    return data?.evaluation?.complete !== true || (Number(data?.totalScore) > 90 && data?.fiveSessionEvaluation?.complete !== true);
+    return data?.evaluation?.complete !== true || fiveSessionPending(data);
   });
   if (!pending.length) return 0;
   let batch = db.batch();
@@ -263,7 +263,7 @@ async function updateEvaluations(db, historyByTicker, benchmarkBars) {
     if (!bars) continue;
     const update = { evaluatedAt: FieldValue.serverTimestamp() };
     if (data.evaluation?.complete !== true) update.evaluation = evaluateCandidate(data, bars, benchmarkBars);
-    if (Number(data.totalScore) > 90 && data.fiveSessionEvaluation?.complete !== true) {
+    if (fiveSessionPending(data)) {
       update.fiveSessionEvaluation = evaluateFiveSession(data, bars);
     }
     batch.update(item.ref, update);
@@ -432,7 +432,7 @@ async function runSlot(db, slot, date, token, chatId, settings) {
     ]);
     const pendingTickers = oldResultsSnap.docs.filter((item) => {
       const data = item.data();
-      return data?.evaluation?.complete !== true || (Number(data?.totalScore) > 90 && data?.fiveSessionEvaluation?.complete !== true);
+      return data?.evaluation?.complete !== true || fiveSessionPending(data);
     }).map((item) => item.data().ticker);
     const scan = await scanMarket({
       phase: slot.phase,

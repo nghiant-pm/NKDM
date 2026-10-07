@@ -68,8 +68,10 @@ screening_runs/{YYYY-MM-DD}      …, analysis (chép bộ thông số đã dùn
 screening_results/{YYYY-MM-DD_MÃ}  …, targetBuy? (mã theo dõi), evalWinPct, evalLossPct, evalSessions
                             (chép ngưỡng đo lúc đề cử — đổi thông số không chấm lại kết quả cũ)
                             fiveSessionEvaluation? { sessions, sessionsObserved, complete, entryPrice, exitDate,
-                            exitPrice, returnPct } — chỉ đề cử totalScore > 90: mua giả định giá đóng cửa ngày đề cử,
-                            chốt giá đóng cửa phiên thứ 5. Báo cáo chỉ tính lần đầu mỗi đợt (`fiveSessionSamples`)
+                            exitPrice, returnPct, closes[{date,close}] } — chỉ đề cử totalScore > 90: mua giả định giá
+                            đóng cửa ngày đề cử, chốt giá đóng cửa phiên thứ 5. `closes` = giá đóng cửa tới 20 phiên sau
+                            (từ 07/10/2026) để app chọn xem 3–20 phiên (`fiveSessionAt`); đủ 20 phiên mới thôi đo
+                            (`fiveSessionPending`). Báo cáo chỉ tính lần đầu mỗi đợt, đợt dài theo số phiên đang xem (`fiveSessionSamples`)
                             từ v1.1.0: foreignScore (0–10), foreign { status ok|missing|room-full, netBuyDays,
                             netSellDays, netRatioPct, netValue (VND) } — khối ngoại 5 phiên
 screening_slots/{YYYY-MM-DD_HHMM}  khoá mỗi khung giờ: status, phase, marketDate, notificationAttemptedAt…

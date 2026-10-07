@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { scoreTicker, evaluateCandidate, evaluateFiveSession, normalizeConfig, DEFAULT_CONFIG } = require("./scoring");
+const { scoreTicker, evaluateCandidate, evaluateFiveSession, fiveSessionPending, FORWARD_SESSIONS, normalizeConfig, DEFAULT_CONFIG } = require("./scoring");
 const { selectResults } = require("./index")._private;
 const { metrics, peerMedian, selectClosestPeers } = require("./ticker-analysis");
 
@@ -86,6 +86,15 @@ assert.equal(completedFive.returnPct, 10, "Lãi/lỗ tính từ giá lúc đề 
 const adjustedFive = evaluateFiveSession({ ...signal, totalScore: 91 }, [{ date: signal.date, close: 44 }, ...fiveSessionBars]);
 assert.equal(adjustedFive.entryPrice, 44, "Giá mua lấy cùng chuỗi giá với phiên 5 khi có");
 assert.equal(adjustedFive.returnPct, 25, "Lãi/lỗ tính trên giá mua cùng chuỗi giá");
+assert.equal(completedFive.closes.length, 6, "Chép giá đóng cửa mọi phiên đã có sau đề cử, không dừng ở phiên 5");
+assert.equal(completedFive.closes[5].close, 40, "Giá phiên 6 nằm trong chuỗi để app chọn số phiên");
+const longBars = Array.from({ length: 25 }, (_, i) => ({ date: `2026-04-${String(i + 1).padStart(2, "0")}`, close: 50 + i }));
+const longFive = evaluateFiveSession({ ...signal, totalScore: 91 }, longBars);
+assert.equal(longFive.closes.length, FORWARD_SESSIONS, "Chuỗi giá dừng ở phiên 20");
+assert.equal(fiveSessionPending({ totalScore: 91, fiveSessionEvaluation: longFive }), false, "Đủ 20 phiên thì thôi đo lại");
+assert.equal(fiveSessionPending({ totalScore: 91, fiveSessionEvaluation: completedFive }), true, "Đã chốt phiên 5 nhưng chưa đủ 20 phiên thì đo tiếp");
+assert.equal(fiveSessionPending({ totalScore: 91, fiveSessionEvaluation: { ...completedFive, closes: undefined } }), true, "Kết quả cũ chưa có chuỗi giá thì được điền bù");
+assert.equal(fiveSessionPending({ totalScore: 90 }), false, "Đúng 90 điểm không thuộc báo cáo");
 
 const targetMetrics = metrics("AAA", bars({ count: 90, start: 45, step: 0.1, volume: 1_000_000 }));
 assert.equal(targetMetrics.return5Pct, 0.94, "So sánh tính đúng biến động 5 phiên");

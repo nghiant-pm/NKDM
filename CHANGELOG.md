@@ -4,6 +4,17 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-07b (Chọn số phiên ở báo cáo đề cử trên 90 điểm)
+
+Owner muốn xem hiệu quả đề cử Cơ hội sau một số phiên tự chọn, không chỉ 5 phiên.
+
+- **Tab Cơ hội → Hiệu quả >90 điểm** có ô chọn **3–20 phiên** (mặc định 5). Đổi số phiên thì 4 ô tổng hợp (Đã đủ N phiên · Đang chờ · Có lãi · Lãi/lỗ bình quân) và từng dòng "Phiên N" tính lại theo số đó. Lựa chọn chỉ giữ trong lúc mở app, tải lại về 5.
+- **Gộp đợt** vẫn chỉ tính lần đầu khi một mã lên trên 90 điểm nhiều ngày liền; khoảng "cùng đợt" dài theo số phiên đang xem.
+- **Bot** chép thêm giá đóng cửa của **20 phiên** sau ngày đề cử (`fiveSessionEvaluation.closes`), đo tiếp tới khi đủ 20 phiên. Đề cử cũ được điền bù ở lượt sau đóng cửa gần nhất; trước đó chọn số phiên khác 5 thì mã cũ hiện "Chờ bot cập nhật". Lúc điền bù bot tính lại cả phần 5 phiên trên cùng chuỗi giá: % lãi/lỗ giữ nguyên, giá hiển thị có thể đổi nếu nguồn đã điều chỉnh theo cổ tức.
+- **Kiểm:** `npm run smoke` qua (thêm phép thử: chép đủ chuỗi giá, dừng ở 20 phiên, khi nào đo tiếp/điền bù). Dựng báo cáo với dữ liệu giả ở 375px, đổi 3/5/10/20 phiên: số đúng, gộp đợt đúng, ô chọn cao 44px, không tràn ngang.
+
+· `functions/scoring.js` · `functions/index.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-10-07 (Biểu đồ mã thêm đường MA10)
 
 Owner muốn thấy thêm MA10 cạnh MA20 / MA50 khi xem biểu đồ mã.
