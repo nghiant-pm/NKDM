@@ -1,6 +1,6 @@
 "use strict";
 
-const SCORE_VERSION = "v1.0.0";
+const SCORE_VERSION = "v1.1.0";
 const MIN_BARS = 60;
 
 /* Thông số owner chỉnh ở tab Chiến lược (`settings/screening.analysis`). Bản sao có chủ ý của
@@ -147,6 +147,33 @@ function liquidityRiskScore(bars, avgValue20) {
   return { score, volatilityPct, positiveDays };
 }
 
+/* Khối ngoại 5 phiên (VNDirect api-finfo) → điểm 0–10 cho chiều mua và chiều bán. Bản sao có chủ ý của
+   screenForeignFlow() trong public/index.html. Thiếu dữ liệu / hết room ngoại → trung lập 5, không thưởng không phạt.
+   `rows`: [{ date, netVal (VND), currentRoom, totalRoom }] tăng dần theo ngày. */
+const FOREIGN_SESSIONS = 5;
+const FOREIGN_NEUTRAL = 5;
+function foreignFlow(rows, bars) {
+  const empty = { buyScore: FOREIGN_NEUTRAL, sellScore: FOREIGN_NEUTRAL, netBuyDays: null, netSellDays: null, netRatioPct: null, netValue: null };
+  if (!Array.isArray(rows) || bars.length <= FOREIGN_SESSIONS) return { status: "missing", ...empty };
+  const recent = rows.filter((row) => row.date <= bars.at(-1).date).slice(-FOREIGN_SESSIONS);
+  // Cho phép nguồn chậm 1 phiên (lượt trong phiên trước khi VNDirect cập nhật ngày hôm nay).
+  if (recent.length < FOREIGN_SESSIONS || recent.at(-1).date < bars.at(-2).date) return { status: "missing", ...empty };
+  const netValue = recent.reduce((sum, row) => sum + row.netVal, 0);
+  const traded = bars.slice(-FOREIGN_SESSIONS).reduce((sum, bar) => sum + bar.close * 1000 * bar.volume, 0);
+  const netRatioPct = traded > 0 ? netValue / traded * 100 : 0;
+  const netBuyDays = recent.filter((row) => row.netVal > 0).length;
+  const netSellDays = recent.filter((row) => row.netVal < 0).length;
+  const facts = { netBuyDays, netSellDays, netRatioPct: round(netRatioPct), netValue: Math.round(netValue) };
+  const last = recent.at(-1);
+  if (last.totalRoom > 0 && last.currentRoom / last.totalRoom < 0.01) {
+    return { status: "room-full", ...facts, buyScore: FOREIGN_NEUTRAL, sellScore: FOREIGN_NEUTRAL };
+  }
+  const ratioPart = (pct) => pct >= 5 ? 6 : pct >= 2 ? 5 : pct > -2 ? 3 : pct > -5 ? 1 : 0;
+  return { status: "ok", ...facts,
+    buyScore: ratioPart(netRatioPct) + Math.min(4, netBuyDays),
+    sellScore: ratioPart(-netRatioPct) + Math.min(4, netSellDays) };
+}
+
 function fitScore(close, config) {
   if (close >= config.fitMin && close <= config.fitMax) return 10;
   if (close >= config.fitMin - 10 && close <= config.fitMax + 10) return 6;
@@ -166,17 +193,21 @@ function buildReasons(parts) {
     candidates.push({ weight: 30 + parts.pullback.score, text: "Điều chỉnh về MA20 và có dấu hiệu hồi phục" });
   }
   if (parts.breakout.volumeRatio >= 1.2) candidates.push({ weight: 15 + parts.breakout.volumeRatio, text: `Khối lượng phiên gần nhất gấp ${round(parts.breakout.volumeRatio, 1)} lần trung bình` });
+  if (parts.foreign.status === "ok" && parts.foreign.buyScore >= 8) {
+    candidates.push({ weight: 25, text: `Khối ngoại mua ròng ${parts.foreign.netBuyDays}/5 phiên gần nhất` });
+  }
   candidates.push({ weight: parts.avgValue20 >= 50_000_000_000 ? 10 : 5, text: `Thanh khoản TB20 khoảng ${Math.round(parts.avgValue20 / 1_000_000_000)} tỷ đồng/phiên` });
   const reasons = candidates.sort((a, b) => b.weight - a.weight).map((item) => item.text);
   const fallback = [
-    `Xu hướng kỹ thuật đạt ${parts.trend.score}/25 điểm`,
-    `Sức mạnh tương đối đạt ${parts.relativeStrength.score}/25 điểm`
+    `Xu hướng kỹ thuật đạt ${parts.trendPart}/20 điểm`,
+    `Sức mạnh tương đối đạt ${parts.strengthPart}/20 điểm`
   ];
   fallback.forEach((text) => { if (reasons.length < 2 && !reasons.includes(text)) reasons.push(text); });
   return reasons.slice(0, 3);
 }
 
-function scoreTicker(ticker, bars, benchmarkBars, config = DEFAULT_CONFIG) {
+/* v1.1.0: Xu hướng 25→20, Sức mạnh 25→20 (nhân 0,8), thêm Khối ngoại 10. Tổng vẫn 100. */
+function scoreTicker(ticker, bars, benchmarkBars, config = DEFAULT_CONFIG, foreignRows = null) {
   if (!Array.isArray(bars) || bars.length < MIN_BARS) return { eligible: false, reason: "insufficient-bars" };
   const cleanBars = bars.filter((bar) => [bar.open, bar.high, bar.low, bar.close, bar.volume].every(Number.isFinite));
   if (cleanBars.length < MIN_BARS) return { eligible: false, reason: "invalid-bars" };
@@ -190,24 +221,31 @@ function scoreTicker(ticker, bars, benchmarkBars, config = DEFAULT_CONFIG) {
   const pullback = pullbackScore(cleanBars, trend);
   const liquidityRisk = liquidityRiskScore(cleanBars, avgValue20);
   const priceFit = fitScore(cleanBars.at(-1).close, config);
+  const foreign = foreignFlow(foreignRows, cleanBars);
   const styleScore = Math.max(breakout.score, pullback.score);
-  const totalScore = trend.score + relativeStrength.score + styleScore + liquidityRisk.score + priceFit;
-  const parts = { trend, relativeStrength, breakout, pullback, liquidityRisk, avgValue20 };
+  const trendPart = round(trend.score * 0.8, 1);
+  const strengthPart = round(relativeStrength.score * 0.8, 1);
+  const totalScore = Math.round(trendPart + strengthPart + styleScore + liquidityRisk.score + priceFit + foreign.buyScore);
+  const parts = { trend, relativeStrength, breakout, pullback, liquidityRisk, avgValue20, foreign, trendPart, strengthPart };
   const riskFlags = [];
   if (liquidityRisk.volatilityPct > 6) riskFlags.push("Biến động ATR14 trên 6%");
   if (breakout.volumeRatio < 0.8) riskFlags.push("Khối lượng gần nhất thấp hơn trung bình");
+  if (foreign.status === "missing") riskFlags.push("Chưa có dữ liệu khối ngoại");
   return {
     eligible: totalScore >= config.minScore,
     ticker,
     date: cleanBars.at(-1).date,
     close: round(cleanBars.at(-1).close),
     totalScore,
-    trendScore: trend.score,
-    relativeStrengthScore: relativeStrength.score,
+    trendScore: trendPart,
+    relativeStrengthScore: strengthPart,
     breakoutScore: breakout.score,
     pullbackScore: pullback.score,
     liquidityRiskScore: liquidityRisk.score,
     priceFitScore: priceFit,
+    foreignScore: foreign.buyScore,
+    foreign: { status: foreign.status, netBuyDays: foreign.netBuyDays, netSellDays: foreign.netSellDays,
+      netRatioPct: foreign.netRatioPct, netValue: foreign.netValue },
     avgValue20: Math.round(avgValue20),
     atr14Pct: round(liquidityRisk.volatilityPct),
     excess20Pct: round(relativeStrength.excess20),
@@ -253,6 +291,32 @@ function evaluateCandidate(result, bars, benchmarkBars) {
   };
 }
 
+/* Số phiên tối đa lưu đường giá sau đề cử >90 điểm. Bản sao có chủ ý: HOLD_MAX_SESSIONS (public/index.html). */
+const HOLD_MAX_SESSIONS = 20;
+
+/* Báo cáo riêng cho đề cử trên 90 điểm: mua tại giá đóng cửa lúc đề cử. `path` lưu giá đóng cửa
+   từng phiên tới phiên 20 để app chọn phiên chốt bất kỳ (tìm điểm ngọt); các trường 5 phiên giữ
+   nguyên nghĩa cũ. Đo tiếp tới khi `pathComplete` — bản ghi cũ chưa có `path` được đo bù. */
+function evaluateFiveSession(result, bars) {
+  if (!(Number(result.totalScore) > 90)) return null;
+  // Giá mua lấy cùng chuỗi giá với phiên chốt: nguồn có điều chỉnh theo cổ tức thì hai đầu cùng điều chỉnh.
+  const entry = Number(bars.find((bar) => bar.date === result.date)?.close ?? result.close);
+  const future = bars.filter((bar) => bar.date > result.date).slice(0, HOLD_MAX_SESSIONS);
+  const complete = future.length >= 5;
+  const end = complete ? future[4] : null;
+  return {
+    sessions: 5,
+    sessionsObserved: Math.min(future.length, 5),
+    complete,
+    entryPrice: round(entry),
+    exitDate: end?.date || null,
+    exitPrice: complete ? round(end.close) : null,
+    returnPct: complete ? round(pctChange(entry, end.close)) : null,
+    path: future.map((bar) => ({ date: bar.date, close: round(bar.close) })),
+    pathComplete: future.length >= HOLD_MAX_SESSIONS
+  };
+}
+
 module.exports = {
   SCORE_VERSION,
   MIN_BARS,
@@ -260,6 +324,8 @@ module.exports = {
   normalizeConfig,
   scoreTicker,
   evaluateCandidate,
+  evaluateFiveSession,
+  HOLD_MAX_SESSIONS,
   decisionInputs: { round, average, sma, pctChange, returnForBars, atrPct, valueAverage20,
-    alignBenchmarkReturn, trendScore, relativeStrengthScore, breakoutScore, pullbackScore }
+    alignBenchmarkReturn, trendScore, relativeStrengthScore, breakoutScore, pullbackScore, foreignFlow }
 };
