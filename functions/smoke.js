@@ -1,8 +1,9 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const { scoreTicker, evaluateCandidate, normalizeConfig, DEFAULT_CONFIG } = require("./scoring");
+const { scoreTicker, evaluateCandidate, evaluateFiveSession, normalizeConfig, DEFAULT_CONFIG } = require("./scoring");
 const { selectResults } = require("./index")._private;
+const { metrics, peerMedian, selectClosestPeers } = require("./ticker-analysis");
 
 function dateAt(index) {
   const date = new Date(Date.UTC(2026, 0, 1 + index));
@@ -61,6 +62,72 @@ assert.equal(loose.priceFitScore, 10, "Vùng giá phù hợp đọc từ thông 
 const wide = evaluateCandidate({ ...signal, evalWinPct: 10, evalLossPct: 10, evalSessions: 5 }, future, benchmark);
 assert.equal(wide.primary, "timeout", "Ngưỡng đo đọc từ chính kết quả đã lưu");
 assert.equal(wide.complete, true, "Số phiên đo đọc từ chính kết quả đã lưu");
+
+const fiveSessionBars = [
+  { date: "2026-03-02", close: 50.5 },
+  { date: "2026-03-03", close: 51 },
+  { date: "2026-03-04", close: 52 },
+  { date: "2026-03-05", close: 51.5 },
+  { date: "2026-03-06", close: 55 },
+  { date: "2026-03-09", close: 40 }
+];
+assert.equal(evaluateFiveSession({ ...signal, totalScore: 90 }, fiveSessionBars), null, "Đúng 90 điểm không thuộc báo cáo >90");
+const newFive = evaluateFiveSession({ ...signal, totalScore: 91 }, []);
+assert.equal(newFive.complete, false, "Chưa có phiên sau đề cử thì vẫn ở trạng thái chờ");
+assert.equal(newFive.sessionsObserved, 0, "Bắt đầu theo dõi từ 0/5 phiên");
+const waitingFive = evaluateFiveSession({ ...signal, totalScore: 91 }, fiveSessionBars.slice(0, 4));
+assert.equal(waitingFive.complete, false, "Chưa đủ 5 phiên thì tiếp tục chờ");
+assert.equal(waitingFive.sessionsObserved, 4, "Đếm đúng số phiên đã quan sát");
+const completedFive = evaluateFiveSession({ ...signal, totalScore: 91 }, fiveSessionBars);
+assert.equal(completedFive.complete, true, "Đủ phiên thứ 5 thì chốt kết quả");
+assert.equal(completedFive.exitDate, "2026-03-06", "Chỉ dùng đúng phiên thứ 5");
+assert.equal(completedFive.exitPrice, 55, "Giá thoát là giá đóng cửa phiên thứ 5");
+assert.equal(completedFive.returnPct, 10, "Lãi/lỗ tính từ giá lúc đề cử");
+const adjustedFive = evaluateFiveSession({ ...signal, totalScore: 91 }, [{ date: signal.date, close: 44 }, ...fiveSessionBars]);
+assert.equal(adjustedFive.entryPrice, 44, "Giá mua lấy cùng chuỗi giá với phiên 5 khi có");
+assert.equal(adjustedFive.returnPct, 25, "Lãi/lỗ tính trên giá mua cùng chuỗi giá");
+
+const targetMetrics = metrics("AAA", bars({ count: 90, start: 45, step: 0.1, volume: 1_000_000 }));
+assert.equal(targetMetrics.return5Pct, 0.94, "So sánh tính đúng biến động 5 phiên");
+assert.equal(targetMetrics.return20Pct, 3.85, "So sánh tính đúng biến động 20 phiên");
+assert.equal(targetMetrics.return60Pct, 12.53, "So sánh tính đúng biến động 60 phiên");
+const peerRows = [0.2, 0.5, 0.8, 1.1, 1.5, 2, 5].map((ratio, index) => ({
+  ...targetMetrics, ticker:`P${index}`, avgValue20:targetMetrics.avgValue20 * ratio
+}));
+peerRows.push({ ...targetMetrics, ticker:"AAA" });
+peerRows.push({ ...targetMetrics, ticker:"OLD", date:"2025-01-01" });
+const closest = selectClosestPeers(targetMetrics, peerRows);
+assert.equal(closest.length, 5, "Chỉ lấy tối đa 5 mã tương đương");
+assert.ok(!closest.some((row) => row.ticker === "AAA" || row.ticker === "OLD"), "Loại chính mã đang chấm và mã lệch ngày");
+assert.deepEqual(closest.map((row) => row.ticker), ["P3", "P2", "P4", "P1", "P5"], "Ưu tiên mã gần thanh khoản theo tỷ lệ");
+assert.equal(peerMedian([{ return20Pct:1 }, { return20Pct:5 }, { return20Pct:3 }]).return20Pct, 3, "Trung vị nhóm được tính đúng");
+
+// Khối ngoại 5 phiên: mua ròng đều được cộng, bán ròng đều bị trừ, thiếu/hết room thì trung lập 5.
+const { foreignFlow } = require("./scoring").decisionInputs;
+const flowBars = bars(); // ~75 tỷ/phiên → 5 phiên ~375 tỷ
+const flowRows = (net, room = 1e8) => flowBars.slice(-5).map((bar) => ({ date: bar.date, netVal: net, currentRoom: room, totalRoom: 1e9 }));
+const buying = foreignFlow(flowRows(5e9), flowBars);
+assert.equal(buying.status, "ok", "Đủ 5 phiên khớp ngày thì chấm");
+assert.equal(buying.buyScore, 10, "Mua ròng 5/5 phiên, ~6,7% giá trị → đủ 10 điểm mua");
+assert.equal(buying.sellScore, 0, "Mua ròng đều → không có áp lực bán từ khối ngoại");
+assert.equal(foreignFlow(flowRows(-5e9), flowBars).sellScore, 10, "Bán ròng đều → áp lực bán tối đa");
+assert.equal(foreignFlow(flowRows(5e9, 1e6), flowBars).status, "room-full", "Hết room ngoại → trung lập");
+assert.equal(foreignFlow(flowRows(5e9, 1e6), flowBars).buyScore, 5, "Hết room ngoại không được cộng điểm");
+assert.equal(foreignFlow(null, flowBars).buyScore, 5, "Không có dữ liệu → trung lập 5");
+assert.equal(foreignFlow(flowRows(5e9).slice(0, 3), flowBars).status, "missing", "Thiếu phiên thì không chấm");
+const lagged = flowRows(5e9).map((row, i, all) => ({ ...row, date: i ? all[i - 1].date : dateAt(84) }));
+assert.equal(foreignFlow(lagged, flowBars).status, "ok", "Nguồn chậm 1 phiên vẫn dùng được");
+const neutralTotal = scoreTicker("TEST", breakout, benchmark).totalScore;
+assert.ok(scoreTicker("TEST", breakout, benchmark, DEFAULT_CONFIG, flowRows(1e10)).totalScore === neutralTotal + 5,
+  "Khối ngoại mua mạnh cộng thêm 5 so với trung lập");
+assert.ok(strong.riskFlags.includes("Chưa có dữ liệu khối ngoại"), "Thiếu dữ liệu khối ngoại phải báo cờ");
+const { scoreDecision, POLICY } = require("./decision-scoring");
+const decision = scoreDecision({ ticker: "TEST", bars: breakout, benchmark, sector: { available: false, strength: 0 },
+  position: { qty: 100, avgCost: 40 }, targetBuy: null, strategy: { buyDrop: 2, sellRise: 3 }, foreignRows: flowRows(-1e10), phase: "post" });
+assert.equal(decision.buyParts.foreign, 0, "Điểm Mua: khối ngoại bán ròng mạnh → 0");
+assert.equal(decision.sellParts.foreign, 10, "Áp lực Bán: khối ngoại bán ròng mạnh → 10");
+Object.entries(POLICY.buyWeights).forEach(([key, max]) => assert.ok(decision.buyParts[key] <= max, `Phần Mua ${key} không vượt ${max}`));
+Object.entries(POLICY.sellWeights).forEach(([key, max]) => assert.ok(decision.sellParts[key] <= max, `Phần Bán ${key} không vượt ${max}`));
 
 // Khung giờ: giờ Việt Nam = UTC+7, Scheduler có thể trễ vài giây.
 const { slotAt, slotEnabled, marketDateFor, telegramHeader } = require("./index")._private;

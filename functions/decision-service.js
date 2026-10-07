@@ -119,6 +119,7 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
       const bars = r.value.filter((b) => b.date <= marketDate);
       if (bars.at(-1)?.date === marketDate) histories.set(symbols[i], bars);
     });
+    const foreignByTicker = await helpers.fetchForeign(targets, marketDate);
     const strategy = activeStrategy(docs(3), marketDate);
     const knownTickers = [...new Set([...targets, ...Object.values(D.SECTORS).flatMap((s) => s.split(" "))])];
     const news = await collectNews(db, knownTickers, Object.keys(D.SECTORS), helpers.mapWithConcurrency, now)
@@ -135,7 +136,8 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
       const matched = news.items.filter((n) => n.tickers?.includes(ticker) || (sector.name && n.sector === sector.name));
       const row = D.scoreDecision({ ticker, bars, benchmark, sector, position,
         targetBuy: Number.isFinite(watch[ticker]?.targetBuy) ? watch[ticker].targetBuy : null,
-        strategy, news: news.aiReady && !["source-error", "ai-error"].includes(news.status) ? matched : [], phase: effectivePhase });
+        strategy, news: news.aiReady && !["source-error", "ai-error"].includes(news.status) ? matched : [],
+        foreignRows: foreignByTicker.get(ticker), phase: effectivePhase });
       if (!row) return null;
       row.newsStatus = news.status; row.newsCoverage = news.coverage; row.newsAiReady = news.aiReady;
       row.sourceNews = matched.map(({ text, ...n }) => n).slice(0, 8);

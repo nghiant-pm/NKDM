@@ -8,7 +8,8 @@ const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const UNIVERSE = require("./universe");
-const { scoreTicker, evaluateCandidate, normalizeConfig, SCORE_VERSION } = require("./scoring");
+const { scoreTicker, evaluateCandidate, evaluateFiveSession, normalizeConfig, SCORE_VERSION } = require("./scoring");
+const tickerAnalysis = require("./ticker-analysis");
 
 initializeApp();
 setGlobalOptions({ region: "asia-southeast1", maxInstances: 1 });
@@ -114,6 +115,37 @@ async function fetchHistory(ticker, historyDays = HISTORY_DAYS, maxAttempts = 2)
   throw new Error(`${ticker}: lỗi nguồn dữ liệu sau ${maxAttempts} lần thử (${lastError?.message || lastError})`);
 }
 
+/* Khối ngoại theo ngày — VNDirect máy chủ api-finfo (đo từ Cloud Function 06/10/2026: 104 mã một lần gọi, <0,6 giây).
+   Bản sao có chủ ý của screenFetchForeign() trong public/index.html. Lỗi nguồn → Map rỗng, điểm khối ngoại
+   tính trung lập; không làm hỏng lượt chấm. Trả Map mã → [{ date, netVal, currentRoom, totalRoom }] tăng dần. */
+const FOREIGN_API = "https://api-finfo.vndirect.com.vn/v4/foreigns";
+async function fetchForeign(tickers, marketDate) {
+  const out = new Map();
+  const codes = [...new Set(tickers)].filter((ticker) => /^[A-Z0-9]{3,10}$/.test(ticker));
+  const from = new Date(Date.parse(`${marketDate}T00:00:00Z`) - 25 * 86400000).toISOString().slice(0, 10);
+  for (let i = 0; i < codes.length; i += 100) {
+    const chunk = codes.slice(i, i + 100);
+    const url = `${FOREIGN_API}?sort=tradingDate&q=code:${chunk.join(",")}~tradingDate:gte:${from}&size=${chunk.length * 30}`;
+    try {
+      const response = await fetch(url, { headers: { accept: "*/*", "user-agent": "Mozilla/5.0 (Fin2-Screener)" }, signal: AbortSignal.timeout(15000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (!Array.isArray(data?.data)) throw new Error("không có dữ liệu");
+      data.data.forEach((row) => {
+        const item = { date: String(row.tradingDate || "").slice(0, 10), netVal: Number(row.netVal),
+          currentRoom: Number(row.currentRoom), totalRoom: Number(row.totalRoom) };
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(item.date) || !Number.isFinite(item.netVal)) return;
+        if (!out.has(row.code)) out.set(row.code, []);
+        out.get(row.code).push(item);
+      });
+    } catch (error) {
+      logger.warn("Không lấy được khối ngoại", { codes: chunk.length, error: String(error?.message || error) });
+    }
+  }
+  out.forEach((rows) => rows.sort((a, b) => a.date.localeCompare(b.date)));
+  return out;
+}
+
 async function mapWithConcurrency(items, limit, worker) {
   const output = new Array(items.length);
   let cursor = 0;
@@ -217,7 +249,10 @@ async function sendTelegram(token, chatId, text) {
 
 async function updateEvaluations(db, historyByTicker, benchmarkBars) {
   const snapshot = await db.collection("screening_results").get();
-  const pending = snapshot.docs.filter((item) => item.data()?.evaluation?.complete !== true);
+  const pending = snapshot.docs.filter((item) => {
+    const data = item.data();
+    return data?.evaluation?.complete !== true || (Number(data?.totalScore) > 90 && data?.fiveSessionEvaluation?.complete !== true);
+  });
   if (!pending.length) return 0;
   let batch = db.batch();
   let writes = 0;
@@ -226,7 +261,12 @@ async function updateEvaluations(db, historyByTicker, benchmarkBars) {
     const data = item.data();
     const bars = historyByTicker.get(data.ticker);
     if (!bars) continue;
-    batch.update(item.ref, { evaluation: evaluateCandidate(data, bars, benchmarkBars), evaluatedAt: FieldValue.serverTimestamp() });
+    const update = { evaluatedAt: FieldValue.serverTimestamp() };
+    if (data.evaluation?.complete !== true) update.evaluation = evaluateCandidate(data, bars, benchmarkBars);
+    if (Number(data.totalScore) > 90 && data.fiveSessionEvaluation?.complete !== true) {
+      update.fiveSessionEvaluation = evaluateFiveSession(data, bars);
+    }
+    batch.update(item.ref, update);
     writes += 1;
     total += 1;
     if (writes === 400) { await batch.commit(); batch = db.batch(); writes = 0; }
@@ -306,10 +346,11 @@ async function scanMarket({ phase, date, held, watchlist, extraTickers, config =
   const missingRatio = failures.length / symbols.length;
   if (missingRatio > MAX_MISSING_RATIO) throw new Error(`Thiếu dữ liệu ${failures.length}/${symbols.length} mã (${Math.round(missingRatio * 100)}%)`);
 
+  const foreignByTicker = await fetchForeign([...historyByTicker.keys()], marketDate);
   const scored = [];
   historyByTicker.forEach((bars, ticker) => {
     if (held.has(ticker) && !watchlist.has(ticker)) return;
-    const result = scoreTicker(ticker, bars, benchmarkBars, config);
+    const result = scoreTicker(ticker, bars, benchmarkBars, config, foreignByTicker.get(ticker));
     if (!result.eligible) return;
     if (!watchlist.has(ticker)) { scored.push({ ...result, group: "new" }); return; }
     const targetBuy = Number(watchlist.get(ticker));
@@ -348,6 +389,9 @@ async function recordOfficialRun(db, date, scan, oldResultsSnap) {
       evalLossPct: old?.evalLossPct || config.lossPct,
       evalSessions: old?.evalSessions || config.evalSessions,
       evaluation: old?.evaluation || { primary: "pending", resolvedDate: null, sessionsObserved: 0, complete: false, return20Pct: null, excess20Pct: null },
+      ...(Number(row.totalScore) > 90 ? {
+        fiveSessionEvaluation: old?.fiveSessionEvaluation || evaluateFiveSession({ ...row, date }, [])
+      } : {}),
       createdAt: old?.createdAt || FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
     });
@@ -386,7 +430,10 @@ async function runSlot(db, slot, date, token, chatId, settings) {
       db.collection("watchlist").get(),
       db.collection("screening_results").get()
     ]);
-    const pendingTickers = oldResultsSnap.docs.filter((item) => item.data()?.evaluation?.complete !== true).map((item) => item.data().ticker);
+    const pendingTickers = oldResultsSnap.docs.filter((item) => {
+      const data = item.data();
+      return data?.evaluation?.complete !== true || (Number(data?.totalScore) > 90 && data?.fiveSessionEvaluation?.complete !== true);
+    }).map((item) => item.data().ticker);
     const scan = await scanMarket({
       phase: slot.phase,
       date,
@@ -441,19 +488,33 @@ exports.screenShortTermOpportunities = onSchedule({
 });
 
 exports._private = {
-  dateInZone, slotAt, slotEnabled, marketDateFor, parseHistory, fetchHistory, mapWithConcurrency,
+  dateInZone, slotAt, slotEnabled, marketDateFor, parseHistory, fetchHistory, fetchForeign, mapWithConcurrency,
   heldTickers, rank, selectResults, watchGapText, telegramHeader, telegramText, scanMarket, SLOTS
 };
 
 // Điểm thử nghiệm độc lập với bot Telegram; có thể chạy dù owner tắt mọi khung nhận tin.
 const { runDecision } = require("./decision-service");
-const decisionHelpers = { fetchHistory, mapWithConcurrency };
+const decisionHelpers = { fetchHistory, fetchForeign, mapWithConcurrency };
 exports.refreshDecisionScores = onCall({ timeoutSeconds: 540, memory: "512MiB", cors: true }, async (request) => {
   if (request.auth?.token?.email !== "nghiant@youmed.vn" || request.auth.token.email_verified !== true) {
     throw new HttpsError("permission-denied", "Không có quyền truy cập");
   }
   try { return await runDecision(getFirestore(), decisionHelpers); }
   catch (error) { logger.error("decision scores", error); throw new HttpsError("unavailable", "Chưa cập nhật được điểm quyết định"); }
+});
+exports.analyzeTicker = onCall({ timeoutSeconds: 120, memory: "256MiB", cors: true }, async (request) => {
+  if (request.auth?.token?.email !== "nghiant@youmed.vn" || request.auth.token.email_verified !== true) {
+    throw new HttpsError("permission-denied", "Không có quyền truy cập");
+  }
+  const ticker = String(request.data?.ticker || "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(ticker)) throw new HttpsError("invalid-argument", "Mã cổ phiếu không hợp lệ");
+  try {
+    const settings = (await getFirestore().collection("settings").doc("screening").get()).data();
+    return await tickerAnalysis.analyzeTicker({ ticker, config: normalizeConfig(settings?.analysis), fetchHistory, fetchForeign, mapWithConcurrency });
+  } catch (error) {
+    logger.error("ticker analysis", { ticker, error });
+    throw new HttpsError("unavailable", "Chưa phân tích được mã này");
+  }
 });
 exports.closeDecisionScores = onSchedule({ schedule: "30 9-15 * * 1-5", timeZone: TIME_ZONE,
   timeoutSeconds: 540, memory: "512MiB", retryCount: 0 }, async () => {
