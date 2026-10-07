@@ -4,6 +4,16 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-07 (Biểu đồ mã thêm đường MA10)
+
+Owner muốn thấy thêm MA10 cạnh MA20 / MA50 khi xem biểu đồ mã.
+
+- Popup Biểu đồ vẽ thêm **MA10** (nét đứt, màu cam; nền tối dùng cam sáng hơn cho dễ nhìn). Chú thích dưới biểu đồ và ô hiện số khi chạm/rê đều có MA10.
+- Chỉ hiển thị, không đổi tín hiệu, điểm hay Firestore.
+- Kiểm tra trên bản thử với dữ liệu giả lập, khổ điện thoại 375px: đủ 3 đường, chú thích một hàng, không tràn ngang.
+
+· `public/index.html` · `CHANGELOG.md`
+
 ## 2026-10-06 (Khối ngoại vào chấm điểm — Cơ hội v1.1.0, Điểm quyết định v1.2.0)
 
 Owner hỏi tài liệu TCBS OpenAPI có gì về doanh nghiệp dùng được cho chấm điểm. Đọc hết tài liệu: mục "Tra cứu thông tin chứng khoán" chỉ là thông tin niêm yết (trạng thái cảnh báo/kiểm soát, margin, room ngoại), không có báo cáo tài chính; dữ liệu thị trường hữu ích là **khối ngoại** và **mua/bán chủ động**, nhưng mọi API TCBS đều cần phiên iOTP (đo: 401 nếu thiếu) nên bot không tự gọi được. Owner chọn đưa khối ngoại vào CẢ HAI bộ điểm bằng cách **chia lại trọng số**, mua/bán chủ động để sau.
