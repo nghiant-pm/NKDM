@@ -4,6 +4,137 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-12b (Bấm "Mã" để bật/tắt chia ngành)
+
+Owner thấy chia ngành làm sắp theo lãi/lỗ chỉ còn xếp trong từng ngành. Nay chữ **Mã** ở đầu mỗi bảng là nút bật/tắt chia ngành
+(màu brand = đang bật), thay cho sắp theo mã. Tắt thì bảng về như trước: sắp theo cột trên toàn bảng, kéo thả tự do.
+Mỗi bảng (Nắm giữ / Theo dõi) bật/tắt riêng, nhớ theo máy (`fin2-sector-off`). Lựa chọn "sắp theo mã" đã lưu trước đây bị bỏ.
+
+· `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-12 (Cổ tức cổ phiếu không còn méo biểu đồ · Bảng mã chia theo ngành)
+
+- **Lệnh mua giá 0,1 = nhận cổ tức cổ phiếu** (FPT, TCX…): biểu đồ không vẽ điểm M cho lệnh này và không kéo trục giá xuống
+  gần 0 nữa. Nhật ký ghi "Nhận cổ tức 1000 FPT" (tóm tắt ngày: "Cổ tức N"). Số CP và giá vốn vẫn tính như cũ.
+- **Bảng Nắm giữ và Theo dõi chia theo nhóm ngành**: dòng tiêu đề ngành có số mã; bảng Nắm giữ thêm tổng giá trị + lãi/lỗ chưa bán
+  của ngành, ngành nhiều vốn nhất lên đầu. Bấm tiêu đề để gập/mở (nhớ theo máy). "Khác" luôn cuối.
+- Ngành lấy theo rổ ngành sẵn có của bot; mã ngoài rổ (như TCX) vào "Khác" — sửa ở menu ⋯ của dòng → **Đổi ngành**
+  (ghi `tickers/{MÃ}.sector`, để trống = quay về rổ mặc định). Sắp theo cột vẫn chạy trong từng ngành; kéo thả chỉ trong cùng ngành.
+
+· `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-09b (orderflow-v2.1.0: Cung cầu có nền ngày trước, không phải chờ 30 phút)
+
+Owner đề xuất đưa dữ liệu các ngày trước vào và quét 5 phút/lần để có nhận xét liên tục. Claude phản biện: giữ nhịp **mỗi phút**
+(thưa mẫu thì mù kê/rút lệnh, chống nhảy thành 15'; thời gian chờ do luật 30 phút chứ không do nhịp quét) và **không trộn mẫu
+phút qua đêm** (sổ lệnh xoá sau mỗi phiên) — ngày trước chỉ làm nền. Owner chọn phương án C:
+- **Sửa lỗi nền 5 phiên đứng yên** (#021): nay làm mới mỗi ngày. Phiên máy đã tự thu đủ mẫu (≥150 phút) dùng dữ liệu tự thu
+  (khớp chủ động cả ngày + cân bằng sổ lệnh 3 mức); phiên thiếu dùng dư mua/dư bán Người Quan Sát. Phiên gần hơn nặng hơn.
+- **Khung 30 phút nối qua nghỉ trưa**: 13:00 nối tiếp 11:30 → hết cảnh chờ tới 13:30.
+- **Nhận xét sơ bộ từ phút thứ 15** (~9:15): điểm trộn giữa hôm nay và nền theo số phút đã có/30 (15 phút ≈ nửa nền);
+  lý do ghi "(sơ bộ)", Chi tiết mã ghi "Sơ bộ · N phút hôm nay + nền 5 phiên trước". Đủ 30 phút thì như v2.0.0.
+- Đo hiệu quả theo phút giao dịch (nối qua trưa); sự kiện v2.0.0 cũ vẫn tiếp tục được đo 20 phiên; sự kiện mới ghi `provisional`.
+- Ghi seed vào `orderflow_daily` không còn gửi `samples: []` (trước đây có thể xoá mẫu tự thu nếu chạy lại).
+
+· `functions/orderflow.js` · `functions/orderflow-service.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `ISSUES.md` · `CHANGELOG.md`
+
+## 2026-10-09 (Biểu đồ mã: điểm mua/bán hiện đủ, đúng ngày)
+
+Owner thấy điểm M/B trên biểu đồ chỗ có chỗ không. Gốc: app so GIỜ của lệnh (12:00 trưa VN) với giờ nến VPS (07:00 sáng VN)
+→ lệnh ngày cuối khung luôn bị loại; lệnh có giá ngoài khung giá đóng cửa cũng bị ẩn.
+- Gắn lệnh theo NGÀY vào đúng nến; lệnh sau nến cuối (dữ liệu chưa cập nhật) dồn về nến cuối.
+- Khung giá trục dọc tính cả giá các lệnh → không còn lệnh bị ẩn ("giao dịch ngoài khung giá" bỏ).
+- Nhiều lệnh cùng ngày cùng chiều gộp một điểm (giá bình quân). Chữ M luôn dưới điểm, B luôn trên.
+- Chạm/rê vào ngày có lệnh: tooltip hiện "Mua 200 CP · 45.20".
+
+· `public/index.html` · `CHANGELOG.md`
+
+## 2026-10-08c (Cung cầu: vùng mua/bán bám giá mới nhất)
+
+Owner thấy FPT đã xuống 59,4 mà vùng mua vẫn 59,6–60. Gốc: vùng được bot tính theo giá lúc đó (vùng luôn dưới giá bot thấy),
+nhưng app ghép với giá mới hơn lấy từ nút lấy giá mà không kiểm tra lệch — nhất là sau 14:45 / nghỉ trưa khi bot không chạy.
+Owner chọn A (chỉ sửa app, không nâng version bot):
+- Giá app lấy SAU lượt tính của bot mà đã tốt hơn mức đề xuất (mua: thấp hơn · bán: cao hơn) → giá đề xuất = giá app,
+  cắt phần vùng đã bị vượt, kèm "giá hiện đã thấp/cao hơn mức đề xuất". Nút Đặt điền theo giá này.
+- Nhận xét cũ quá 5 phút ghi kèm "tính lúc HH:MM".
+- Một chỗ duy nhất: `orderflowRefit()` gọi trong `orderflowAdvice` → bảng mã, Khuyến nghị, Chi tiết mã, log `signals` cùng thấy.
+
+· `public/index.html` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-08b (Mã vừa mua: Chờ hàng)
+
+Owner: mã mới mua phải chờ hàng về (T+2) mới bán được nên khuyến nghị mua/bán trong lúc chờ không có ý nghĩa.
+- Mã còn lô chưa về tài khoản và chưa có CP nào bán được (theo `sellableAt`: 11:35 ngày làm việc thứ hai, chỉ loại T7/CN) → cột Mua/Bán hiện **Chờ hàng**,
+  phần mở rộng hiện "Chờ hàng · về 11:35 dd/mm" thay cảnh báo T+ và dòng cung cầu; Chi tiết mã cũng vậy.
+- Mã đó **không ra tín hiệu** mua/bán (Khuyến nghị, log `signals` khi Lưu nhật ký); xuất dữ liệu ghi `trangThaiNguong: "cho-hang"`.
+- Còn lô cũ đã về (owner chốt): **vẫn khuyến nghị bán**, tối đa số CP bán được; cột Mua/Bán hiện ngưỡng bán, chiều mua vẫn Chờ hàng.
+  Hàng về thì tự trở lại bình thường. Chặn chung qua `awaitingBlocks(mã, chiều)`.
+
+· `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-08 (orderflow-v2.0.0: Cung cầu tinh chỉnh trên mốc T+)
+
+Owner thấy khuyến nghị cung cầu dính sát giá vốn. Gốc: máy lấy giá vốn ±1% làm điểm kích hoạt thay vì mốc T+, và gợi ý giá
+ngược chiều (phe bán áp đảo lại gợi ý bán giá cao hơn). Owner chốt 1A · 2A · 3A:
+- **Mốc = mốc T+** (giá vốn −2/+3 theo tab Chiến lược; mã watchlist = giá kỳ vọng). Máy cung cầu chỉ nhận xét khi giá đã tới mốc:
+  bên mua *Mua ngay* (lực bán đã yếu) hoặc *Chờ giá thấp hơn* (lực bán trong ngày còn mạnh, gợi ý mức đỡ trong 3% dưới mốc);
+  bên bán *Bán ngay* (cầu đã yếu) hoặc *Giữ thêm* (cầu còn mạnh, gợi ý mức cản trong 3% trên mốc). Giá "ngay" không kém mốc T+.
+- **Khuyến nghị gộp một dòng mỗi mã**: dòng T+ kèm nhãn cung cầu; nút Đặt điền sẵn giá cung cầu (chờ/giữ → giá tốt hơn).
+  Bỏ nhóm "Cung cầu" riêng — hết rủi ro bấm Đặt hai lần cùng mã. `signals` T+ chép thêm `flowVerdict`/`flowPrice`/`flowZone*`/`flowReason`/`orderflowVersion`.
+- Giữ sàn an toàn: không bán dưới giá vốn +1%, mua thêm ≤ giá vốn −1%. Đổi nhận xét phải lặp 3 phút liên tiếp.
+- Sự kiện đo hiệu quả có 4 loại: Mua ngay / Bán ngay (đo 15/30/60' + 20 phiên), Chờ / Giữ thêm (đo giá tốt hơn có tới trong 30').
+- Công thức mốc T+ phía server gom về `tplusLevels()` (`decision-service.js`), dùng chung cho Điểm quyết định và cung cầu.
+
+· `functions/orderflow.js` · `functions/orderflow-service.js` · `functions/decision-service.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-07f (Chạy song song T+ và Cung cầu)
+
+Owner thấy thay hẳn T+ bằng cung cầu chưa đọc được giá trị — giữ lại cả hai.
+- **T+ trở lại y như trước**: ngưỡng −2/+3 ở cột Mua/Bán và cảnh báo "Sắp mua/bán" trên bảng mã, ô sửa ngưỡng ở tab Chiến lược,
+  ngưỡng trong Chi tiết mã và trên biểu đồ, tín hiệu T+ + giá kỳ vọng watchlist, xuất dữ liệu ngưỡng.
+- **Cung cầu chạy song song**: dòng trạng thái ở phần mở rộng của bảng mã + mục Cung cầu trong Chi tiết mã.
+- Khuyến nghị chia 3 nhóm **T+ · Cung cầu · Đã đặt**; hai máy cùng báo một mã thì hiện hai dòng riêng.
+- Tín hiệu cung cầu lưu với id `ngày_mã_loại_cungcau` + `engine` để không ghi đè tín hiệu T+ cùng mã cùng ngày; xuất dữ liệu ghi rõ máy.
+- Điểm quyết định ghi lại sự kiện đối chứng của ngưỡng T+ (legacy) như trước.
+- Dòng Cung cầu ở bảng mã **luôn hiện giá tối ưu** kể cả khi Chờ: "Mua tối ưu 58,7 (58,5–58,9) · Bán tối ưu 60,2 (…)"; mã đang giữ mà giá chưa qua ±1% giá vốn thì hiện "Mua thêm khi ≤ …" / "Bán khi ≥ …". Ngoài giờ hiện giá phiên gần nhất kèm ngày. Chỉ để tham khảo — khuyến nghị thật vẫn chỉ khi máy báo Mua/Bán.
+
+· `public/index.html` · `functions/decision-service.js` · `CLAUDE.md` · `CHANGELOG.md`
+
+## 2026-10-07e (orderflow-v1.2.0: vùng giá tối ưu + Mua thêm dưới giá vốn 1%)
+
+Owner thấy giá đề xuất chỉ là giá hiện tại. Gốc: VPS chỉ có 3 mức giá mỗi bên, cách giá khớp 1–3 bước giá.
+- Giá Mua/Bán đề xuất giờ lấy trong **vùng tối ưu cách giá hiện tại tối đa 3%**, gộp ba nguồn: mức khớp nhiều trong phiên
+  (≥10% khối lượng ngày), lệnh treo bền 3/5 mẫu, và đáy/đỉnh 5–20 phiên + 3 mức đóng cửa có khối lượng lớn nhất (nến VNDirect,
+  tính một lần mỗi ngày, làm tròn về bước giá HOSE). Mức trùng nhiều nguồn được ưu tiên; bằng nhau thì chọn mức gần giá hiện tại.
+- Mã đang giữ chỉ **Mua thêm khi giá thấp hơn giá vốn TB ít nhất 1%**; vùng Mua không vượt giá vốn −1%, vùng Bán không dưới +1%.
+- Khuyến nghị, dòng mã và Chi tiết mã hiện vùng giá + giá đề xuất + nguồn. `signals` có thêm `zoneLow`/`zoneHigh`.
+- Nâng `orderflow-v1.2.0` — đối chứng 20 phiên tính lại. Deploy sau giờ giao dịch, chạy thật từ phiên 08/10/2026.
+
+· `functions/orderflow.js` · `functions/orderflow-service.js` · `functions/index.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-07d (orderflow-v1.1.0: không bao giờ khuyến nghị bán lỗ)
+
+Owner thử thấy VPI ra "Giảm rủi ro" (bán khi đang lỗ) — không chấp nhận.
+- Bỏ hẳn hành động **Giảm rủi ro**. Bán chỉ khi giá hiện tại và giá đề xuất cao hơn giá vốn TB **ít nhất 1%** (đã gồm thuế 0,1%).
+  Áp lực bán khi chưa đủ lãi chỉ hiện cảnh báo trong Chi tiết mã kèm mức giá cần đạt.
+- App chặn thêm một lớp: không hiện Bán nếu giá đề xuất không cao hơn giá vốn đang thấy ở app, kể cả dữ liệu bản cũ.
+- Nâng `orderflow-v1.1.0` — bộ đếm 20 phiên đối chứng tính lại từ hôm nay. Giá đề xuất vẫn sát giá hiện tại (VPS chỉ có 3 mức) — làm ở bản sau.
+
+· `functions/orderflow.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `CHANGELOG.md`
+
+## 2026-10-07c (Khuyến nghị theo cung–cầu orderflow-v1.0.0)
+
+- Khuyến nghị chính chuyển từ ngưỡng giá vốn sang cung–cầu: VPS chụp 3 mức mua/bán mỗi phút trong phiên; Người Quan Sát cấp nền dư mua/dư bán và khối lượng trung bình lệnh của 5 phiên. Nút lấy giá của app vẫn gọi VPS thẳng từ trình duyệt; callable `getMarketQuotes` có sẵn nhưng chỉ chuyển sang khi đã xác nhận Cloud Function gọi được VPS (#012).
+- Máy chỉ phát **Mua / Bán / Giảm rủi ro** khi đủ 5 phiên nền, 30 mẫu liên tục và các điều kiện điểm, chênh lệch, độ bền, rủi ro kê/rút. Thiếu/lỗi/cũ hiện **Chờ / Đang học**. Mã Giữ chỉ hiện cảnh báo áp lực bán trong chi tiết, không vào Khuyến nghị bán.
+- Giữ một vòng đời lệnh Đặt/Bỏ qua → Khớp/Hủy. `signals` giữ `kind=buy|sell`, bổ sung `action`, `orderflowVersion`, độ tin cậy, giá đề xuất, lý do và rủi ro kê/rút. Số lượng vẫn đọc `lotSize`.
+- Điểm quyết định v1.2.0 tiếp tục chạy bóng; ngưỡng giá vốn cũ không sinh khuyến nghị/sự kiện mới nhưng dữ liệu, phiên bản chiến lược và phép tính lịch sử vẫn giữ nguyên.
+- Tỷ lệ phủ 80% tính trên 30 phút đồng hồ (mẫu buổi sáng không bù cho buổi chiều); thiếu dữ liệu thì về Chờ ngay, không giữ hành động cũ. Mã đang giữ hiện **Mua thêm**. Popup Chi tiết mã và biểu đồ bỏ ngưỡng −2/+3. Bảng mã dùng cùng điều kiện với Khuyến nghị (mã Giữ không tô Bán, thiếu giá đề xuất thì Chờ). Xuất dữ liệu có thêm hành động, phiên bản máy, độ tin cậy. Mã nằm sàn/trần (sổ lệnh một bên) không còn bị bỏ qua (#020).
+- Thêm `orderflow_daily/latest/events/versions/control`; owner chỉ đọc, Cloud Function mới được ghi. Sự kiện đo hướng 15/30/60 phút, khả năng chạm giá 30 phút và kết quả +6%/−3% trong 20 phiên.
+- Kiểm nguồn thật **từ Cloud Function** 07/10/2026 phiên chiều: 24/24 mã có sổ lệnh VPS mỗi phút, đủ 5 phiên nền Người Quan Sát. Deploy Functions trước (12:05), giao diện sau khi thu đủ 30 phút.
+- Kiểm nguồn ban đầu: VPS trả đủ 3 tầng sổ lệnh; Người Quan Sát trả đủ 5 phiên gần nhất. Smoke kiểm đủ dữ liệu, thiếu dữ liệu, tường lệnh bị rút, Giảm rủi ro và mã Giữ.
+
+· `functions/orderflow.js` · `functions/orderflow-service.js` · `functions/index.js` · `functions/decision-service.js` · `functions/smoke.js` · `public/index.html` · `firestore.rules` · `ISSUES.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-10-07b (Chọn số phiên ở báo cáo đề cử trên 90 điểm)
 
 Owner muốn xem hiệu quả đề cử Cơ hội sau một số phiên tự chọn, không chỉ 5 phiên.

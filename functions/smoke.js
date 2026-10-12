@@ -138,6 +138,104 @@ assert.equal(decision.sellParts.foreign, 10, "Áp lực Bán: khối ngoại bá
 Object.entries(POLICY.buyWeights).forEach(([key, max]) => assert.ok(decision.buyParts[key] <= max, `Phần Mua ${key} không vượt ${max}`));
 Object.entries(POLICY.sellWeights).forEach(([key, max]) => assert.ok(decision.sellParts[key] <= max, `Phần Bán ${key} không vượt ${max}`));
 
+// Cung-cầu v2.0.0: tinh chỉnh trên mốc T+. Đủ 30 mẫu + 5 phiên nền mới có nhận xét; tường mua kê rồi rút = lực bán còn mạnh.
+const orderflow = require("./orderflow");
+const bookSample = (index, bid, ask, side = "B", totalVolume = index * 1000) => ({
+  ticker:"HPG", capturedAt:new Date(Date.UTC(2026, 9, 7, 2, index)).toISOString(), price:50 + index * .01,
+  totalVolume, lastVolume:1000, side,
+  bids:[{ price:49.9, quantity:bid }, { price:49.8, quantity:bid * .7 }, { price:49.7, quantity:bid * .5 }],
+  asks:[{ price:50.1, quantity:ask }, { price:50.2, quantity:ask * .7 }, { price:50.3, quantity:ask * .5 }]
+});
+const flow = (samples, extra = {}) => orderflow.scoreOrderflow({ samples, seedSessions:5, ...extra });
+const buyingBooks = Array.from({ length:30 }, (_, index) => bookSample(index, 100000 + index * 4000, 10000));
+const sellingBooks = Array.from({ length:30 }, (_, index) => bookSample(index, 10000, 100000 + index * 4000, "S"));
+// Giá hiện tại 50,29. Mã theo dõi giá kỳ vọng 51 → đã tới mốc mua.
+assert.equal(flow(buyingBooks).action, "wait", "Không có mốc T+ thì máy cung cầu không tự ra hành động");
+const buyNow = flow(buyingBooks, { buyAt:51 });
+assert.equal(buyNow.action, "buy", "Tới mốc mua và lực bán yếu phải ra Mua ngay");
+assert.ok(buyNow.suggestedPrice <= 50.29, "Mua ngay không trả cao hơn giá hiện tại");
+assert.equal(flow(buyingBooks, { buyAt:50 }).action, "wait", "Giá chưa về mốc mua thì chưa có hành động");
+assert.equal(flow(buyingBooks, { buyAt:50 }).buyAdvice.verdict, "now", "Chưa tới mốc vẫn có sẵn nhận xét để app ghép vào dòng T+");
+assert.ok(flow(buyingBooks, { buyAt:50 }).buyAdvice.price <= 50, "Giá mua không bao giờ cao hơn mốc T+");
+assert.equal(flow(buyingBooks.slice(16), { buyAt:51 }).buyAdvice, null, "Chưa đủ 15 phút thì không có nhận xét");
+const early = flow(buyingBooks.slice(1), { buyAt:51 });
+assert.ok(early.ready && early.provisional && /sơ bộ/.test(early.buyAdvice.reason), "Đủ 15 phút nhưng chưa đủ 30 phút là nhận xét sơ bộ");
+assert.equal(buyNow.provisional, false, "Đủ 30 phút thì không còn sơ bộ");
+assert.equal(flow(buyingBooks, { buyAt:51, seedSessions:4 }).buyAdvice, null, "Thiếu 5 phiên nền thì không có nhận xét");
+const buyWait = flow(sellingBooks, { buyAt:51 });
+assert.equal(buyWait.action, "buy-wait", "Tới mốc mua nhưng lực bán còn mạnh phải Chờ");
+assert.ok(buyWait.suggestedPrice < 50.29 && buyWait.suggestedPrice >= 50.29 * .97, "Chờ mua phải gợi ý giá thấp hơn, trong 3%");
+const fakeWall = buyingBooks.slice(0, 29).concat(bookSample(29, 1000, 10000, "S", 29001));
+const fakeScore = flow(fakeWall, { buyAt:51 });
+assert.ok(fakeScore.buySpoofRisk > 40, "Tường mua bị rút phải vượt ngưỡng rủi ro");
+assert.equal(fakeScore.action, "buy-wait", "Tường mua biến mất = cầu giả, không được Mua ngay");
+const withSupport = flow(sellingBooks, { buyAt:51, levels:{ support:[49.5], resistance:[] } });
+assert.equal(withSupport.suggestedPrice, 49.5, "Mốc hỗ trợ nhiều phiên trong 3% được ưu tiên hơn lệnh treo");
+const farSupport = flow(sellingBooks, { buyAt:51, levels:{ support:[45], resistance:[] } });
+assert.ok(farSupport.zone.low > 48.7, "Mốc xa hơn 3% không vào vùng");
+// Mã đang giữ giá vốn 47, mốc bán 50 → đã tới mốc bán.
+const sellHold = flow(buyingBooks, { held:true, avgCost:47, sellAt:50 });
+assert.equal(sellHold.action, "sell-hold", "Tới mốc bán nhưng cầu còn mạnh phải Giữ thêm");
+assert.ok(sellHold.suggestedPrice > 50.29 && sellHold.suggestedPrice <= 50.29 * 1.03, "Giữ thêm phải gợi ý giá bán cao hơn, trong 3%");
+const sellNow = flow(sellingBooks, { held:true, avgCost:47, sellAt:50 });
+assert.equal(sellNow.action, "sell", "Tới mốc bán và cầu yếu phải Bán ngay");
+assert.ok(sellNow.suggestedPrice >= 50.29, "Bán ngay không thấp hơn giá hiện tại");
+// Không bao giờ khuyến nghị bán lỗ: kể cả mốc T+ đặt thấp, giá bán ≥ giá vốn +1%.
+const lossSell = flow(sellingBooks, { held:true, avgCost:55, sellAt:50 });
+assert.notEqual(lossSell.action, "sell", "Dưới giá vốn không được ra Bán");
+assert.ok(lossSell.sellAdvice.price >= 55 * 1.01, "Giá bán luôn từ giá vốn +1%");
+// Mua thêm chỉ ≤ giá vốn −1%.
+assert.equal(flow(buyingBooks, { held:true, avgCost:52, buyAt:50.5 }).action, "buy", "Tới mốc mua thêm và lực bán yếu phải Mua ngay");
+const costCap = flow(buyingBooks, { held:true, avgCost:50.5, buyAt:51 });
+assert.notEqual(costCap.action, "buy", "Giá chưa thấp hơn giá vốn 1% không được Mua thêm");
+assert.ok(costCap.buyAdvice.price <= 50.5 * .99, "Giá mua thêm luôn ≤ giá vốn −1%");
+const blocked = flow(sellingBooks, { held:true, avgCost:40, sellAt:43, hold:true });
+assert.equal(blocked.sellAdvice, null, "Mã Giữ không có nhận xét bán");
+assert.equal(blocked.action, "wait", "Mã Giữ không được phát Bán");
+// Chống nhảy: đổi nhận xét phải lặp 3 lần liên tiếp; thiếu dữ liệu thì bỏ ngay.
+let smoothed = orderflow.nextState(buyNow, buyWait);
+assert.equal(smoothed.action, "buy", "Một lần đo ngược chiều chưa được đổi nhận xét");
+smoothed = orderflow.nextState(orderflow.nextState(smoothed, buyWait), buyWait);
+assert.equal(smoothed.action, "buy-wait", "Ba lần liên tiếp thì đổi sang Chờ");
+assert.equal(orderflow.nextState(buyNow, flow(buyingBooks.slice(16), { buyAt:51 })).action, "wait", "Thiếu dữ liệu không được giữ hành động cũ");
+const levelBars = Array.from({ length:25 }, (_, index) => ({ date:"2026-09-" + String(index + 1).padStart(2, "0"),
+  open:50, high:52 + index * .01, low:48 - index * .01, close:49.03, volume:1000 })).concat({ date:"2026-10-07", open:50, high:60, low:40, close:50, volume:1 });
+const levels = orderflow.sessionLevels(levelBars, "2026-10-07");
+assert.equal(levels.low20, orderflow.toTick(48 - 24 * .01), "Đáy 20 phiên không lấy nến hôm nay");
+assert.equal(levels.nodes[0], 49.05, "Giá lịch sử lẻ phải làm tròn về bước giá");
+// Mã nằm sàn (bên mua trống) vẫn phải đọc được sổ lệnh.
+const floorQuote = orderflow.parseVpsQuote({ sym:"PNJ", lastPrice:18.75, r:20.15, lot:3693380, side:"S",
+  g1:"0.0|0|d", g2:"0.0|0|d", g3:"0.0|0|d", g4:"18.75|373360|f", g5:"18.8|4380|d", g6:"18.85|1370|d" });
+assert.ok(floorQuote && floorQuote.bids.length === 0 && floorQuote.asks.length === 3, "Mã nằm sàn vẫn có dữ liệu cung cầu");
+// Tỷ lệ phủ tính trên 30 phút đồng hồ: rơi rớt quá 20% hoặc mẫu buổi sáng bù cho buổi chiều đều phải Chờ.
+const thinned = buyingBooks.filter((_, index) => index % 3 !== 1);
+assert.equal(orderflow.scoreOrderflow({ samples:thinned, seedSessions:5 }).ready, false, "Chỉ 20/30 phút có mẫu phải Chờ");
+const afterLunch = buyingBooks.concat(Array.from({ length:10 }, (_, index) => ({ ...bookSample(29, 130000, 10000),
+  capturedAt:new Date(Date.UTC(2026, 9, 7, 6, index)).toISOString() })));
+assert.equal(orderflow.scoreOrderflow({ samples:afterLunch, seedSessions:5 }).ready, false, "Mẫu 9 giờ không được đếm bù cho đầu phiên chiều");
+// v2.1.0: khung 30 phút nối qua nghỉ trưa — 11:00–11:29 + 13:00–13:04 là đủ 30 phút liên tục.
+const lunchBridge = Array.from({ length:35 }, (_, index) => ({ ...bookSample(index, 100000 + index * 4000, 10000),
+  capturedAt:new Date(Date.UTC(2026, 9, 7, index < 30 ? 4 : 6, index < 30 ? index : index - 30)).toISOString() }));
+const bridged = orderflow.scoreOrderflow({ samples:lunchBridge, seedSessions:5 });
+assert.ok(bridged.ready && !bridged.provisional, "Đầu phiên chiều nối với cuối phiên sáng, không phải chờ tới 13:30");
+const lunchRefresh = { capturedAt:new Date(Date.UTC(2026, 9, 7, 5)).toISOString() };
+assert.equal(orderflow.minuteOf(lunchRefresh), orderflow.minuteOf(lunchBridge[29]) + 1, "Mẫu giờ nghỉ trưa dồn về 11:30");
+const learning = orderflow.nextState({ action:"buy", orderflowVersion:orderflow.VERSION },
+  orderflow.scoreOrderflow({ samples:buyingBooks.slice(16), seedSessions:5 }));
+assert.equal(learning.action, "wait", "Thiếu dữ liệu không được giữ hành động cũ");
+// Nền các phiên trước: phiên gần nặng hơn; tự thu chưa đủ mẫu thì không tin; sơ bộ nghiêng theo nền, đủ 30 phút gần như không.
+assert.equal(orderflow.baselineLean([{ date:"2026-10-06", lean:-1 }, { date:"2026-10-07", lean:1 }]), 0.333, "Phiên gần hơn nặng hơn");
+assert.equal(orderflow.baselineLean([{ date:"2026-10-07", buyRemaining:300, sellRemaining:100, avgBuyOrder:1, avgSellOrder:1 }]), 0.35,
+  "Nền cũ chưa có độ nghiêng thì tính từ dư mua/dư bán");
+assert.equal(orderflow.sessionLean(buyingBooks), null, "Phiên tự thu dưới 150 mẫu không dùng làm nền");
+const fullDay = Array.from({ length:200 }, (_, index) => bookSample(index, 50000, 10000, "B", index * 1000));
+assert.ok(orderflow.sessionLean(fullDay) > 0, "Phiên tự thu nghiêng mua cho độ nghiêng dương");
+const earlySell = sellingBooks.slice(14);
+const leanBuy = flow(earlySell, { baselineLean:1 }), leanSell = flow(earlySell, { baselineLean:-1 });
+assert.ok(leanBuy.provisional && leanBuy.buyScore - leanSell.buyScore > 40, "Sơ bộ: nền chiếm phần lớn điểm");
+assert.ok(flow(sellingBooks, { baselineLean:1 }).buyScore - flow(sellingBooks, { baselineLean:-1 }).buyScore <= 10.01,
+  "Đủ 30 phút: nền chỉ cộng/trừ tối đa 5 điểm");
+
 // Khung giờ: giờ Việt Nam = UTC+7, Scheduler có thể trễ vài giây.
 const { slotAt, slotEnabled, marketDateFor, telegramHeader } = require("./index")._private;
 const vnTime = (hhmmss) => new Date(`2026-09-24T${hhmmss}+07:00`);

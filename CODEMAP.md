@@ -6,14 +6,14 @@
 public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                         ├── firebase-app.js       initializeApp
                         ├── firebase-auth.js      Google Sign-In
-                        └── firebase-firestore.js đọc 13 collection;
-                            2 collection screening chỉ đọc
+                        └── firebase-firestore.js đọc dữ liệu danh mục + 5 collection orderflow chỉ đọc
                         └── firebase-functions.js callable refreshDecisionScores,
                             analyzeTicker (tickerAnalysisApi — chỉ gửi mã),
                             readTcbsPortfolio (tcbsReadApi — chỉ gửi iOTP)
                       Google Fonts (Inter 400/500)
                       bgapidatafeed.vps.com.vn   giá thị trường (chỉ đọc,
-                        chỉ gửi đi danh sách MÃ — không gửi SL hay số dư)
+                        chỉ gửi đi danh sách MÃ — không gửi SL hay số dư).
+                        Callable getMarketQuotes đã có ở server, CHƯA dùng tới khi xác nhận #012
                       histdatafeed.vps.com.vn    lịch sử OHLCV theo ngày;
                         gọi khi owner mở biểu đồ hoặc bấm Quét ngay;
                         kết quả quét tay không lưu vào Firestore
@@ -26,6 +26,8 @@ public/index.html ──> Firebase JS SDK 10.12.5 (ESM, gstatic CDN)
                                                  fin2-sort-*    (cột / chiều sort 2 bảng mã)
                                                  fin2-order-*   (thứ tự mã do owner kéo thả)
                                                  fin2-collapsed (section nào đang gập)
+                                                 fin2-sector-collapsed (nhóm ngành đang gập ở 2 bảng mã)
+                                                 fin2-sector-off (bảng nào đang TẮT chia ngành — bấm chữ "Mã")
                                                  fin2-skip-highlight (tín hiệu Bỏ qua ở Khuyến nghị, hết hạn theo ngày)
                         ⚠️ các khoá này thuộc về MÁY, không đồng bộ giữa thiết bị
                       tải file .json xuống máy   downloadExport() — không gửi
@@ -39,6 +41,9 @@ functions/index.js ──> Firebase Functions v2 · Node.js 22
                         ├── tcbs-service.js: readTcbsPortfolio (callable owner, CHỈ ĐỌC)
                         │    └── openapi.tcbs.com.vn  iOTP → phiên → tài sản/tiền/lệnh khớp → bỏ phiên;
                         │        API Key + mã lưu ký ở Secret Manager; không ghi Firestore
+                        ├── orderflow-service.js: VPS 3 tầng giá + nền 5 phiên (tự thu, thiếu thì Người Quan Sát), làm mới mỗi ngày
+                        │    └── orderflow.js: công thức cố định orderflow-v2.1.0 (tinh chỉnh trên mốc T+, sơ bộ từ phút 15)
+                        │        collectOrderflow mỗi phút trong phiên; không Telegram
                         ├── lịch mỗi 30 phút 8:00–20:30 T2–T6, Asia/Ho_Chi_Minh;
                         │   chỉ chạy thật ở khung giờ owner bật (settings/screening)
                         ├── functions/scoring.js  chấm điểm + đánh giá 20 phiên;
@@ -61,7 +66,7 @@ Không có bundler. Logic danh mục vẫn ở `public/index.html`.
 
 - Client import thêm Firebase Functions SDK, gọi `refreshDecisionScores` sau nút lấy giá chung; server xác thực email owner + email_verified. Công thức chỉ server, không có bản sao ở client.
 - `scoreDecision` trả `buyScore`, `sellScore` (null nếu chưa có lãi/chưa giữ), `buyParts`, `sellParts`, `sector`, `market`, `newsImpact`, `reasons`, `riskFlags`, ngưỡng chiến lược đã dùng. `rankDecisions` xếp riêng hai chiều; ≥`POLICY.threshold` (80) là đáng chú ý, mỗi dòng chép `threshold`. Mọi ngưỡng trong `POLICY` cố định theo version, cố ý không đọc tab Chiến lược. Thiếu rổ ngành thì phần Thị trường lấy trọn từ VN-Index (thang 20 từ v1.2.0). Từ v1.2.0 có thêm `foreign` (khối ngoại 0–10 ở cả Mua và Bán, qua `foreignFlow`) và cờ "Chưa có dữ liệu khối ngoại". `sectorContext` dùng các mã cùng rổ (trừ chính mã), tối thiểu 2 mã có đủ 60 phiên cùng ngày; đây là rổ nội bộ, không phải chỉ số ngành chính thức.
-- `runDecision` đọc vị thế/chiến lược/tin, tải lịch sử qua chính `fetchHistory` VNDirect, chấm và lưu; khoá `decision_control/runtime` chống chạy đồng thời. Mặc định và chọn phiên bản trong `decision-service.activeStrategy` phải khớp `public/index.html.activeStrategy`; `holdings` phải khớp giá vốn/số lượng của `computeLedger`. Không lưu/gửi danh mục tới AI, chỉ gửi tin công khai và danh sách mã/ngành.
+- `runDecision` đọc vị thế/chiến lược/tin, tải lịch sử qua chính `fetchHistory` VNDirect, chấm và lưu; khoá `decision_control/runtime` chống chạy đồng thời. Mặc định và chọn phiên bản trong `decision-service.activeStrategy` phải khớp `public/index.html.activeStrategy`; `holdings` phải khớp giá vốn/số lượng của `computeLedger`; `tplusLevels` (mốc T+, dùng cả cho máy cung cầu) phải khớp `strategyLevels`. Không lưu/gửi danh mục tới AI, chỉ gửi tin công khai và danh sách mã/ngành.
 - `decision_versions/{scoreVersion}` lưu policy và rổ ngành lần đầu; đổi công thức tăng version. `decision_latest/{TICKER}` kết quả gần nhất; `decision_runs/{marketDate_time}` trạng thái/phiên thử/rank gọn; `decision_snapshots/{runId_TICKER}` đủ thành phần/bối cảnh mỗi lần chấm; doc `date_post` đầu tiên thành công được giữ nguyên, lượt sau lưu id riêng.
 - `decision_events/{date_TICKER_kind_engine_version}` lưu sự kiện mới (`engine=decision`) và mốc so sánh chiến lược cũ (`engine=legacy`), tối đa một lần/ngày/mã/chiều/engine/version. Chỉ lượt sau đóng cửa (`post`) tạo sự kiện, khi vượt ngưỡng từ dưới lên; cờ `buyAbove/sellAbove/legacyBuyAbove/legacySellAbove` trong `decision_latest` chỉ đổi ở lượt `post` (`aboveFlags`). `evaluateDecision` đo nến SAU ngày đề cử theo policy chép trong sự kiện, đối xứng hai chiều (Bán đúng khi −winPct trước +lossPct); hai ngưỡng cùng phiên không đoán đường đi. Chỉ đo/đếm sự kiện cùng `scoreVersion` hiện tại.
 - `decision_news/{hashUrl}` tin công khai + nguồn/thời gian/nội dung/chứng cứ/phân loại; `decision_control/news` cache 1 giờ, trạng thái AI và độ phủ. Nguồn hiện có: RSS công bố tổ chức phát hành và công bố từ Sở của HNX. Lỗi tin = tác động 0; chưa có AI không đoán cảm xúc bằng từ khóa. Chưa bao phủ hết HOSE/ngành (#014).
@@ -108,7 +113,7 @@ Tầng 3 của mã: nút "Chi tiết" (`detailButton`) hoặc dòng điểm ở 
 | | `computeLedger(transactions)` `computeHoldings(transactions)` | duyệt giao dịch theo thứ tự `date_createdAt`, trả vị thế và từng sự kiện lãi/lỗ bán sau thuế. Mỗi vị thế giữ `cycleRealizedPnl`; bán hết đặt lại chu kỳ để tính Giá vốn sau lướt khi mua lại |
 | | `computeCashVND(transactions, cashflows)` | Σ nạp − Σ rút − Σ mua + Σ bán − thuế bán |
 | | `netCapitalVND(cashflows)` | vốn nạp ròng = Σ nạp − Σ rút, BỎ "adjust" (lệch đối chiếu TCBS không phải vốn) → `#s-net-capital`; Lãi/lỗ từ đầu = `summary.total` − vốn nạp ròng → `#s-total-pnl` |
-| | `sellableAt(dateStr)` `computeSellAvailability(transactions,ticker,now)` | tính số CP được bán từ 11:35 ngày làm việc thứ hai sau ngày mua; chỉ loại T7/CN. Trừ mọi lệnh bán đã ghi và không chặn submit |
+| | `sellableAt(dateStr)` `computeSellAvailability(transactions,ticker,now)` | tính số CP được bán từ 11:35 ngày làm việc thứ hai sau ngày mua; chỉ loại T7/CN. Trừ mọi lệnh bán đã ghi và không chặn submit. `awaitingShares(ticker)` + `awaitingBlocks(ticker,side)` → còn lô chưa về thì chặn chiều mua; chiều bán chỉ chặn khi chưa CP nào bán được (bảng mã/`buildSignals`/`orderflowAdvice`) |
 | | `currentPriceFor(ticker, avgCost)` | lấy `tickers.lastPrice`, **không có thì rơi về avgCost** (⇒ lãi/lỗ = 0, không phải lỗi) |
 | | `computeSummary()` | gộp tất cả, trả tiền mặt, tổng tài sản, lãi/lỗ chưa bán, vị thế kèm `netCost` và danh sách sự kiện bán để dashboard lọc theo kỳ |
 | | `unrealizedPnlScope(summary)` | giữ nguyên summary gốc; khi tuỳ chọn bật thì lọc mã `hold` khỏi riêng tổng lãi/lỗ chưa bán và tỷ suất đi kèm ở cả Gọn lẫn Đầy đủ |
@@ -121,6 +126,8 @@ Tầng 3 của mã: nút "Chi tiết" (`detailButton`) hoặc dòng điểm ở 
 | | `watchLatestMove(ticker)` `watchProximity(ticker,watch,meta,strategy)` | lấy lần ghi giá liền trước và trả trạng thái "Chuẩn bị mua" khi giá hiện tại còn cao hơn mục tiêu không quá `watchNearRange` đồng thời thấp hơn giá trước. Thiếu giá trước hoặc đã đạt mục tiêu thì không trả trạng thái |
 | | `priceTickers(held)` | danh sách mã cần lấy/nhập giá = mã đang giữ **+** mã trong `watchlist` |
 | Vẽ | `render()` | **cửa duy nhất** — mọi thay đổi dữ liệu đều đi qua đây rồi gọi các hàm con |
+| | `sectorOf(ticker)` `defaultSector(ticker)` `sectorGroups(group,rows,rowHtml,summary)` `editSector(ticker)` | nhóm ngành 2 bảng mã (12/10/2026): `TICKER_SECTORS` là bản sao rổ `SECTORS` của bot, `tickers/{MÃ}.sector` gán đè (menu ⋯ → Đổi ngành; để trống/trùng rổ = bỏ gán), ngoài rổ → "Khác". `sectorGroups` chia dòng đã lọc/sắp theo ngành, giữ thứ tự trong ngành; nắm giữ xếp ngành theo tổng giá trị, tiêu đề có giá trị + lãi/lỗ chưa bán; "Khác" cuối. Gập/mở theo máy (`fin2-sector-collapsed`). Kéo thả chỉ trong cùng ngành (`data-sector`). Chữ "Mã" đầu bảng = `toggleSectorMode(group)` bật/tắt chia ngành (`sectorGroupOn`, `fin2-sector-off`), KHÔNG còn sắp theo mã; tắt thì sắp cột/kéo thả trên toàn bảng |
+| | `isStockDividend(t)` | lệnh MUA giá ≤ 0,1 = cổ tức cổ phiếu owner ghi vào sổ: vẫn tính số CP/giá vốn; biểu đồ bỏ điểm M + không tính vào trục giá; nhật ký ghi "Nhận cổ tức" |
 | | `renderCompact(s)` `compactRows(rows,group)` | dashboard Gọn gồm đúng 4 chỉ số dùng chung công thức với Đầy đủ; hai bảng tìm/lọc/sort như cũ. Tên mã mở biểu đồ. Dòng mã nắm giữ hiện tuổi vị thế, cảnh báo gần ngưỡng và hành động mua/bán khi đã đạt; khi `strategyAlert` có cảnh báo thì cột Mua / Bán ưu tiên cùng chiều đó, chỉ chưa có cảnh báo mới chọn theo biến động trong ngày. Watchlist giữ highlight riêng qua `watchProximity` |
 | | `renderDashboardDetails(summary,data)` `renderSellForecast(summary)` `renderRangeSwitches()` | Đầy đủ vẽ phân nhóm, lãi/lỗ đã chốt theo mã và ba kịch bản chốt lời; đồng bộ bộ chọn kỳ ở cả hai view |
 | | `renderAdvice(s)` | khối **Khuyến nghị** `#advice-section` (chuyển slot `compact-advice-slot` ↔ `full-advice-slot` trong `showView`): tín hiệu hôm nay từ `buildSignals` chưa có lệnh gắn và chưa khớp đủ → nút **Đặt** (`data-place-signal` → `openOrderDialog`) / **Bỏ qua** (`fin2-skip-highlight`); lệnh `openOrders()` → **Khớp** (`openFillDialog`) / **Hủy**. Sự kiện gắn trên `#advice-section`. Gập/mở bằng `initCollapse` (`data-sec="khuyen-nghi"`) như các section khác |
@@ -181,6 +188,7 @@ Tầng 3 của mã: nút "Chi tiết" (`detailButton`) hoặc dòng điểm ở 
 | File | Hàm | Việc |
 |---|---|---|
 | `index.js` | `screenShortTermOpportunities` | chạy mỗi 30 phút T2–T6; `slotAt` ra khung giờ, `slotEnabled` đọc `settings/screening` (thiếu doc = chỉ 16:00). Khung tắt thì thoát ngay |
+| | `collectOrderflow` `refreshOrderflow` `getMarketQuotes` | thu cung-cầu mỗi phút trong hai phiên; callable owner chạy tay/đọc quote chuẩn hóa. Độc lập Telegram |
 | | `analyzeTicker` | callable chỉ email owner đã xác minh; nhận mã 3 chữ, đọc `settings/screening.analysis`, chuẩn hoá rồi gọi `ticker-analysis.analyzeTicker`. Chỉ trả kết quả, không ghi Firestore hay tạo tín hiệu |
 | | `runSlot(db,slot,date,…)` `acquireSlot(db,date,slot)` | khoá `screening_slots/{ngày}_{khung}` — mỗi khung gửi Telegram đúng một lần; ngày nghỉ ghi `holiday`, không nhắn |
 | | `scanMarket({phase,date,held,watchlist,extraTickers,config})` `marketDateFor(phase,date,bars)` | tải + chấm, KHÔNG ghi gì. `pre` chấm theo phiên gần nhất đã đóng; `intraday`/`post` cần nến hôm nay (nến trong phiên chưa đóng → tin ghi “tạm tính”). `watchlist` là Map mã → giá kỳ vọng; dòng theo dõi mang theo `targetBuy` |
@@ -201,6 +209,8 @@ Tầng 3 của mã: nút "Chi tiết" (`detailButton`) hoặc dòng điểm ở 
 | `universe.js` | `UNIVERSE` | danh sách khoảng 100 mã thanh khoản cao dùng làm tập ứng viên ban đầu; watchlist và mã cũ đang chờ đánh giá được ghép thêm lúc chạy |
 | `smoke.js` | các ca kiểm nhanh | kiểm bứt phá, thanh khoản yếu, mã ngoài vùng 40–70 vẫn được xét, hai ngưỡng cùng phiên, không nhìn dữ liệu tương lai, chọn theo từng nhóm, dòng khoảng cách giá kỳ vọng, thông số sai rơi về mặc định, ngưỡng đo đọc từ kết quả; phép đo 5 phiên kiểm đủ các mốc 90/91 điểm, 0/4/5 phiên và không dùng phiên thứ 6 |
 | `tcbs-service.js` | `readPortfolio(request,secrets)` | thân của callable `readTcbsPortfolio` (khai trong `index.js`, gắn secret `TCBS_API_KEY`, `TCBS_CUSTODY_CODE`). Chỉ đúng email owner đã xác minh. Đổi iOTP lấy phiên (`exchangeToken`), lấy tiểu khoản cổ phiếu thường `NORMAL` (`activeNormalAccounts`, bỏ margin/phái sinh), đọc `/se`, `/cashInvestments`, lệnh khớp; trả `{readAt, accounts (che số), positions, cash, trades, tradesComplete}` rồi bỏ phiên. Không ghi Firestore, không log phiên |
+| `orderflow-service.js` | `runOrderflow` `ensureSeeds` `ensureLevels` `fetchVpsQuotes` `fetchNqsHistory` `evaluateOrderflowEvents` | server là nơi duy nhất đọc/parsing VPS; nền 5 phiên làm mới mỗi ngày (`ensureSeeds`: ngày theo Người Quan Sát, phiên tự thu ≥150 mẫu dùng dữ liệu tự thu), gom mẫu ngày, chấm latest, ghi một event khi đổi sang hành động và đánh giá 15/30/60 phút giao dịch + 20 phiên (mọi event v2.x) |
+| `orderflow.js` | `scoreOrderflow` `nextState` `priceZone` `sessionLevels` `minuteOf` `baselineLean` `sessionLean` `nqsLean` | công thức `orderflow-v2.1.0`: khung 30 phút GIAO DỊCH (`minuteOf` nối qua nghỉ trưa); 15–29 phút = sơ bộ, điểm trộn với nền `baselineLean` theo số phút/30; điểm 30/25/25/20, phạt kê/rút tối đa 30 điểm; nhận xét trên mốc T+ (`buyAt`/`sellAt`): mua now/wait theo lực bán, bán now/hold theo cầu; giá ngay không kém mốc, chờ/giữ gợi ý mức tốt hơn ≤3% (khớp nhiều + lệnh treo bền + mốc 5–20 phiên); sàn giá vốn ±1%; đổi nhận xét sau 3 mẫu. Đổi công thức phải nâng version |
 | | `readTrades(token,accountNo)` `normalizeTrade(row)` `execIso(value)` | đọc `/matching-details` từng trang (tối đa 20 × 50), gộp theo `tradeId`; giá VND → nghìn đồng; giờ khớp không có múi giờ → hiểu là giờ VN. Chưa rõ TCBS trả bao xa (#015) |
 | | `normalizeAssets` `normalizeCash` `aggregatePositions(rows)` | đổi giá vốn VND → nghìn đồng; cộng nhiều tiểu khoản, giá vốn bình quân gia quyền; tiền giữ VND nguyên (#016) |
 | `backtest.js` | `main()` | walk-forward lịch sử để đo công thức trước khi bật; chỉ dùng dữ liệu có tại ngày chấm, nhưng vẫn có sai lệch sống sót vì dùng universe hiện tại |
@@ -231,6 +241,11 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 | `screening_results` | `watchRef` query 250 kết quả gần nhất → `renderScreeningHub`, `buildExport`; query riêng `totalScore > 90` (không giới hạn) → `renderFiveSessionReport` | Cloud Function `recordOfficialRun`, `updateEvaluations`; kết quả trên 90 điểm có thêm `fiveSessionEvaluation`; client không được ghi | ✅ chỉ owner đọc |
 | `screening_slots` | (client chưa đọc) | Cloud Function `acquireSlot`, `runSlot`, `markFailure` | ✅ chỉ owner đọc |
 | `settings` | `watch("settings")` → `screeningSlotOn`, `renderScreeningSlots`, `screeningConfig`, `renderScreeningSettings`; bot đọc trong `screenShortTermOpportunities` | `toggleScreeningSlot`, `saveScreeningSettings` (`setDoc settings/screening`, `merge`) | ✅ |
+| `orderflow_daily` | server đọc mẫu theo ngày; client không tải | `runOrderflow` ghi mẫu phút/tổng hợp và seed ngày | ✅ chỉ owner đọc |
+| `orderflow_latest` | `watch("orderflow_latest")` → `orderflowAdvice` (qua `orderflowRefit`: giá app mới hơn đã vượt mức đề xuất thì bám giá app; cũ >5' ghi giờ tính) → bảng mã, Khuyến nghị (nhãn trên dòng T+), popup chi tiết, `buildSignals` | `runOrderflow`; client không được ghi | ✅ chỉ owner đọc |
+| `orderflow_events` | `watch("orderflow_events")` → xuất dữ liệu/đối chứng | `runOrderflow`, `evaluateOrderflowEvents`; client không được ghi | ✅ chỉ owner đọc |
+| `orderflow_versions` | owner có thể đọc để kiểm policy | `runOrderflow`; client không được ghi | ✅ chỉ owner đọc |
+| `orderflow_control` | `watch("orderflow_control")` → phiên bản/trạng thái máy | `runOrderflow` + seed từng mã; client không được ghi | ✅ chỉ owner đọc |
 
 ⚠️ **Thêm collection mới = thêm 1 dòng bảng này + 1 nhánh trong `firestore.rules` NGAY.**
 
@@ -255,10 +270,10 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 - **Mọi chuỗi người dùng gõ chèn vào HTML phải qua `esc()`.** Không có ngoại lệ.
 - **Mọi thay đổi dữ liệu đều đi qua `render()`, gồm cả `renderCompact`.** Chuyển view cũng gọi `renderCompact(computeSummary())` để lấy thứ tự mã mới nhất; không mở listener riêng.
 - **Một nút lấy giá chung (từ 24/09/2026) — owner chốt.** `#global-price-refresh` ghi thẳng giá hiện tại vào `tickers` cho mọi mã, nhưng **không thay bước chốt nhật ký**: `daily_snapshots` và `signals` vẫn chỉ sinh khi bấm Lưu ở tab Danh mục. Các nút cũ `#fetch-price`, `#wl-fetch`, `#compact-prices` đã bỏ. Phần đọc datafeed chỉ được có MỘT chỗ là `fetchQuotes` (hiện 2 nơi gọi: nút chung và nút xem giá trong form thêm mã).
-- **localStorage chỉ giữ thứ thuộc về MÁY.** `fin2-theme` · `fin2-tab` · `fin2-collapsed` · `fin2-skip-highlight` · `fin2-view` · `fin2-pnl-range` · `fin2-hide-pnl` · `fin2-exclude-hold-pnl` · `fin2-sort-*` · `fin2-order-*`. Đây là sở thích hiển thị, không phải dữ liệu — mất cũng không sao, và cố ý KHÔNG đồng bộ giữa thiết bị. Dữ liệu thật luôn nằm ở Firestore.
+- **localStorage chỉ giữ thứ thuộc về MÁY.** `fin2-theme` · `fin2-tab` · `fin2-collapsed` · `fin2-sector-collapsed` · `fin2-sector-off` · `fin2-skip-highlight` · `fin2-view` · `fin2-pnl-range` · `fin2-hide-pnl` · `fin2-exclude-hold-pnl` · `fin2-sort-*` · `fin2-order-*`. Đây là sở thích hiển thị, không phải dữ liệu — mất cũng không sao, và cố ý KHÔNG đồng bộ giữa thiết bị. Dữ liệu thật luôn nằm ở Firestore.
 - **Nút icon phải có `aria-label`.** Nút bật/tắt trạng thái thêm `aria-pressed`.
 - **Đối chiếu TCBS: sổ tay là nguồn chính, TCBS chỉ đọc khi owner bấm.** Không collection mới, không đổi rules: xác nhận thì ghi thẳng vào `transactions` / `cashflows` như nhập tay. Phiên TCBS không được cất ở đâu (có quyền đặt lệnh) — mỗi lần đối chiếu nhập iOTP mới. Dữ liệu `readTcbsPortfolio` trả về đã theo đơn vị app: giá nghìn đồng, tiền VND nguyên. Vị thế lệch chỉ hiện để xem, không có loại "điều chỉnh vị thế".
 
 ---
 
-_Cập nhật lần cuối: 2026-10-05 — thêm `analyzeTicker` chấm tạm một mã HOSE và so với tối đa 5 mã cùng ngành; không collection mới._
+_Cập nhật lần cuối: 2026-10-09 — cung cầu `orderflow-v2.1.0`: nền 5 phiên làm mới mỗi ngày (ưu tiên tự thu), khung 30 phút nối qua nghỉ trưa, nhận xét sơ bộ từ phút 15._

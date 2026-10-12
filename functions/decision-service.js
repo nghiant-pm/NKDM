@@ -23,6 +23,17 @@ function activeStrategy(rows, date) {
   }
   return out;
 }
+// Mốc T+ (↔ strategyLevels() ở app): mã đang giữ theo giá vốn, mã chỉ theo dõi lấy giá kỳ vọng. Dùng cho
+// ngưỡng legacy của Điểm quyết định và mốc của máy cung cầu (orderflow-service).
+function tplusLevels(position, strategy, targetBuy = null) {
+  if (!position) return { buyAt: Number.isFinite(targetBuy) ? targetBuy : null, sellAt: null };
+  return {
+    buyAt: Math.max(position.avgCost - strategy.buyDrop,
+      strategy.buyDropPct ? position.avgCost * (1 - strategy.buyDropPct / 100) : -Infinity),
+    sellAt: Math.min(position.avgCost + strategy.sellRise,
+      strategy.sellRisePct ? position.avgCost * (1 + strategy.sellRisePct / 100) : Infinity)
+  };
+}
 function holdings(rows) {
   const out = {};
   rows.slice().sort((a, b) => ((a.date || "") + "_" + (a.createdAt || "")).localeCompare((b.date || "") + "_" + (b.createdAt || "")))
@@ -142,10 +153,7 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
       row.newsStatus = news.status; row.newsCoverage = news.coverage; row.newsAiReady = news.aiReady;
       row.sourceNews = matched.map(({ text, ...n }) => n).slice(0, 8);
       row.priceSource = effectivePhase === "intraday" && meta.lastPriceDate === marketDate && Number.isFinite(meta.lastPrice) && meta.lastPrice > 0 ? "VPS + VNDirect OHLCV" : "VNDirect OHLCV";
-      const buyAt = position ? Math.max(position.avgCost - strategy.buyDrop,
-        strategy.buyDropPct ? position.avgCost * (1 - strategy.buyDropPct / 100) : -Infinity) : watch[ticker]?.targetBuy;
-      const sellAt = position ? Math.min(position.avgCost + strategy.sellRise,
-        strategy.sellRisePct ? position.avgCost * (1 + strategy.sellRisePct / 100) : Infinity) : null;
+      const { buyAt, sellAt } = tplusLevels(position, strategy, watch[ticker]?.targetBuy);
       row.legacyBuy = Number.isFinite(buyAt) && row.close <= buyAt;
       row.legacySell = !!position && !position.hold && row.close >= sellAt;
       row.news = row.news.map(({ text, ...n }) => n);
@@ -205,4 +213,4 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     throw error;
   }
 }
-module.exports = { runDecision, activeStrategy, holdings, makeEvents, aboveFlags, vnClock };
+module.exports = { runDecision, activeStrategy, tplusLevels, holdings, makeEvents, aboveFlags, vnClock };

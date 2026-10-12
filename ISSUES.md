@@ -170,6 +170,35 @@ theo ngày lịch thay vì theo số bản ghi. Cần owner chọn.
 
 ## Đã fix
 
+### 🟢 #021 — Nền 5 phiên của máy cung cầu đứng yên từ ngày bật máy `fix 2026-10-09`
+**Triệu chứng:** nền dư mua/dư bán 5 phiên (cộng/trừ tối đa 5 điểm) vẫn là 5 phiên trước 07/10/2026, không theo ngày.
+
+**Bug gốc:** `ensureSeeds` thấy đã có ≥5 phiên thì dùng lại mãi, không có bước làm mới. Kèm rủi ro ẩn: bước ghi seed vào
+`orderflow_daily` gửi `samples: []` (merge) — nếu được gọi lại sẽ xoá mẫu phút đã tự thu của ngày đó.
+
+**Fix (orderflow-v2.1.0):** làm mới mỗi ngày (`refreshedOn`), lỗi nguồn thì dùng nền cũ và thử lại sau 30 phút; phiên đã tự thu
+đủ mẫu dùng dữ liệu tự thu; ghi seed vào `orderflow_daily` chỉ thêm trường `seed`, không đụng `samples`/`source`.
+
+**File:** `functions/orderflow-service.js` — `ensureSeeds`; `functions/orderflow.js` — `baselineLean`, `sessionLean`, `nqsLean`.
+
+### 🟢 #020 — Mã nằm sàn bị máy cung–cầu bỏ qua `fix 2026-10-07`
+**Triệu chứng:** từ 13:15 PNJ nằm sàn 18,75 (−6,95%), log bộ thu báo `missing: ["PNJ"]`, mã không có khuyến nghị đúng lúc áp lực bán mạnh nhất.
+
+**Bug gốc:** `parseVpsQuote` loại mọi mã thiếu một bên sổ lệnh. Nằm sàn thì bên mua trống (`g1–g3 = 0|0`), nằm trần thì bên bán trống.
+
+**Fix:** chỉ loại khi trống cả hai bên; Giảm rủi ro không có giá mua tốt nhất thì đề xuất giá hiện tại. Thêm ca smoke với dữ liệu thật của PNJ.
+
+**File:** `functions/orderflow.js` — `parseVpsQuote`, `scoreOrderflow`.
+
+### 🟢 #019 — Người Quan Sát trả số có dấu phân cách nên bộ seed đọc được 0 phiên `fix 2026-10-07`
+**Triệu chứng:** endpoint trả đúng bảng lịch sử nhưng máy cung–cầu luôn ở “Chưa đủ 5 phiên nền”.
+
+**Bug gốc:** khối lượng dạng `30,157,923`; bộ đọc ban đầu coi dấu phẩy đầu tiên là dấu thập phân nên số không hợp lệ và bỏ cả dòng.
+
+**Fix:** xác định bốn cột là khối lượng nguyên, bỏ toàn bộ dấu phân cách hàng nghìn trước khi đổi sang số. Đã gọi thật HPG và đọc đúng 5 phiên 30/09–06/10/2026.
+
+**File:** `functions/orderflow-service.js` — `numberVi`, `parseNqsOrderHistory`.
+
 ### 🟢 #018 — Highlight báo bán nhưng cột Mua / Bán hiện ngưỡng mua `fix 2026-10-02`
 **Triệu chứng:** MSN chưa đạt mức bán đang thấy ở bảng nhưng dải Highlight vẫn hiện khuyến nghị bán,
 làm owner không biết nên tin phần nào.

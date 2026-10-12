@@ -35,6 +35,12 @@ service cloud.firestore {
     match /decision_versions/{id} { allow read: if isOwner(); allow write: if false; }
     match /decision_news/{id}     { allow read: if isOwner(); allow write: if false; }
     match /decision_control/{id}  { allow read: if isOwner(); allow write: if false; }
+    // Cung-cầu: Cloud Function là bộ thu duy nhất; trình duyệt owner chỉ đọc kết quả chuẩn hóa.
+    match /orderflow_daily/{id}    { allow read: if isOwner(); allow write: if false; }
+    match /orderflow_latest/{id}   { allow read: if isOwner(); allow write: if false; }
+    match /orderflow_events/{id}   { allow read: if isOwner(); allow write: if false; }
+    match /orderflow_versions/{id} { allow read: if isOwner(); allow write: if false; }
+    match /orderflow_control/{id}  { allow read: if isOwner(); allow write: if false; }
     // Cấu hình owner chỉnh trong app (khung giờ nhận tin sàng lọc).
     match /settings/{id}          { allow read, write: if isOwner(); }
 

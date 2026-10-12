@@ -10,6 +10,7 @@ const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestor
 const UNIVERSE = require("./universe");
 const { scoreTicker, evaluateCandidate, evaluateFiveSession, fiveSessionPending, normalizeConfig, SCORE_VERSION } = require("./scoring");
 const tickerAnalysis = require("./ticker-analysis");
+const orderflow = require("./orderflow-service");
 
 initializeApp();
 setGlobalOptions({ region: "asia-southeast1", maxInstances: 1 });
@@ -519,6 +520,33 @@ exports.analyzeTicker = onCall({ timeoutSeconds: 120, memory: "256MiB", cors: tr
 exports.closeDecisionScores = onSchedule({ schedule: "30 9-15 * * 1-5", timeZone: TIME_ZONE,
   timeoutSeconds: 540, memory: "512MiB", retryCount: 0 }, async () => {
   await runDecision(getFirestore(), decisionHelpers, { scheduled: true });
+  await orderflow.evaluateOrderflowEvents(getFirestore(), fetchHistory);
+});
+
+// Mốc đáy/đỉnh 5–20 phiên cho vùng giá tối ưu: cùng nguồn VNDirect với chấm điểm, chỉ cần ~45 ngày lịch.
+const orderflowHistory = (ticker) => fetchHistory(ticker, 45);
+// Bộ thu cung-cầu chạy độc lập với Telegram. Hàm tự bỏ qua giờ nghỉ trưa/ngoài phiên.
+exports.collectOrderflow = onSchedule({ schedule: "* 9-14 * * 1-5", timeZone: TIME_ZONE,
+  timeoutSeconds: 120, memory: "256MiB", retryCount: 0 }, async () => {
+  const result = await orderflow.runOrderflow(getFirestore(), { scheduled: true, fetchHistory: orderflowHistory });
+  // Log tóm tắt để biết bộ thu có chạy thật không (thiếu sổ lệnh VPS = missing, thiếu nền 5 phiên = learning).
+  if (result.status !== "outside-session") logger.info("orderflow", result);
+});
+exports.refreshOrderflow = onCall({ timeoutSeconds: 120, memory: "256MiB", cors: true }, async (request) => {
+  if (request.auth?.token?.email !== orderflow.OWNER || request.auth.token.email_verified !== true) {
+    throw new HttpsError("permission-denied", "Không có quyền truy cập");
+  }
+  try { return await orderflow.runOrderflow(getFirestore(), { fetchHistory: orderflowHistory }); }
+  catch (error) { logger.error("orderflow refresh", error); throw new HttpsError("unavailable", "Chưa cập nhật được cung cầu"); }
+});
+exports.getMarketQuotes = onCall({ timeoutSeconds: 30, memory: "256MiB", cors: true }, async (request) => {
+  if (request.auth?.token?.email !== orderflow.OWNER || request.auth.token.email_verified !== true) {
+    throw new HttpsError("permission-denied", "Không có quyền truy cập");
+  }
+  const tickers = Array.isArray(request.data?.tickers) ? request.data.tickers : [];
+  if (!tickers.length || tickers.length > 150) throw new HttpsError("invalid-argument", "Danh sách mã không hợp lệ");
+  try { return Object.fromEntries(await orderflow.fetchVpsQuotes(tickers)); }
+  catch (error) { logger.error("market quotes", error); throw new HttpsError("unavailable", "Chưa lấy được giá thị trường"); }
 });
 
 // TCBS OpenAPI: CHỈ ĐỌC để đối chiếu với sổ tay. API Key + mã lưu ký nằm trong Secret Manager;
