@@ -11,6 +11,7 @@ const UNIVERSE = require("./universe");
 const { scoreTicker, evaluateCandidate, evaluateFiveSession, fiveSessionPending, normalizeConfig, SCORE_VERSION } = require("./scoring");
 const tickerAnalysis = require("./ticker-analysis");
 const orderflow = require("./orderflow-service");
+const { activeStrategy, maStreak, maInZone } = require("./decision-service");
 
 initializeApp();
 setGlobalOptions({ region: "asia-southeast1", maxInstances: 1 });
@@ -216,9 +217,37 @@ function telegramHeader(slot, date, marketDate, trial) {
     (trial && trial.isTrial ? `Thử nghiệm ${trial.trialSession}/20 · ` : "") + `Công thức ${SCORE_VERSION}`];
 }
 
-function telegramText(header, fresh, watched, config = normalizeConfig()) {
+/* Vùng mua MA (owner chốt 13/10/2026): Telegram chỉ báo THAY ĐỔI ở lượt sau đóng cửa — mã đang có/theo dõi hôm nay
+   mới vào vùng mua, hoặc vừa ra khỏi vùng (rơi dưới MA · quá maMaxDays phiên · MA hết đi lên). Cùng maStreak()/maInZone()
+   với Điểm quyết định. */
+function maChanges(tickers, historyByTicker, strategy) {
+  const entered = [], bounced = [], dropped = [], expired = [], flat = [];
+  [...tickers].sort().forEach((ticker) => {
+    const bars = historyByTicker.get(ticker), t = bars && maStreak(bars, strategy.maLength);
+    if (!t) return;
+    const now = maInZone(t.streak, t.rise, strategy), before = maInZone(t.prevStreak, t.prevRise, strategy);
+    // Mới vào mà phiên cuối giảm → ghi kèm "chờ bật lên"; đang chờ mà hôm nay tăng → "Bật lên lại" (lúc mua được).
+    if (now && !before) entered.push(t.up ? ticker : `${ticker} (chờ bật lên)`);
+    else if (now && t.up && !t.prevUp) bounced.push(ticker);
+    else if (!now && before) (t.streak === 0 ? dropped : t.streak > strategy.maMaxDays ? expired : flat).push(ticker);
+  });
+  return { len: strategy.maLength, days: strategy.maDays, maxDays: strategy.maMaxDays, entered, bounced, dropped, expired, flat };
+}
+
+function maTelegramLines(ma) {
+  if (!ma || ![ma.entered, ma.bounced || [], ma.dropped, ma.expired, ma.flat].some((list) => list.length)) return [];
+  const lines = ["", `Vùng mua MA${ma.len} · ${ma.days}–${ma.maxDays} phiên trên MA, MA đi lên`];
+  if (ma.entered.length) lines.push(`Mới vào: ${ma.entered.join(", ")}`);
+  if (ma.bounced?.length) lines.push(`Bật lên lại, mua được: ${ma.bounced.join(", ")}`);
+  if (ma.dropped.length) lines.push(`Rơi xuống dưới MA: ${ma.dropped.join(", ")}`);
+  if (ma.expired.length) lines.push(`Quá ${ma.maxDays} phiên, bỏ qua: ${ma.expired.join(", ")}`);
+  if (ma.flat.length) lines.push(`MA hết đi lên: ${ma.flat.join(", ")}`);
+  return lines;
+}
+
+function telegramText(header, fresh, watched, config = normalizeConfig(), ma = null) {
   const lines = header.slice();
-  if (!fresh.length && !watched.length) return lines.concat("", `Không có mã đạt chuẩn ${config.minScore} điểm.`).join("\n");
+  if (!fresh.length && !watched.length) return lines.concat("", `Không có mã đạt chuẩn ${config.minScore} điểm.`, maTelegramLines(ma)).join("\n");
   if (fresh.length) {
     lines.push("", "Cơ hội mới");
     fresh.forEach((row) => lines.push(`${row.rank}. ${row.ticker} · ${row.totalScore} điểm · ${row.close.toFixed(2)}`, `   ${row.reasons.join(" · ")}`));
@@ -232,6 +261,7 @@ function telegramText(header, fresh, watched, config = normalizeConfig()) {
       lines.push(`   ${row.reasons.join(" · ")}`);
     });
   }
+  lines.push(...maTelegramLines(ma));
   lines.push("", "Chỉ là đề cử để xem xét, không tự tạo lệnh.");
   return lines.join("\n");
 }
@@ -426,21 +456,25 @@ async function runSlot(db, slot, date, token, chatId, settings) {
   if (lock.skip) { logger.info(`Bỏ qua ${date} ${slot.time}: ${lock.reason}`); return; }
   const runRef = slot.phase === "post" ? db.collection("screening_runs").doc(date) : null;
   try {
-    const [transactionsSnap, watchlistSnap, oldResultsSnap] = await Promise.all([
+    const [transactionsSnap, watchlistSnap, oldResultsSnap, strategiesSnap] = await Promise.all([
       db.collection("transactions").get(),
       db.collection("watchlist").get(),
-      db.collection("screening_results").get()
+      db.collection("screening_results").get(),
+      db.collection("strategies").get()
     ]);
     const pendingTickers = oldResultsSnap.docs.filter((item) => {
       const data = item.data();
       return data?.evaluation?.complete !== true || fiveSessionPending(data);
     }).map((item) => item.data().ticker);
+    const held = heldTickers(transactionsSnap.docs.map((item) => item.data()));
+    const watchlist = new Map(watchlistSnap.docs.map((item) => [item.id, item.data().targetBuy]));
+    // Lượt sau đóng cửa tải thêm lịch sử mã đang có (ngoài rổ) để báo thay đổi MA.
     const scan = await scanMarket({
       phase: slot.phase,
       date,
-      held: heldTickers(transactionsSnap.docs.map((item) => item.data())),
-      watchlist: new Map(watchlistSnap.docs.map((item) => [item.id, item.data().targetBuy])),
-      extraTickers: slot.phase === "post" ? pendingTickers : [],
+      held,
+      watchlist,
+      extraTickers: slot.phase === "post" ? [...pendingTickers, ...held] : [],
       config
     });
     if (!scan.marketDate) {
@@ -457,8 +491,12 @@ async function runSlot(db, slot, date, token, chatId, settings) {
       status: "completed", marketDate: scan.marketDate, scannedCount: scan.historyByTicker.size,
       missingCount: scan.failures.length, selectedCount: scan.selected.length, updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
+    const ma = slot.phase === "post"
+      ? maChanges(new Set([...held, ...watchlist.keys()]), scan.historyByTicker,
+        activeStrategy(strategiesSnap.docs.map((item) => ({ ...item.data(), id: item.id })), scan.marketDate))
+      : null;
     if (await claimNotification(db, lock.ref, notificationType)) {
-      await sendTelegram(token, chatId, telegramText(telegramHeader(slot, date, scan.marketDate, trial), scan.fresh, scan.watched, config));
+      await sendTelegram(token, chatId, telegramText(telegramHeader(slot, date, scan.marketDate, trial), scan.fresh, scan.watched, config, ma));
       await lock.ref.set({ notificationSentAt: FieldValue.serverTimestamp() }, { merge: true });
     }
     logger.info(`Hoàn tất ${date} ${slot.time}`, { selected: scan.selected.length, missing: scan.failures.length });
@@ -490,7 +528,7 @@ exports.screenShortTermOpportunities = onSchedule({
 
 exports._private = {
   dateInZone, slotAt, slotEnabled, marketDateFor, parseHistory, fetchHistory, fetchForeign, mapWithConcurrency,
-  heldTickers, rank, selectResults, watchGapText, telegramHeader, telegramText, scanMarket, SLOTS
+  heldTickers, rank, selectResults, watchGapText, telegramHeader, telegramText, maChanges, scanMarket, SLOTS
 };
 
 // Điểm thử nghiệm độc lập với bot Telegram; có thể chạy dù owner tắt mọi khung nhận tin.

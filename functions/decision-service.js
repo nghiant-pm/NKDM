@@ -3,12 +3,13 @@
 const { randomUUID } = require("node:crypto");
 const D = require("./decision-scoring");
 const { collectNews } = require("./decision-news");
+const { decisionInputs: I } = require("./scoring");
 
 /* Bản sao có chủ ý (ghi ở CLAUDE.md): DEFAULT_STRATEGY ↔ RULE_* · activeStrategy() ↔ activeStrategy() ·
    holdings() ↔ computeLedger() · buyAt/sellAt legacy ↔ strategyLevels() trong public/index.html.
    Đổi một bên phải đổi bên kia. Phiên bản thật luôn đọc từ strategies. */
 const DEFAULT_STRATEGY = { id: null, buyDrop: 2, sellRise: 3, buyDropPct: null, sellRisePct: null,
-  lotSize: 100, minCashRatio: 20, maxCashRatio: 30 };
+  lotSize: 100, minCashRatio: 20, maxCashRatio: 30, maLength: 10, maDays: 5, maMaxDays: 15 };
 function activeStrategy(rows, date) {
   const usable = rows.filter((r) => r.effectiveFrom && r.effectiveFrom <= date).sort((a, b) =>
     a.effectiveFrom.localeCompare(b.effectiveFrom) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
@@ -18,10 +19,33 @@ function activeStrategy(rows, date) {
   for (const key of ["buyDrop", "sellRise", "lotSize", "minCashRatio", "maxCashRatio"]) {
     if (Number.isFinite(Number(row[key]))) out[key] = Number(row[key]);
   }
-  for (const key of ["buyDropPct", "sellRisePct"]) {
+  for (const key of ["buyDropPct", "sellRisePct", "maLength", "maDays", "maMaxDays"]) {
     if (row[key] != null && Number.isFinite(Number(row[key])) && Number(row[key]) > 0) out[key] = Number(row[key]);
   }
   return out;
+}
+/* Vùng mua MA (owner chốt 13/10/2026), chỉ đưa phiên đã đóng cửa vào `bars`:
+   streak = số phiên LIÊN TIẾP đóng cửa trên MA{len} (tức đã cắt lên MA từ `since`) · rise = số phiên liên tiếp
+   đường MA đi lên. prev* = tính tới phiên liền trước → biết hôm nay mã mới vào / vừa ra khỏi vùng. Ở đây chỉ đếm;
+   so ngưỡng maDays/maMaxDays ở maInZone() (bot) ↔ maTrendFor() (app) — đổi số phiên không cần bot chạy lại. */
+function maStreak(bars, len) {
+  const last = bars.at(-1);
+  if (!last || !(len > 0)) return null;
+  const run = (end, ok) => { let n = 0; while (ok(end - n)) n += 1; return n; };
+  const above = (end) => end >= len && bars[end - 1].close > I.sma(bars, len, end);
+  const rising = (end) => end > len && I.sma(bars, len, end) > I.sma(bars, len, end - 1);
+  const streak = run(bars.length, above);
+  // Đà giá (owner chốt 13/10/2026): MA chậm nên giá có thể đang giảm về MA mà MA vẫn đi lên → phiên cuối phải TĂNG mới mua.
+  const upAt = (end) => end >= 2 && bars[end - 1].close > bars[end - 2].close;
+  return { len, date: last.date, close: last.close, ma: I.round(I.sma(bars, len)),
+    streak, prevStreak: run(bars.length - 1, above), rise: run(bars.length, rising), prevRise: run(bars.length - 1, rising),
+    since: streak ? bars[bars.length - streak].date : null,
+    up: upAt(bars.length), prevUp: upAt(bars.length - 1), down: run(bars.length, (end) => end >= 2 && bars[end - 1].close < bars[end - 2].close) };
+}
+// Trong vùng mua: đủ maDays..maMaxDays phiên trên MA và MA đi lên ít nhất maDays phiên gần nhất.
+// Mua khi trong vùng VÀ phiên cuối tăng (`up`); trong vùng mà phiên cuối giảm/đứng = chờ bật lên.
+function maInZone(streak, rise, st) {
+  return streak >= st.maDays && streak <= st.maMaxDays && rise >= st.maDays;
 }
 // Mốc T+ (↔ strategyLevels() ở app): mã đang giữ theo giá vốn, mã chỉ theo dõi lấy giá kỳ vọng. Dùng cho
 // ngưỡng legacy của Điểm quyết định và mốc của máy cung cầu (orderflow-service).
@@ -138,6 +162,8 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     const rows = targets.map((ticker) => {
       let bars = histories.get(ticker);
       if (!bars) return null;
+      // MA chỉ tính trên phiên đã đóng cửa: lượt trong phiên bỏ nến hôm nay đang chạy.
+      const maTrend = maStreak(effectivePhase === "intraday" ? bars.filter((b) => b.date < marketDate) : bars, strategy.maLength);
       const meta = prices[ticker] || {}, sector = D.sectorContext(ticker, histories, benchmark);
       if (effectivePhase === "intraday" && meta.lastPriceDate === marketDate && Number.isFinite(meta.lastPrice) && meta.lastPrice > 0) {
         bars = bars.map((b, i) => i === bars.length - 1 ? { ...b, close: meta.lastPrice,
@@ -157,6 +183,7 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
       row.legacyBuy = Number.isFinite(buyAt) && row.close <= buyAt;
       row.legacySell = !!position && !position.hold && row.close >= sellAt;
       row.news = row.news.map(({ text, ...n }) => n);
+      row.maTrend = maTrend;
       row.previousBuy = prior[ticker]?.scoreVersion === D.VERSION ? prior[ticker].buyScore : null;
       row.previousSell = prior[ticker]?.scoreVersion === D.VERSION ? prior[ticker].sellScore : null;
       row.updatedAt = new Date().toISOString();
@@ -213,4 +240,4 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
     throw error;
   }
 }
-module.exports = { runDecision, activeStrategy, tplusLevels, holdings, makeEvents, aboveFlags, vnClock };
+module.exports = { runDecision, activeStrategy, tplusLevels, holdings, makeEvents, aboveFlags, vnClock, maStreak, maInZone };

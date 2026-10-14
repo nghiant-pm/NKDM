@@ -4,6 +4,71 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-14 (Quản lý cổ phiếu theo lô)
+
+Owner muốn thấy một mã đang lỗ vẫn có lô lãi, để biết bán lô nào, bao nhiêu. Phỏng vấn + chốt bước 1 (chỉ xem và tính lãi/lỗ):
+- **Mỗi lệnh mua là một lô**, mã lô `FPT-L1-1203` (mã · thứ tự mua · ngày). Cổ tức cổ phiếu là lô riêng, nhãn "Cổ tức".
+- **Bảng nắm giữ:** nút **mũi tên + số lô** đặt ngay trước mã (không cần mở dòng; owner chốt đưa ra ngoài) xổ các lô còn giữ thành hàng dưới dòng mã: số CP còn/gốc, giá mua, lãi/lỗ (K) + %, nhãn "Chờ về" khi chưa về T+2.
+  **Chi tiết mã** có mục Lô (cả lô đã bán hết, hiện lãi đã chốt) và dòng lệnh bán ghi lô đã bán.
+- **Khi bán, owner tự chọn lô** (không điền sẵn): form Giao dịch và popup Khớp lệnh bán hiện từng lô (ngày, giá, còn bao nhiêu,
+  lãi/lỗ % nếu bán ở giá đang nhập), nhập số CP từng lô, chưa đủ số CP thì không lưu; lô chưa về thì khoá. Lệnh bán đặt từ form
+  có chọn lô thì popup Khớp điền sẵn lô đó. Lệnh bán ghi thêm `lots [{ id, qty }]`.
+- **Lệnh bán cũ / Đồng bộ TCBS** (chưa có lô): app tự trừ lô mua trước. Nhật ký có nút **Chọn lô** (đang tự gán) / **Lô** trên
+  từng lệnh bán để sửa.
+- **Lãi/lỗ đã chốt + đang treo tính theo lô** (Tổng quan, bảng mã, nhóm ngành, Đã chốt theo mã, Dự kiến bán, Hiệu quả tín hiệu,
+  file xuất cho AI có `cacLo`/`giaVonTheoLo`/`tuGanLo`). Bán hết một mã thì tổng lãi/lỗ không đổi so với cách bình quân.
+  Nhật ký ngày lưu từ nay ghi `investedCost` theo lô; ngày cũ giữ số cũ.
+- **Không đổi:** cột Giá vốn, mốc Mua/Bán, tín hiệu T+ / cung cầu / MA, luật không bán lỗ, bot server, đối chiếu TCBS — vẫn theo giá
+  vốn bình quân như TCBS. Không collection mới, không đổi rules.
+
+· `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-13c (Vùng mua MA: giá đang giảm về MA thì Chờ bật lên)
+
+Owner thấy MWG đang giảm 4 phiên về sát MA10 (76,9 → 74,8, cách MA +0,7%) mà app vẫn khuyên mua. Gốc: luật chỉ xét "giá trên MA"
++ "MA đi lên", không xét đà của chính giá — MA10 chậm nên vẫn đi lên khi giá đã quay đầu. Owner chọn "Chờ bật lên":
+- Trong vùng mua MA + **phiên cuối đóng cửa TĂNG** → khuyến nghị Mua · theo MA (như cũ).
+- Trong vùng mua MA + phiên cuối giảm/đứng → nhóm mới **"Chờ bật lên"** trong Khuyến nghị (giá · giảm N phiên liền + dòng chi tiết),
+  không nút Đặt, không ghi `signals`. Bảng mã: nhãn vàng "MA10 chờ". Chip "Ưu tiên" trên dòng T+ cũng chỉ khi phiên cuối tăng.
+- Telegram thêm dòng "Bật lên lại, mua được" (đang chờ → hôm nay tăng); mã mới vào vùng mà phiên cuối giảm ghi kèm "(chờ bật lên)".
+- Bot: `maStreak` thêm `up`/`prevUp`/`down`; tín hiệu chép `maUp`. Dữ liệu bot cũ thiếu `up` → không hiện nhãn tới lượt chạy sau.
+
+· `functions/decision-service.js` · `functions/index.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-13b (Vùng mua MA: tự ra khuyến nghị mua · dòng chi tiết Khuyến nghị mới)
+
+Owner review bản sáng nay: luật "đang trên MA10 ≥5 phiên" chưa đúng ý. Owner chốt lại:
+- **Vùng mua MA** = giá cắt lên MA10, đóng cửa trên MA10 **từ 5 tới 15 phiên** liền, và **đường MA10 đi lên** ≥5 phiên gần nhất.
+  Trên MA quá 15 phiên → bỏ qua (khó lướt). Ba số 10 · 5 · 15 chỉnh ở tab Chiến lược (thêm ô "Trên MA tối đa").
+- **Tự ra khuyến nghị "Mua · theo MA10"** (tín hiệu `trend`, id `ngày_MÃ_trend`, engine `ma`) dù chưa tới mốc T+: mã đang có kể cả
+  giá trên giá vốn (dòng ghi "Giá vốn X → Y"), mã theo dõi không cần chạm giá kỳ vọng. Nút Đặt điền giá hiện tại, không kèm cung cầu.
+  Mã đã có tín hiệu mua T+ hôm nay → chỉ một dòng T+ kèm chip "Ưu tiên · MA10↑". Chờ hàng T+2 → không ra.
+- **Mỗi đợt chỉ khuyến nghị tới khi mua:** đã khớp mua hoặc còn lệnh mua chờ của mã từ ngày bắt đầu đợt → thôi, đợt sau mới ra lại.
+- **Dòng chi tiết Khuyến nghị:** bỏ "Sau lệnh x% tiền mặt" (bỏ hẳn, kể cả cảnh báo). Thay bằng: điểm Mua/Bán x/10 · phiên n/15 trên MA10
+  (cách MA bao nhiêu %) · khối ngoại mua/bán ròng n/5 phiên · mạnh/yếu hơn VN-Index 20 phiên; chiều mua thêm dòng đỏ cảnh báo rủi ro.
+- Nhãn "MA10↑" ở bảng mã chỉ hiện khi mã đang trong vùng mua. Telegram báo: mới vào vùng / rơi dưới MA / quá 15 phiên / MA hết đi lên.
+- Tab Phân tích: so "Mua theo MA" với "Mua T+" (thay "có/không có MA↑"). Xuất dữ liệu: `may: "MA"`, `xuHuongMA`.
+- Bot: `maStreak` thêm `rise`/`prevRise` (số phiên MA đi lên) + `since` (ngày bắt đầu đợt); `maInZone()` dùng chung bot/Telegram.
+
+· `functions/decision-service.js` · `functions/index.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
+## 2026-10-13 (Ưu tiên mua khi mã nằm trên MA10 từ 5 phiên)
+
+Owner muốn ưu tiên mua mã (đang có + theo dõi) đã đóng cửa trên MA10 nhiều phiên liền. Owner chốt qua phỏng vấn:
+- **Điều kiện:** giá ĐÓNG CỬA nằm trên MA từ N phiên liền trở lên (mặc định MA10 · 5 phiên), chỉ tính phiên đã đóng cửa
+  → trạng thái đứng yên suốt ngày hôm sau, không nhấp nháy giữa phiên.
+- **Ưu tiên = chỉ gắn nhãn + xếp lên đầu**, KHÔNG tự sinh tín hiệu mua: tín hiệu mua T+ (giá vốn −2 / giá kỳ vọng) của mã đủ
+  điều kiện có chip "Ưu tiên · MA10↑" và lên đầu nhóm Tín hiệu ở Khuyến nghị. T+ vẫn quyết định KHI NÀO. Rơi xuống dưới MA chỉ mất nhãn.
+- **Bảng mã:** nhãn nhỏ "MA10↑" cạnh mã cho mọi mã đủ điều kiện (cả khi chưa tới mốc mua).
+- **Telegram** (lượt sau đóng cửa): mục MA chỉ báo THAY ĐỔI — mã mới đủ N phiên hôm nay, mã vừa rơi xuống dưới MA.
+- **Chỉnh ở tab Chiến lược** (2 ô mới: đường MA 2–100 phiên, số phiên trên MA 1–30) — lưu như một phiên bản chiến lược có ngày
+  hiệu lực, bản cũ thiếu 2 ô này rơi về 10 · 5.
+- **Đo song song:** doc `signals` chép `maLength`/`maDays`/`maStreak` lúc Lưu nhật ký; tab Phân tích → Chất lượng tín hiệu
+  thêm 2 dòng "Mua có MA↑" / "Mua không có MA↑" (sau 5 · 10 · 20 lần lưu). Xuất dữ liệu thêm `uuTienMA`.
+- Bot: `maStreak()` đếm số phiên ở lượt Điểm quyết định, lưu `decision_latest.maTrend` (không đổi điểm → không nâng `scoreVersion`).
+
+· `functions/decision-service.js` · `functions/index.js` · `functions/smoke.js` · `public/index.html` · `CLAUDE.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-10-12b (Bấm "Mã" để bật/tắt chia ngành)
 
 Owner thấy chia ngành làm sắp theo lãi/lỗ chỉ còn xếp trong từng ngành. Nay chữ **Mã** ở đầu mỗi bảng là nút bật/tắt chia ngành

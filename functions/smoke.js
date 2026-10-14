@@ -256,4 +256,37 @@ assert.equal(marketDateFor("intraday", "2026-09-25", vn), null, "Không có nế
 assert.match(telegramHeader({ phase: "intraday", time: "10:30" }, "2026-09-24", "2026-09-24", null)[1], /Tạm tính/, "Trong phiên phải ghi tạm tính");
 assert.match(telegramHeader({ phase: "pre", time: "08:30" }, "2026-09-24", "2026-09-23", null)[1], /23\/09\/2026/, "Trước phiên ghi rõ phiên được chấm");
 
+// MA: đếm phiên đóng cửa liên tiếp trên MA, Telegram chỉ báo mã mới đủ số phiên / vừa rơi xuống.
+const { maStreak, maInZone, activeStrategy: pickStrategy } = require("./decision-service");
+const { maChanges, telegramText } = require("./index")._private;
+const closesToBars = (closes) => closes.map((close, i) => ({ date: `2026-10-${String(i + 1).padStart(2, "0")}`, close }));
+const base10 = Array(10).fill(10);
+const rising = closesToBars([...base10, 11, 12, 13, 14, 15]);
+const r5 = maStreak(rising, 10);
+assert.deepEqual([r5.streak, r5.prevStreak, r5.rise, r5.since], [5, 4, 5, "2026-10-11"], "Cắt lên + 5 phiên trên MA10, MA đi lên 5 phiên");
+const fell = closesToBars([...base10, 11, 12, 13, 14, 15, 16, 9]);
+assert.deepEqual([maStreak(fell, 10).streak, maStreak(fell, 10).prevStreak], [0, 6], "Rơi xuống dưới MA10 → về 0");
+assert.equal(maStreak(closesToBars([10, 11, 12]), 10).streak, 0, "Chưa đủ 10 phiên thì không tính");
+const maRule = pickStrategy([], "2026-10-13");
+assert.deepEqual([maRule.maLength, maRule.maDays, maRule.maMaxDays], [10, 5, 15], "Mặc định MA10 · 5–15 phiên");
+assert.deepEqual([pickStrategy([{ effectiveFrom: "2026-10-01", maLength: 20, maDays: 3 }], "2026-10-13").maLength,
+  pickStrategy([{ effectiveFrom: "2026-10-01", buyDrop: 2 }], "2026-10-13").maMaxDays], [20, 15], "Phiên bản cũ thiếu MA thì rơi về mặc định");
+assert.ok(maInZone(5, 5, maRule) && !maInZone(16, 16, maRule) && !maInZone(8, 3, maRule) && !maInZone(4, 4, maRule), "Vùng mua: 5–15 phiên và MA đi lên ≥5");
+const longRun = closesToBars([...base10, ...Array.from({ length: 16 }, (_, i) => 11 + i)]);
+assert.equal(maStreak(longRun, 10).streak, 16, "Trên MA 16 phiên");
+const ma = maChanges(new Set(["AAA", "BBB", "CCC", "DDD"]),
+  new Map([["AAA", rising], ["BBB", fell], ["CCC", closesToBars([10, 11])], ["DDD", longRun]]), maRule);
+assert.deepEqual([ma.entered, ma.dropped, ma.expired], [["AAA"], ["BBB"], ["DDD"]], "Telegram: AAA mới vào, BBB rơi, DDD quá 15 phiên");
+assert.match(telegramText(["H"], [], [], normalizeConfig(), ma), /Vùng mua MA10 · 5–15[\s\S]*Mới vào: AAA[\s\S]*Rơi xuống dưới MA: BBB[\s\S]*Quá 15 phiên, bỏ qua: DDD/, "Tin có mục MA");
+assert.doesNotMatch(telegramText(["H"], [], [], normalizeConfig(), { ...ma, entered: [], dropped: [], expired: [], flat: [] }), /MA10/, "Không đổi thì không thêm dòng");
+// Kiểu MWG 13/10/2026: tăng lên đỉnh rồi giảm 4 phiên về sát MA, MA vẫn đi lên → trong vùng nhưng phải CHỜ bật lên.
+const pullback = closesToBars([...base10, 11, 12, 13, 14, 15, 14.8, 14.6, 14.4, 14.2]);
+const pb = maStreak(pullback, 10);
+assert.ok(maInZone(pb.streak, pb.rise, maRule) && !pb.up && pb.down === 4, "Giảm về MA: trong vùng, phiên cuối giảm, giảm 4 phiên liền");
+const bounce = maStreak(closesToBars([...base10, 11, 12, 13, 14, 15, 14.8, 14.6, 14.9]), 10);
+assert.ok(bounce.up && !bounce.prevUp && bounce.down === 0, "Bật lên: phiên cuối tăng sau phiên giảm");
+const mb = maChanges(new Set(["PBK", "BNC"]), new Map([["PBK", pullback], ["BNC", closesToBars([...base10, 11, 12, 13, 14, 15, 14.8, 14.6, 14.9])]]), maRule);
+assert.deepEqual(mb.bounced, ["BNC"], "Telegram: BNC bật lên lại");
+assert.match(telegramText(["H"], [], [], normalizeConfig(), mb), /Bật lên lại, mua được: BNC/, "Tin có dòng bật lên");
+
 console.log("Smoke scoring + khung giờ: OK");

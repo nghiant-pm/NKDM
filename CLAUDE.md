@@ -56,15 +56,35 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
   `activeStrategy(ngày)`, **không nơi nào được gõ số**.
 - **Mã vừa mua còn lô chưa về (T+2, `awaitingShares`) → "Chờ hàng"**: không tín hiệu/nhận xét cung cầu chiều MUA tới khi hàng về;
   chiều BÁN chỉ còn khi có lô cũ đã về, tối đa số CP bán được (owner chốt 08/10/2026). Chặn qua `awaitingBlocks(mã, chiều)` ở `buildSignals` + `orderflowAdvice` + bảng mã.
+- **Vùng mua MA — máy mua thứ ba** (owner chốt 13/10/2026, sửa lại chiều cùng ngày): mã đang có/theo dõi đã cắt lên MA `maLength`,
+  đóng cửa trên MA từ `maDays` tới `maMaxDays` phiên liền VÀ MA đi lên ≥`maDays` phiên gần nhất (mặc định 10 · 5 · 15, chỉnh ở tab
+  Chiến lược, theo phiên bản `strategies`). Trên MA quá `maMaxDays` = khó lướt → bỏ. Trong vùng + **phiên cuối đóng cửa TĂNG** →
+  **tự ra tín hiệu "Mua · theo MA"** (`kind:"trend"`, `engine:"ma"`) dù chưa tới mốc T+; trong vùng mà phiên cuối giảm/đứng (giá
+  đang giảm về MA, MA chậm nên vẫn đi lên — vụ MWG 13/10/2026) → nhóm **"Chờ bật lên"** ở Khuyến nghị, không nút Đặt, không ghi
+  `signals` (`maCandidates` là nơi duy nhất lọc cho cả hai); mã đã có tín hiệu mua T+ cùng ngày thì chỉ gắn chip "Ưu tiên" vào dòng T+
+  (một mã một lệnh mua/ngày). **Mỗi đợt chỉ tới khi mua** (`maBoughtInRun`: khớp mua / lệnh mua chờ từ ngày `since`).
+  ⚠️ **Ngoại lệ có chủ ý:** mua thêm theo MA được phép khi giá TRÊN giá vốn (owner chốt; dòng Khuyến nghị ghi "Giá vốn X → Y") —
+  khác luật cung cầu "mã đang giữ chỉ mua thêm ≤ giá vốn −1%". Không kèm nhận xét cung cầu (giá cung cầu bám mốc T+).
+  Chỉ tính phiên đã đóng cửa. Bot đếm (`maStreak` → `decision_latest.maTrend`), app so ngưỡng (`maTrendFor`);
+  Telegram sau đóng cửa chỉ báo thay đổi vào/ra vùng (`maChanges`).
+- **Dòng chi tiết Khuyến nghị** (`adviceInsight`, owner chốt 13/10/2026): điểm quyết định · xu hướng MA · khối ngoại + so VN-Index,
+  chiều mua thêm cảnh báo rủi ro. **Đã bỏ hẳn "sau lệnh còn x% tiền mặt"** (owner không cần) — đừng dựng lại.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.
 - Broker TCBS miễn phí môi giới; chỉ còn thuế TNCN 0.1% giá trị bán — chưa đưa vào tính toán.
+- **Quản lý theo lô** (owner chốt 14/10/2026, bước 1): mỗi lệnh mua là một lô, mã `FPT-L1-1203` (mã · thứ tự mua · ngày ddmm),
+  cổ tức cổ phiếu là lô riêng nhãn "Cổ tức". Bán thì owner **tự chọn lô** (không điền sẵn, không quy tắc FIFO/HIFO). **Lãi/lỗ đã chốt +
+  đang treo tính theo giá mua của lô** (`lotCost`); cột Giá vốn, mốc Mua/Bán, mọi tín hiệu (T+, cung cầu, MA), luật không bán lỗ và
+  bot server **vẫn theo giá vốn bình quân** `avgCost` như TCBS — cố ý, nên giá vốn × số CP không ra đúng lãi/lỗ trên dòng.
+  Đổi tín hiệu sang theo lô là bước sau, chờ owner dùng thử. Lô suy từ `transactions`, không có collection riêng.
 
 ---
 
 ## Mô hình dữ liệu
 ```
 transactions/{autoId}       ticker, side "buy"|"sell", qty, price (nghìn đ), date, note, createdAt
+                            từ 14/10/2026 lệnh bán có lots [{ id (= id lệnh mua của lô), qty }] — bán bao nhiêu CP từ lô nào.
+                            Thiếu/lệch (lệnh cũ, Đồng bộ TCBS, lô đã xoá) → app tự trừ lô mua trước, sửa lại bằng nút Lô ở Nhật ký
 cashflows/{autoId}          type "deposit"|"withdraw"|"adjust", amount (VND nguyên), date, note, createdAt
                             ("adjust" = đối chiếu số dư TCBS, amount CÓ DẤU, không phải vốn nạp/rút thật)
 tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, refPrice? (giá tham chiếu, nghìn đ), refPriceDate?, hold?, sector?, updatedAt
@@ -73,11 +93,14 @@ tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, refPrice? (gi�
 daily_snapshots/{YYYY-MM-DD}  date, cash, investedCost, marketValue, totalAssets, prices{}, createdAt, updatedAt
 watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
 strategies/{autoId}         buyDrop, sellRise, lotSize, effectiveFrom (YYYY-MM-DD), reason, createdAt
+                            từ 13/10/2026: maLength, maDays, maMaxDays (vùng mua MA; thiếu = 10 · 5 · 15)
 signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price, avgCost,
                             targetBuy, qty, strategyId, buyDrop, sellRise, createdAt, updatedAt
                             07/10/2026 (orderflow-v1.x, dữ liệu cũ): doc cung cầu riêng id _cungcau, engine "orderflow", action, suggestedPrice…
                             từ orderflow-v2.0.0: CHỈ doc T+, kèm nhận xét cung cầu cùng chiều: orderflowVersion, flowVerdict now|wait|hold,
                             flowPrice (giá nút Đặt điền), flowZoneLow/flowZoneHigh, flowReason
+                            từ 13/10/2026: kind "trend" + engine "ma" (mua theo vùng MA, id ngày_MÃ_trend); mọi tín hiệu chép
+                            maLength, maDays, maMaxDays, maStreak, maRise, maSince, maUp (trạng thái MA lúc lưu; null = không rõ / lưu ngày cũ)
 settings/screening          slots { "0830"|"1030"|"1330"|"1530"|"1600"|"2000": bool }, updatedAt
                             (không có doc = chỉ bật 16:00). Owner bật/tắt khung giờ nhận tin Telegram
                             analysis { minScore, maxNew, minLiquidityBn (tỷ đ), fitMin, fitMax (nghìn đ),
@@ -98,6 +121,8 @@ screening_slots/{YYYY-MM-DD_HHMM}  khoá mỗi khung giờ: status, phase, marke
 decision_latest/{TICKER}    điểm quyết định gần nhất: buyScore, sellScore (0–100), buyParts, sellParts, threshold,
                             phase, scoreVersion, buyAbove/sellAbove/legacyBuyAbove/legacySellAbove…
                             từ decision-v1.2.0: buyParts.foreign/sellParts.foreign (0–10) + foreign { …như trên }
+                            từ 13/10/2026: maTrend { len, date, close, ma, streak, prevStreak, rise, prevRise, since, up, prevUp, down } — chỉ phiên
+                            đã đóng cửa, không vào điểm
 decision_snapshots/{runId_MÃ} · decision_runs/{ngày_post|ngày_giờ} · decision_versions/{version}
 decision_events/{ngày_MÃ_chiều_engine_version}  sự kiện vượt ngưỡng + evaluation (engine decision|legacy)
 decision_news/{hash} · decision_control/{runtime|news}   (tất cả decision_*: chỉ Cloud Function ghi, owner đọc)
@@ -160,6 +185,9 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 - **Điểm quyết định (server) chép lại logic app:** `DEFAULT_STRATEGY` + `activeStrategy()` + `holdings()` +
   ngưỡng legacy `buyAt/sellAt` (`functions/decision-service.js`) ↔ `RULE_*` + `activeStrategy()` + `computeLedger()`
   + `strategyLevels()` (`public/index.html`). Đổi cách chọn phiên bản chiến lược hay tính giá vốn → sửa cả hai.
+  Từ 13/10/2026 cả hai bên cùng có `maLength`/`maDays`/`maMaxDays` (mặc định 10 · 5 · 15) — thêm khoá chiến lược mới thì thêm cả hai bên.
+- **Luật vùng mua MA** `maInZone()` (`functions/decision-service.js`, Telegram dùng) ↔ `maInZone()` (`public/index.html`, bảng mã +
+  Khuyến nghị + `signalMaAbove`). Đổi điều kiện vùng → sửa cả hai.
 - **Chuỗi cảnh báo `riskFlags`** (`functions/decision-scoring.js`) ↔ khoá của `DECISION_RISK_TEXT` (bản lời thường ở
   tab Phân tích) + chuỗi "Xu hướng yếu — nguy cơ bắt dao rơi" mà `renderDecisionPilot` dùng để đếm (`public/index.html`).
   Đổi chữ cảnh báo phía bot → sửa cả hai chỗ bên app, không thì cảnh báo hiện nguyên văn kỹ thuật và bộ đếm về 0.
