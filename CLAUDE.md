@@ -60,8 +60,8 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
   đóng cửa trên MA từ `maDays` tới `maMaxDays` phiên liền VÀ MA đi lên ≥`maDays` phiên gần nhất (mặc định 10 · 5 · 15, chỉnh ở tab
   Chiến lược, theo phiên bản `strategies`). Trên MA quá `maMaxDays` = khó lướt → bỏ. Trong vùng + **phiên cuối đóng cửa TĂNG** →
   **tự ra tín hiệu "Mua · theo MA"** (`kind:"trend"`, `engine:"ma"`) dù chưa tới mốc T+; trong vùng mà phiên cuối giảm/đứng (giá
-  đang giảm về MA, MA chậm nên vẫn đi lên — vụ MWG 13/10/2026) → nhóm **"Chờ bật lên"** ở Khuyến nghị, không nút Đặt, không ghi
-  `signals` (`maCandidates` là nơi duy nhất lọc cho cả hai); mã đã có tín hiệu mua T+ cùng ngày thì chỉ gắn chip "Ưu tiên" vào dòng T+
+  đang giảm về MA, MA chậm nên vẫn đi lên — vụ MWG 13/10/2026) → chỉ nhãn **"MA10 chờ"** ở bảng mã, không ghi `signals`
+  (từ 16/10/2026 KHÔNG còn nhóm "Chờ bật lên" ở Khuyến nghị; `maCandidates` là nơi duy nhất lọc); mã đã có tín hiệu mua T+ cùng ngày thì chỉ gắn chip "Ưu tiên" vào dòng T+
   (một mã một lệnh mua/ngày). **Mỗi đợt chỉ tới khi mua** (`maBoughtInRun`: khớp mua / lệnh mua chờ từ ngày `since`).
   ⚠️ **Ngoại lệ có chủ ý:** mua thêm theo MA được phép khi giá TRÊN giá vốn (owner chốt; dòng Khuyến nghị ghi "Giá vốn X → Y") —
   khác luật cung cầu "mã đang giữ chỉ mua thêm ≤ giá vốn −1%". Không kèm nhận xét cung cầu (giá cung cầu bám mốc T+).
@@ -69,6 +69,17 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
   Telegram sau đóng cửa chỉ báo thay đổi vào/ra vùng (`maChanges`).
 - **Dòng chi tiết Khuyến nghị** (`adviceInsight`, owner chốt 13/10/2026): điểm quyết định · xu hướng MA · khối ngoại + so VN-Index,
   chiều mua thêm cảnh báo rủi ro. **Đã bỏ hẳn "sau lệnh còn x% tiền mặt"** (owner không cần) — đừng dựng lại.
+- **KỶ LUẬT: KẾ HOẠCH CHỐT TRƯỚC PHIÊN** (owner chốt 16/10/2026 sau review 10/09–16/10: lệnh tự phát lỗ −5,9% so với −2,2% theo
+  tín hiệu, mua lúc giá xanh tốn nhất, T+ mua khi VN-Index yếu 1 thắng/16 thua). Khối Khuyến nghị = **kế hoạch ngày** `plans/{ngày}`
+  (`buildPlan`): lệnh giới hạn đặt sẵn tại mốc (bán/mua thêm T+, giá kỳ vọng, vùng MA tại giá tham chiếu; mốc đã vượt → giá
+  tham chiếu, mốc ngoài biên độ 7% → chưa vào). Ngoài phiên: nháp + nút Chốt (chốt lại tới 9:00). **Trong phiên 9:00–15:00 không
+  ra khuyến nghị mới**, chưa chốt thì tự chốt (`maybeAutoFreeze`, chờ đủ dữ liệu `PLAN_INPUTS`).
+  **Cửa lọc MUA** (thứ tự): VN-Index yếu (`marketState`, cờ bot) → dừng T+ kể cả mã theo dõi, MA vẫn mua · quá `maxBuys`
+  (mặc định 3, theo phiên bản `strategies`) · tiền mặt SAU lệnh < `minCashRatio` → không mua. Bán không qua cửa lọc.
+  Mục bị lọc vẫn lưu trong kế hoạch kèm `gate` để đo — đừng bỏ. **Chế độ trong phiên** (`sessionLocked`): bảng mã bỏ
+  mũi tên/%, ẩn cung cầu, biểu đồ bỏ nến hôm nay; nút lấy giá hỏi "Vẫn xem?" → mở 15 phút trên máy + đếm `plans.peeks`.
+  Lệnh theo kế hoạch hay không **suy ra** (`planStatusFor`), không lưu cờ. Đổi chiến lược: sớm nhất phiên chưa mở, cách bản
+  mới nhất ≥ 5 phiên (`strategyEarliestFrom`). Fin2 không chặn được app TCBS — chỉ bớt kéo owner vào xem bảng giá.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.
 - Broker TCBS miễn phí môi giới; chỉ còn thuế TNCN 0.1% giá trị bán — chưa đưa vào tính toán.
@@ -83,6 +94,7 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
 ## Mô hình dữ liệu
 ```
 transactions/{autoId}       ticker, side "buy"|"sell", qty, price (nghìn đ), date, note, createdAt
+                            từ 16/10/2026 refPrice? = giá tham chiếu hôm đó (chép lúc ghi, chỉ khi app đã lấy giá ngày đó) → "mua lúc giá xanh"
                             từ 14/10/2026 lệnh bán có lots [{ id (= id lệnh mua của lô), qty }] — bán bao nhiêu CP từ lô nào.
                             Thiếu/lệch (lệnh cũ, Đồng bộ TCBS, lô đã xoá) → app tự trừ lô mua trước, sửa lại bằng nút Lô ở Nhật ký
 cashflows/{autoId}          type "deposit"|"withdraw"|"adjust", amount (VND nguyên), date, note, createdAt
@@ -94,6 +106,12 @@ daily_snapshots/{YYYY-MM-DD}  date, cash, investedCost, marketValue, totalAssets
 watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
 strategies/{autoId}         buyDrop, sellRise, lotSize, effectiveFrom (YYYY-MM-DD), reason, createdAt
                             từ 13/10/2026: maLength, maDays, maMaxDays (vùng mua MA; thiếu = 10 · 5 · 15)
+                            từ 16/10/2026: maxBuys (lệnh mua tối đa mỗi kế hoạch ngày; thiếu = 3)
+plans/{YYYY-MM-DD}          kế hoạch phiên đó: date, strategyId, maxBuys, minCashRatio, cashRatio, market { weak, known, date },
+                            items [{ key, ticker, side, kind buy|sell|watch|trend, engine tplus|ma, qty, level (mốc), ref (giá biên độ),
+                            limitPrice, avgCost, score, maPriority?, gate null|market|market-unknown|cash|cap }], frozenAt, frozenBy owner|auto,
+                            peeks (số lần "Vẫn xem" trong phiên, increment — doc có thể chỉ có peeks mà chưa frozenAt), createdAt, updatedAt
+orders/{autoId}             … từ 16/10/2026 planDate (lệnh đặt từ mục kế hoạch ngày đó); signalId chỉ còn ở lệnh cũ
 signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price, avgCost,
                             targetBuy, qty, strategyId, buyDrop, sellRise, createdAt, updatedAt
                             07/10/2026 (orderflow-v1.x, dữ liệu cũ): doc cung cầu riêng id _cungcau, engine "orderflow", action, suggestedPrice…
@@ -144,7 +162,7 @@ orderflow_versions/{version} · orderflow_control/{runtime|seed_MÃ (sessions 5 
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
 `fin2-tab` (tab đang mở) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight`
-(tín hiệu đã Bỏ qua ở khối Khuyến nghị, tự hết hạn khi sang ngày) · `fin2-sector-collapsed` (nhóm ngành đang gập) ·
+(mục kế hoạch đã Bỏ qua ở khối Khuyến nghị, tự hết hạn khi sang ngày) · `fin2-sector-collapsed` (nhóm ngành đang gập) ·
 `fin2-sector-off` (bảng đang tắt chia ngành — chữ "Mã" đầu bảng là nút bật/tắt, không còn sắp theo mã). Đây là sở thích hiển thị,
 mất cũng không sao. **Dữ liệu thật luôn nằm ở Firestore** — đừng đẩy thứ gì cần giữ vào đây.
 
@@ -163,7 +181,7 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 - **Ngưỡng mua/bán có 3 tầng:** hằng số mặc định `RULE_BUY_DROP`/`RULE_SELL_RISE`/`RULE_LOT`
   → phiên bản trong `strategies` → nơi dùng gọi `activeStrategy(ngày)`. Ba nơi dùng phải
   ra cùng một số cho cùng một ngày: `renderCompact` (cột Mua / Bán + tầng mở của bảng mã), `buildSignals` (phần T+ ghi log
-  tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"). **Thêm chỗ dùng mới thì gọi
+  tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"), `buildPlan` (kế hoạch ngày, theo `activeStrategy(ngày phiên)`). **Thêm chỗ dùng mới thì gọi
   `activeStrategy()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
   Phiên bản chiến lược **chỉ thêm, không sửa đè** — sửa đè là tín hiệu cũ mất ngưỡng gốc.
 - **Phần đọc datafeed giá ở app chỉ có MỘT chỗ là `fetchQuotes()`** (gọi từ nút lấy giá chung và nút
@@ -186,6 +204,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   ngưỡng legacy `buyAt/sellAt` (`functions/decision-service.js`) ↔ `RULE_*` + `activeStrategy()` + `computeLedger()`
   + `strategyLevels()` (`public/index.html`). Đổi cách chọn phiên bản chiến lược hay tính giá vốn → sửa cả hai.
   Từ 13/10/2026 cả hai bên cùng có `maLength`/`maDays`/`maMaxDays` (mặc định 10 · 5 · 15) — thêm khoá chiến lược mới thì thêm cả hai bên.
+- **Cờ "VN-Index đang yếu"** trong `riskFlags` (`functions/decision-scoring.js`) cũng là `MARKET_WEAK_FLAG` của `marketState()` (cửa lọc
+  mua của kế hoạch ngày). Đổi chữ cờ phía bot → sửa hằng số này, không thì app coi thị trường luôn "ổn".
 - **Luật vùng mua MA** `maInZone()` (`functions/decision-service.js`, Telegram dùng) ↔ `maInZone()` (`public/index.html`, bảng mã +
   Khuyến nghị + `signalMaAbove`). Đổi điều kiện vùng → sửa cả hai.
 - **Chuỗi cảnh báo `riskFlags`** (`functions/decision-scoring.js`) ↔ khoá của `DECISION_RISK_TEXT` (bản lời thường ở
@@ -235,7 +255,8 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 
 ## Đã CHỐT và CẤM dựng lại
 - **Firebase project đặt trên tài khoản công ty `nghiant@youmed.vn`.** Claude đã nêu rủi ro (IT admin tổ chức truy cập được dữ liệu tài chính cá nhân); owner cân nhắc và **chọn giữ**. Không nêu lại.
-- **Không có ngưỡng chặn mua thêm** (số lần / % vốn tối đa mỗi mã). Owner biết rủi ro dồn vốn và **chốt chưa làm**. Đừng tự thêm.
+- **Không có ngưỡng chặn mua thêm theo mã** (số lần / % vốn tối đa mỗi mã) — vẫn giữ. Từ 16/10/2026 owner chốt thêm cửa lọc
+  CHUNG của kế hoạch ngày: tối đa `maxBuys` lệnh mua/ngày + tiền mặt sau lệnh ≥ `minCashRatio` (thay quyết định cũ "không chặn").
 - **Sổ lệnh 3 mức cho máy cung–cầu cũng lấy từ `bgapidatafeed.vps.com.vn`, gọi từ Cloud Function** — đo thật 07/10/2026:
   chạy mỗi phút, 24/24 mã có dữ liệu, ~1 giây/lượt (khác `histdatafeed` của VPS bị timeout ở #012). Nền 5 phiên dư mua/dư bán
   lấy từ Người Quan Sát (`dulieu.nguoiquansat.vn/Company/OrderHistory`), cũng đo được từ Cloud Function. DNSE là phương án sau (cần API key).
@@ -269,10 +290,13 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   Nút **“Bỏ qua”** ở khối *Khuyến nghị* (trước là dải Highlight, từ 24/09/2026) KHÔNG phải nút này: nó chỉ
   ẩn tín hiệu khỏi khối trên đúng máy đó tới hết ngày (localStorage `fin2-skip-highlight`), không ghi
   Firestore, không đụng `signals` hay lệnh. Đừng biến nó thành cờ lưu vào tín hiệu.
-- **Khuyến nghị thay Highlight + Hàng đợi tín hiệu + Lệnh đang chờ** (owner chốt 02/10/2026): một danh sách theo
+- **Khuyến nghị thay Highlight + Hàng đợi tín hiệu + Lệnh đang chờ** (owner chốt 02/10/2026; từ 16/10/2026 phần "Tín hiệu" thay bằng
+  **Kế hoạch ngày** — xem mục KỶ LUẬT ở trên, đoạn dưới đây là lịch sử): một danh sách theo
   vòng đời lệnh — tín hiệu đã đạt ngưỡng hôm nay (**Đặt** / **Bỏ qua**) → lệnh đã đặt còn chờ (**Khớp** / **Hủy**).
   Từ 08/10/2026 hai nhóm trong CÙNG khối: **Tín hiệu** (dòng T+ kèm nhãn cung cầu, nút Đặt điền giá cung cầu) · **Đã đặt**.
-  Mục "sắp tới ngưỡng" và watchlist gần giá kỳ vọng KHÔNG vào Khuyến nghị (bảng mã đã báo). Tab Phân tích chỉ
+  Mục "sắp tới ngưỡng" và watchlist gần giá kỳ vọng KHÔNG vào Khuyến nghị (bảng mã đã báo). Từ 16/10/2026 mua còn chờ
+  (cung cầu "Chờ giá thấp hơn", vùng MA chờ bật lên) cũng KHÔNG vào — chỉ lọc hiển thị ở `renderAdvice`, `signals` vẫn ghi đủ.
+  Chi tiết phân tích (Điểm quyết định, Điểm Cơ hội) mở đầu bằng **Tóm lại** lời thường, số liệu gập "Xem số liệu". Tab Phân tích chỉ
   còn "Hiệu quả tín hiệu" (chất lượng tín hiệu + đóng góp lãi/lỗ). Đừng dựng lại hàng đợi thứ hai.
 - **Không có mô phỏng ngược** (tính lại "nếu dùng ngưỡng khác từ đầu thì sao"). Owner chọn
   cách so sánh theo giai đoạn hiệu lực thật. Đừng tự thêm.

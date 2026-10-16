@@ -22,6 +22,8 @@ service cloud.firestore {
     match /watch_prices/{id}    { allow read, write: if isOwner(); }
     match /orders/{id}          { allow read, write: if isOwner(); }
     match /theses/{id}          { allow read, write: if isOwner(); }
+    // Kế hoạch ngày (chốt trước phiên) + số lần mở xem giá trong phiên — owner ghi từ app.
+    match /plans/{id}           { allow read, write: if isOwner(); }
     // Kết quả bot do Cloud Function (Admin SDK) ghi; trình duyệt chỉ được đọc.
     match /screening_runs/{id}    { allow read: if isOwner(); allow write: if false; }
     match /screening_results/{id} { allow read: if isOwner(); allow write: if false; }

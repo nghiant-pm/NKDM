@@ -9,7 +9,7 @@ const { decisionInputs: I } = require("./scoring");
    holdings() ↔ computeLedger() · buyAt/sellAt legacy ↔ strategyLevels() trong public/index.html.
    Đổi một bên phải đổi bên kia. Phiên bản thật luôn đọc từ strategies. */
 const DEFAULT_STRATEGY = { id: null, buyDrop: 2, sellRise: 3, buyDropPct: null, sellRisePct: null,
-  lotSize: 100, minCashRatio: 20, maxCashRatio: 30, maLength: 10, maDays: 5, maMaxDays: 15 };
+  lotSize: 100, minCashRatio: 20, maxCashRatio: 30, maLength: 10, maDays: 5, maMaxDays: 15, maxBuys: 3 };
 function activeStrategy(rows, date) {
   const usable = rows.filter((r) => r.effectiveFrom && r.effectiveFrom <= date).sort((a, b) =>
     a.effectiveFrom.localeCompare(b.effectiveFrom) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
@@ -19,7 +19,7 @@ function activeStrategy(rows, date) {
   for (const key of ["buyDrop", "sellRise", "lotSize", "minCashRatio", "maxCashRatio"]) {
     if (Number.isFinite(Number(row[key]))) out[key] = Number(row[key]);
   }
-  for (const key of ["buyDropPct", "sellRisePct", "maLength", "maDays", "maMaxDays"]) {
+  for (const key of ["buyDropPct", "sellRisePct", "maLength", "maDays", "maMaxDays", "maxBuys"]) {
     if (row[key] != null && Number.isFinite(Number(row[key])) && Number(row[key]) > 0) out[key] = Number(row[key]);
   }
   return out;

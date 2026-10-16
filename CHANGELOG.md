@@ -4,6 +4,51 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-16b (Kỷ luật: kế hoạch chốt trước phiên)
+
+Review 10/09–16/10/2026 (owner nhờ): lệnh tự phát lỗ −5,9% so với −2,2% khi theo tín hiệu; 26/45 lệnh mua đặt lúc giá cao hơn
+phiên trước (5 phiên sau −2,1%, 4/22 lệnh có lãi); khi VN-Index yếu, các lần mua T+ được 1 thắng / 16 thua; 10 phiên bản chiến lược trong 31 ngày. Owner chốt
+làm cả 6 đề xuất:
+- **Khuyến nghị thành Kế hoạch ngày** (`plans/{ngày}`, collection mới + nhánh rules). Ngoài phiên: bản nháp cho phiên kế tiếp
+  (mỗi mục là lệnh giới hạn đặt sẵn: bán/mua thêm tại mốc T+, mã theo dõi tại giá kỳ vọng, vùng MA tại giá tham chiếu; mốc đã
+  vượt thì đặt ở giá tham chiếu, mốc ngoài biên độ 7% thì chưa vào kế hoạch) + nút **Chốt kế hoạch** (chốt lại được tới 9:00).
+  Trong phiên chỉ còn kế hoạch đã chốt, không ra khuyến nghị mới; chưa chốt thì app tự chốt bản nháp. Nút Đặt điền giá + ngày kế hoạch.
+- **Cửa lọc lệnh MUA:** VN-Index yếu → dừng mua T+ (kể cả mã theo dõi), mua theo MA vẫn được · tối đa **3 lệnh mua/ngày**
+  (ô mới ở tab Chiến lược, theo phiên bản `maxBuys`) xếp theo vùng MA rồi Điểm mua · **tiền mặt sau lệnh dưới mức tối thiểu** thì
+  không mua (thay quyết định cũ "không có ngưỡng chặn mua thêm"). Mục bị lọc vẫn lưu trong kế hoạch kèm lý do để đo về sau.
+- **Chế độ trong phiên (9:00–15:00):** bảng mã bỏ mũi tên/% trong ngày, ẩn cung cầu, biểu đồ bỏ nến hôm nay. Nút lấy giá hỏi
+  "Vẫn xem?" — đồng ý thì mở 15 phút trên máy đó và **đếm** vào `plans.peeks`. Bot cung cầu vẫn chạy để đo.
+- **Lệnh ngoài kế hoạch:** form Giao dịch báo ngay "Ngoài kế hoạch" / "Mua cao hơn giá tham chiếu" (không chặn); Nhật ký ghi
+  "· ngoài kế hoạch", "· giá xanh". Lệnh mới chép `refPrice` (giá tham chiếu hôm đó). Trước ngày có kế hoạch đầu tiên: theo tín hiệu cùng ngày.
+- **Báo cáo Kỷ luật** đầu tab Phân tích (7/30 ngày): % lệnh theo kế hoạch, lãi/lỗ theo lô của lệnh mua theo/ngoài kế hoạch, mua
+  lúc giá xanh, số lần xem giá trong phiên, số kế hoạch chốt tay/tự chốt.
+- **Giãn nhịp đổi chiến lược:** phiên bản mới hiệu lực sớm nhất từ phiên chưa mở và cách bản mới nhất ≥ 5 phiên.
+- Xuất dữ liệu thêm `keHoach` + cờ `theoKeHoach`/`muaLucGiaXanh` ở giao dịch. Server chỉ thêm khoá `maxBuys` vào bản sao chiến lược.
+
+· `public/index.html` · `firestore.rules` · `functions/decision-service.js` · `CHANGELOG.md` · `CLAUDE.md` · `CODEMAP.md`
+
+## 2026-10-16 (Khuyến nghị gọn hơn + phân tích lời thường)
+
+Owner thấy danh sách Khuyến nghị dài và phần phân tích khó hiểu. Chốt:
+- **Khuyến nghị bỏ các mục mua còn chờ:** cung cầu "Chờ giá thấp hơn" và nhóm "Chờ bật lên" (vùng MA) không còn hiện. Tín hiệu vẫn
+  ghi log `signals` như cũ; bảng mã vẫn báo (dòng cung cầu, nhãn "MA10 chờ"). Trong ngày chuyển sang "Mua ngay" thì tự hiện lại.
+  Chiều bán "Giữ thêm" giữ nguyên.
+- **Điểm quyết định** (Chi tiết mã + tab Phân tích): thêm **Tóm lại** ở đầu — kết luận Mua/Bán bằng lời, điểm cộng, điểm trừ, lý do
+  nên chốt lời (chỉ khi áp lực bán ≥ 6). Bảng thành phần gập vào "Xem số liệu".
+- **Điểm Cơ hội** (nút Chấm cơ hội): thêm kết luận + điểm cộng/điểm trừ lời thường; so cùng ngành còn một câu "1 tháng qua tăng
+  tốt hơn/kém hơn". Bảng điểm và bảng so sánh gập vào "Xem số liệu".
+- Không đổi công thức, điểm hay ngưỡng nào — chỉ đổi cách hiển thị.
+
+· `public/index.html` · `CHANGELOG.md` · `CLAUDE.md`
+
+## 2026-10-14b (Bảng mã: cột STT trước mã)
+
+- Bảng nắm giữ và bảng theo dõi có **số thứ tự** trước mã, đếm theo đúng thứ tự đang hiện (sau sắp xếp/kéo thả, liền mạch qua
+  các nhóm ngành; nhóm đang gập không đếm).
+- Sửa kèm: trên điện thoại ô mã bị tràn sang cột số lượng khi có cả nút lô và nhãn MA10↑ — nay nhãn MA tự xuống dòng khi thiếu chỗ.
+
+· `public/index.html` · `CHANGELOG.md`
+
 ## 2026-10-14 (Quản lý cổ phiếu theo lô)
 
 Owner muốn thấy một mã đang lỗ vẫn có lô lãi, để biết bán lô nào, bao nhiêu. Phỏng vấn + chốt bước 1 (chỉ xem và tính lãi/lỗ):
