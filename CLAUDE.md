@@ -80,6 +80,13 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
   mũi tên/%, ẩn cung cầu, biểu đồ bỏ nến hôm nay; nút lấy giá hỏi "Vẫn xem?" → mở 15 phút trên máy + đếm `plans.peeks`.
   Lệnh theo kế hoạch hay không **suy ra** (`planStatusFor`), không lưu cờ. Đổi chiến lược: sớm nhất phiên chưa mở, cách bản
   mới nhất ≥ 5 phiên (`strategyEarliestFrom`). Fin2 không chặn được app TCBS — chỉ bớt kéo owner vào xem bảng giá.
+- **BÁN / GỒNG** (owner chốt 19/10/2026, `sell-v1.0.0`, chống bán non + bán cảm xúc): tới mốc bán T+ thì bán theo số **dấu hiệu giữ**
+  (`holdSignals`): MA bắt buộc (đóng cửa trên MA `maLength`, MA đi lên) + VN-Index không yếu · khối ngoại mua ròng · cầu còn mạnh cuối phiên
+  trước (cung cầu `sellAdvice.verdict === "hold"`). Không MA/MA+0 → bán hết · MA+1 → 1/2 · MA+2 → 1/3 · 4/4 → gồng hết (`SELL_TIER_SHARE`,
+  cố định theo version — đổi là nâng `SELL_VERSION`; làm tròn lô, không chia được thì gồng cả). Phần gồng thoát khi đóng cửa dưới MA hoặc
+  chạm **sàn = mốc T+ lúc bán đợt đầu** (lệnh điều kiện owner tự đặt ở TCBS; sàn KHÔNG đổi khi mua thêm theo MA). Lãi mỏng (vốn +1% →
+  mốc) chỉ bán khi dưới MA / VN-Index yếu. Đang gồng **suy ra** (`rideState`: kế hoạch đã chốt có mục `tier` `keepQty>0` + có lệnh bán
+  ngày đó), không lưu cờ. Đang gồng vẫn được mua theo MA. Chỉ ở app (`sellPlanFor` trong `buildPlan`); `signals` + nhãn tầng mở chưa đổi.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.
 - Broker TCBS miễn phí môi giới; chỉ còn thuế TNCN 0.1% giá trị bán — chưa đưa vào tính toán.
@@ -109,7 +116,8 @@ strategies/{autoId}         buyDrop, sellRise, lotSize, effectiveFrom (YYYY-MM-D
                             từ 16/10/2026: maxBuys (lệnh mua tối đa mỗi kế hoạch ngày; thiếu = 3)
 plans/{YYYY-MM-DD}          kế hoạch phiên đó: date, strategyId, maxBuys, minCashRatio, cashRatio, market { weak, known, date },
                             items [{ key, ticker, side, kind buy|sell|watch|trend, engine tplus|ma, qty, level (mốc), ref (giá biên độ),
-                            limitPrice, avgCost, score, maPriority?, gate null|market|market-unknown|cash|cap }], frozenAt, frozenBy owner|auto,
+                            limitPrice, avgCost, score, maPriority?, gate null|market|market-unknown|cash|cap,
+                            từ 19/10/2026 mục bán: mode tier|ride|exit|thin, keepQty, floor, holdCount, holdSignals{ma,market,foreign,demand}, rideSince?, why?, sellVersion }], frozenAt, frozenBy owner|auto,
                             peeks (số lần "Vẫn xem" trong phiên, increment — doc có thể chỉ có peeks mà chưa frozenAt), createdAt, updatedAt
 orders/{autoId}             … từ 16/10/2026 planDate (lệnh đặt từ mục kế hoạch ngày đó); signalId chỉ còn ở lệnh cũ
 signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price, avgCost,

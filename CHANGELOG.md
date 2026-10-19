@@ -4,6 +4,22 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-19 (Khuyến nghị bán / gồng — sell-v1.0.0)
+
+Owner phỏng vấn + chốt 19/10/2026: chống bán non và bán cảm xúc, cùng tinh thần kế hoạch chốt trước phiên. Chỉ sửa app, bot không đổi.
+- **Tới mốc bán T+ thì bán theo số dấu hiệu giữ.** MA10 bắt buộc (đóng cửa trên MA, MA đi lên) + 3 xác nhận: VN-Index không yếu ·
+  khối ngoại mua ròng 5 phiên · cầu còn mạnh cuối phiên trước. Không MA hoặc MA+0 → bán hết · MA+1 → bán 1/2 · MA+2 → bán 1/3 ·
+  đủ 4/4 → gồng hết. Làm tròn theo lô 100; mã không chia được thì gồng cả. Trước đây bán cố định 100 CP.
+- **Phần gồng** thoát khi đóng cửa dưới MA10 (kế hoạch hôm sau bán hết tại giá tham chiếu) hoặc chạm **sàn = mốc T+ lúc bán đợt đầu**
+  (dòng "Lệnh điều kiện" để owner đặt bên TCBS). Sàn giữ nguyên dù mua thêm theo MA. Mã đang gồng có nhãn "Gồng" ở bảng mã.
+- **Lãi mỏng** (giá vốn +1% → mốc T+): chỉ bán khi đóng cửa dưới MA10 hoặc VN-Index yếu, bán hết tại giá tham chiếu.
+- Dòng bán ở Khuyến nghị ghi rõ phần bán / phần gồng / sàn + "Giữ x/4" từng dấu hiệu. Luật không bán lỗ vẫn là lớp chặn cuối.
+- Mục bán của kế hoạch lưu thêm `mode`, `keepQty`, `floor`, `holdCount`, `holdSignals`, `rideSince`, `why`, `sellVersion` để đo gồng có đáng không;
+  xuất dữ liệu thêm `cheDoBan`, `dauHieuGiu`, `giuLai`, `san`, `gongTu`. Tự chốt kế hoạch chờ thêm dữ liệu cung cầu.
+- Chưa đổi: log `signals` lúc Lưu nhật ký và nhãn "Bán 100 CP" ở tầng mở bảng mã vẫn theo luật cũ.
+
+· `public/index.html` · `CHANGELOG.md` · `CLAUDE.md` · `CODEMAP.md`
+
 ## 2026-10-16b (Kỷ luật: kế hoạch chốt trước phiên)
 
 Review 10/09–16/10/2026 (owner nhờ): lệnh tự phát lỗ −5,9% so với −2,2% khi theo tín hiệu; 26/45 lệnh mua đặt lúc giá cao hơn
