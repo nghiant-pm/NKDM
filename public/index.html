@@ -5624,6 +5624,12 @@ function exportClean(v){
   return v;
 }
 
+function exportPlanItems(p){
+  return (p.items || []).map((x) => ({ ma:x.ticker, loai:x.kind, may:x.engine === "ma" ? "MA" : "T+", soLuong:x.qty, giaDat:x.limitPrice,
+    moc:x.level, giaThamChieu:x.ref, diemMua:x.score ?? null, loc:x.gate ? (PLAN_GATE_TEXT[x.gate] || x.gate) : null,
+    cheDoBan:x.mode ? SELL_MODE_TEXT[x.mode] : null, dauHieuGiu:x.holdCount ?? null, giuLai:x.keepQty ?? null, san:x.floor ?? null,
+    gongTu:x.rideSince ?? null }));
+}
 function buildExport(days, priceHistory = {}){
   const today = todayStr();
   const from = days > 0 ? daysAgoStr(days - 1) : "";
@@ -5704,10 +5710,10 @@ function buildExport(days, priceHistory = {}){
     keHoach: Object.values(state.plans).filter((p) => p.frozenAt && inRange(p.id)).sort((a,b) => a.id < b.id ? -1 : 1)
       .map((p) => ({ ngay:p.id, chotLuc:p.frozenAt, chotBoi:p.frozenBy === "auto" ? "tự chốt" : "owner", thiTruongYeu:p.market?.weak ?? null,
         tyLeTienMatPct:p.cashRatio ?? null, tienMatToiThieuPct:p.minCashRatio ?? null, muaToiDa:p.maxBuys ?? null, soLanXemTrongPhien:Number(p.peeks) || 0,
-        cacMuc:(p.items || []).map((x) => ({ ma:x.ticker, loai:x.kind, may:x.engine === "ma" ? "MA" : "T+", soLuong:x.qty, giaDat:x.limitPrice,
-          moc:x.level, giaThamChieu:x.ref, diemMua:x.score ?? null, loc:x.gate ? (PLAN_GATE_TEXT[x.gate] || x.gate) : null,
-          cheDoBan:x.mode ? SELL_MODE_TEXT[x.mode] : null, dauHieuGiu:x.holdCount ?? null, giuLai:x.keepQty ?? null, san:x.floor ?? null,
-          gongTu:x.rideSince ?? null })) })),
+        cacMuc:exportPlanItems(p) })),
+    // Kế hoạch phiên sắp tới (nháp hoặc đã chốt) — skill review mã đọc mục này để review từng lệnh trước khi Chốt.
+    keHoachSapToi: (() => { const date = planDateStr(), p = frozenPlan(date) || buildPlan(summary, date);
+      return { ngay:date, daChot:!!p.frozenAt, thiTruongYeu:p.market?.weak ?? null, cacMuc:exportPlanItems(p) }; })(),
     lenhDat: state.orders.filter((o) => inRange(o.orderDate)).sort((a,b) => (a.orderDate || "") < (b.orderDate || "") ? -1 : 1)
       .map((o) => ({ ngayDat:o.orderDate, ma:o.ticker, loai:o.side, soLuong:o.qty, giaDat:o.limitPrice,
         daKhop:o.filledQty || 0, giaKhopTB:o.averageFillPrice ?? null, trangThai:o.status,

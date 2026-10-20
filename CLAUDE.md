@@ -30,6 +30,9 @@ portfolio-tracker.html   Bản app CŨ chạy trên Artifact, đã ngưng. Giữ
                      vì chưa có git. Có git rồi thì xoá được.
 contexx.md           Context gốc từ phiên chat đầu. Chỉ đọc, không sửa logic từ đây.
 Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
+.claude/skills/review-ma/  Skill review 360 độ trước mỗi lệnh (versioning, khác các skill dùng chung bị gitignore).
+functions/review-ma.js     CLI gom dữ liệu cho skill trên, chạy ở máy owner, không deploy, không ghi Firestore.
+reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) — giai đoạn 2 nhập vào Fin2.
 ```
 
 ---
@@ -87,6 +90,12 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
   chạm **sàn = mốc T+ lúc bán đợt đầu** (lệnh điều kiện owner tự đặt ở TCBS; sàn KHÔNG đổi khi mua thêm theo MA). Lãi mỏng (vốn +1% →
   mốc) chỉ bán khi dưới MA / VN-Index yếu. Đang gồng **suy ra** (`rideState`: kế hoạch đã chốt có mục `tier` `keepQty>0` + có lệnh bán
   ngày đó), không lưu cờ. Đang gồng vẫn được mua theo MA. Chỉ ở app (`sellPlanFor` trong `buildPlan`); `signals` + nhãn tầng mở chưa đổi.
+- **REVIEW 360 ĐỘ TRƯỚC MỖI LỆNH** (owner chốt 20/10/2026, skill `review-ma`, `review-v1.0.0`): review MỌI lệnh — nhịp chính là buổi tối
+  review cả kế hoạch phiên sắp tới (`keHoachSapToi` của file xuất) trước khi Chốt; lệnh ngoài kế hoạch review riêng và tốt nhất chỉ được
+  "đưa vào kế hoạch / watchlist", không đặt ngay. Kết luận Đồng ý / Chờ / Không + giá + 3 lý do + phản biện; luật cứng đứng trước.
+  **Chạy bóng 20 phiên**: chỉ ghi kết luận, lệnh vẫn theo máy T+/MA — chưa có quyền chặn. Tin tức 3 mức, tin "ý định/tin đồn" KHÔNG cộng điểm
+  (owner lo tin do đội lái tung). **Hộp giá 1–3 tháng chỉ tinh chỉnh giá trong 3% quanh mốc, không tự ra lệnh** — nói bằng số mẫu, không "đọc đội lái".
+  Giai đoạn 2 (chưa làm): xuất file → nút "Nhập review" trong app (owner chọn, KHÔNG cất khoá quản trị trên máy) + chip trên mục kế hoạch + đo độ đúng.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.
 - Broker TCBS miễn phí môi giới; chỉ còn thuế TNCN 0.1% giá trị bán — chưa đưa vào tính toán.

@@ -4,6 +4,21 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-20 (Review 360 độ trước mỗi lệnh — giai đoạn 1)
+
+Owner phỏng vấn + chốt 20/10/2026: trước mỗi lệnh có một lượt rà soát độc lập để chắc không mua/bán theo cảm xúc. Giai đoạn 1 chỉ ở máy, chưa ghi Fin2.
+- **Skill `review-ma`** (`.claude/skills/review-ma/`): review một mã, hoặc cả kế hoạch phiên sắp tới vào buổi tối trước khi Chốt. Kết luận
+  Đồng ý / Chờ / Không + giá đặt + 3 lý do + phản biện. Luật cứng của owner đứng trước (không bán lỗ, cửa lọc mua, trong phiên không khuyến nghị mới);
+  lệnh ngoài kế hoạch tốt nhất chỉ được "đưa vào kế hoạch phiên sau". Tin tức xếp 3 mức (đã xảy ra / cam kết có thể huỷ / ý định–tin đồn
+  không cộng điểm), đối chiếu thời điểm tin với vị trí giá → cờ nghi xả hàng / nghi gom hàng. Chạy bóng 20 phiên: lệnh vẫn theo kế hoạch.
+- **Script `functions/review-ma.js`**: gom dữ liệu 360 độ của mã (giá sống VPS, xu hướng MA10–200, so VN-Index, khối lượng đột biến, khối ngoại
+  20 phiên, dư mua/dư bán 5 phiên, điểm Cơ hội + mã cùng ngành, công bố HNX) + vị thế/kế hoạch từ file xuất. Dùng lại hàm của bot, không chép phần đọc datafeed.
+  Mới: **hộp giá 1–3 tháng** (đáy/đỉnh, nhịp đáy↔đỉnh, đếm 1 năm mỗi lần chạm đáy bao nhiêu lần bật / thủng) — chỉ để tinh chỉnh giá trong 3% quanh mốc, không ra lệnh.
+- **Xuất dữ liệu thêm `keHoachSapToi`** (kế hoạch phiên sắp tới, nháp hoặc đã chốt) để review được trước khi Chốt.
+- Bản review lưu ở `reviews/` trên máy (gitignore). Giai đoạn 2: nút "Nhập review" + chip trên mục kế hoạch + đo độ đúng.
+
+· `functions/review-ma.js` · `.claude/skills/review-ma/SKILL.md` · `public/index.html` · `.gitignore` · `CHANGELOG.md` · `CLAUDE.md` · `CODEMAP.md`
+
 ## 2026-10-19 (Khuyến nghị bán / gồng — sell-v1.0.0)
 
 Owner phỏng vấn + chốt 19/10/2026: chống bán non và bán cảm xúc, cùng tinh thần kế hoạch chốt trước phiên. Chỉ sửa app, bot không đổi.

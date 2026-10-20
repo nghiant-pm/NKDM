@@ -3,7 +3,12 @@ node_modules/
 *.log
 
 # Bộ skill dùng chung, không thuộc riêng dự án này — cài lại được, không cần versioning.
-.claude/skills/
+# Riêng review-ma là skill của Fin2 (đọc functions/review-ma.js) nên vẫn versioning.
+.claude/skills/*
+!.claude/skills/review-ma/
+
+# Bản review từng mã (dữ liệu tài chính cá nhân) — chỉ ở máy, giai đoạn 2 nhập vào Fin2.
+reviews/
 
 # Repo riêng (bộ chuẩn dùng chung) — không nhúng vào repo này.
 Starter-Kit/
