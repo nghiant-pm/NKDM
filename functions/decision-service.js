@@ -73,12 +73,17 @@ function holdings(rows) {
     });
   return out;
 }
+/* Kế hoạch chiều (owner chốt 23/10/2026): lượt chấm trong giờ nghỉ trưa 11:30–13:00 tính thêm MA với giá 11:30 làm đóng cửa
+   tạm (maTrendNoon), cất RIÊNG để bảng mã + kế hoạch tối vẫn chỉ theo phiên đã đóng cửa (maTrend). Bản sao giờ của
+   LUNCH_START_MIN/LUNCH_END_MIN ở public/index.html. */
+const NOON_START = 11 * 60 + 30, NOON_END = 13 * 60;
 function vnClock(now) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now)
     .reduce((out, p) => { out[p.type] = p.value; return out; }, {});
   const minutes = Number(parts.hour) * 60 + Number(parts.minute);
-  return { date: `${parts.year}-${parts.month}-${parts.day}`, phase: minutes >= 930 ? "post" : minutes >= 540 ? "intraday" : "pre" };
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, phase: minutes >= 930 ? "post" : minutes >= 540 ? "intraday" : "pre",
+    noon: minutes >= NOON_START && minutes < NOON_END };
 }
 async function saveEvaluation(db, events, histories) {
   // Chỉ đo sự kiện của phiên bản hiện tại: sự kiện bản cũ giữ nguyên kết quả theo luật lúc đó.
@@ -114,7 +119,7 @@ function makeEvents(rows, prior, date, phase) {
     evaluation: { primary: "pending", complete: false, sessionsObserved: 0, effectPct: null } }))));
 }
 async function runDecision(db, helpers, { now = new Date(), scheduled = false } = {}) {
-  const { date, phase } = vnClock(now), id = randomUUID();
+  const { date, phase, noon } = vnClock(now), id = randomUUID();
   const lock = db.collection("decision_control").doc("runtime");
   const acquired = await db.runTransaction(async (tx) => {
     const old = (await tx.get(lock)).data();
@@ -184,6 +189,11 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
       row.legacySell = !!position && !position.hold && row.close >= sellAt;
       row.news = row.news.map(({ text, ...n }) => n);
       row.maTrend = maTrend;
+      // Lượt nghỉ trưa: nến hôm nay theo VNDirect (giá 11:30), không lấy lastPrice của app (có thể là giá sáng sớm).
+      // Lượt khác trong ngày giữ lại bản trưa để app còn đọc được tới hết phiên.
+      const noonTrend = effectivePhase === "intraday" && noon ? maStreak(histories.get(ticker), strategy.maLength) : null;
+      row.maTrendNoon = noonTrend ? { ...noonTrend, provisional: true }
+        : prior[ticker]?.maTrendNoon?.date === marketDate ? prior[ticker].maTrendNoon : null;
       row.previousBuy = prior[ticker]?.scoreVersion === D.VERSION ? prior[ticker].buyScore : null;
       row.previousSell = prior[ticker]?.scoreVersion === D.VERSION ? prior[ticker].sellScore : null;
       row.updatedAt = new Date().toISOString();

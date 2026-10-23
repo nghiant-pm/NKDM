@@ -180,7 +180,7 @@ function hardRules(ledger, side, clock, levels) {
   const pos = ledger.position, rules = [];
   if (clock.inSession) rules.push("Đang trong phiên 9:00–15:00: KHÔNG ra khuyến nghị mới (kỷ luật 16/10/2026). Chỉ review để ghi nhận, lệnh để kế hoạch tối nay.");
   if (pos && pos.giaVonTB > 0) {
-    rules.push(`Không bao giờ bán lỗ: giá bán ≥ ${r2(pos.giaVonTB * 1.01)} (giá vốn TB ${pos.giaVonTB} +1%).`);
+    rules.push(`Không bao giờ bán lỗ: giá bán ≥ ${r2(pos.giaVonTB * 1.01)} (giá vốn TB ${r2(pos.giaVonTB)} +1%).`);
     rules.push(`Mua thêm theo T+/cung cầu chỉ ≤ ${r2(pos.giaVonTB * 0.99)} (giá vốn −1%). Ngoại lệ: máy MA được mua trên giá vốn.`);
     if (pos.coTheBan < pos.soLuong) rules.push(`Còn ${pos.soLuong - pos.coTheBan} CP chưa về (T+2): không mua thêm tới khi hàng về; bán tối đa ${pos.coTheBan} CP.`);
   }

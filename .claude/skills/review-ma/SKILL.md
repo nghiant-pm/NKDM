@@ -102,7 +102,7 @@ Khung chính là **ngắn hạn (vài phiên–vài tuần)**. Dài hạn 3–12
 - Làm tròn bước giá HOSE: dưới 10 → 0,01; 10–49,95 → 0,05; từ 50 → 0,1.
 - Nằm ngoài biên độ ±7% so với giá tham chiếu thì ghi "chưa vào phiên sau".
 
-**Chiều bán** dùng luật bán/gồng `sell-v1.0.0` của app: số dấu hiệu giữ (MA, VN-Index, khối ngoại, cầu) quyết định bán hết / 1/2 / 1/3 / gồng. Review chỉ nhận xét luật đó có hợp lý với bức tranh hiện tại không, không tự đổi tỷ lệ.
+**Chiều bán** dùng luật bán/gồng của app (`SELL_VERSION`, hiện `sell-v1.1.0`): tới mốc T+ thì số dấu hiệu giữ (MA, VN-Index, khối ngoại, cầu) quyết định bán hết / 1/2 / 1/3 / gồng; lãi mỏng (dưới mốc) chỉ bán khi đóng cửa dưới MA10. Review chỉ nhận xét luật đó có hợp lý với bức tranh hiện tại không, không tự đổi tỷ lệ.
 
 ## 6. Trình bày (tiếng Việt, lời thường, không thuật ngữ khó)
 

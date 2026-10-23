@@ -289,4 +289,23 @@ const mb = maChanges(new Set(["PBK", "BNC"]), new Map([["PBK", pullback], ["BNC"
 assert.deepEqual(mb.bounced, ["BNC"], "Telegram: BNC bật lên lại");
 assert.match(telegramText(["H"], [], [], normalizeConfig(), mb), /Bật lên lại, mua được: BNC/, "Tin có dòng bật lên");
 
+// Kế hoạch chiều (23/10/2026): giờ nghỉ trưa, tóm tắt sơ bộ, đo khớp chiều + 5 phiên.
+const noonPlan = require("./noon-plan");
+const { vnClock } = require("./decision-service");
+assert.deepEqual([vnClock(new Date("2026-10-23T04:30:00Z")).noon, vnClock(new Date("2026-10-23T05:59:00Z")).noon,
+  vnClock(new Date("2026-10-23T06:00:00Z")).noon, vnClock(new Date("2026-10-23T04:29:00Z")).noon], [true, true, false, false], "Giờ nghỉ trưa 11:30–13:00");
+const noonRows = [
+  { ticker: "AAA", riskFlags: [], maTrend: { streak: 4 }, maTrendNoon: { date: "2026-10-23", close: 50, streak: 6, rise: 6, up: true } },
+  { ticker: "NEW", riskFlags: [], maTrend: { streak: 0 }, maTrendNoon: { date: "2026-10-23", close: 50, streak: 6, rise: 6, up: true } },
+  { ticker: "BBB", riskFlags: ["VN-Index đang yếu"], maTrendNoon: { date: "2026-10-23", close: 20, streak: 0, rise: 0, up: false } },
+  { ticker: "OLD", riskFlags: [], maTrendNoon: { date: "2026-10-22", close: 1, streak: 6, rise: 6, up: true } }];
+const ns = noonPlan.noonSummary({ rows: noonRows, positions: { BBB: { qty: 100, avgCost: 23 } }, watch: {}, hold: new Set(),
+  strategy: maRule, date: "2026-10-23" });
+assert.deepEqual([ns.weak, ns.buy, ns.ma, ns.sell], [true, ["BBB"], ["AAA"], []], "Trưa: MA tạm cần nền phiên trước, bỏ bản trưa ngày cũ");
+assert.match(noonPlan.noonText(ns, "2026-10-23", 1), /Chạy bóng phiên 1\/10[\s\S]*Mua T\+ \(bị dừng\): BBB[\s\S]*Mua theo MA: AAA/, "Tin trưa");
+const ev = noonPlan.evaluateNoonItem({ key: "buy_AAA", ticker: "AAA", side: "buy", kind: "buy", limitPrice: 49 },
+  [{ capturedAt: "2026-10-23T03:00:00Z", price: 40 }, { capturedAt: "2026-10-23T06:05:00Z", price: 49.5 }],
+  closesToBars([50, 51, 52, 53, 54]).map((b, i) => ({ ...b, date: "2026-10-2" + (4 + i) })), "2026-10-23", []);
+assert.deepEqual([ev.filled, ev.returnPct, ev.sessions], [false, null, 5], "Giá sáng không tính khớp chiều");
+
 console.log("Smoke scoring + khung giờ: OK");

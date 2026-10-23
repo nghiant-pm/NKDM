@@ -37,7 +37,9 @@ functions/index.js ──> Firebase Functions v2 · Node.js 22
                         ├── decision-service.js: refreshDecisionScores (callable owner), closeDecisionScores (scheduler)
                         │    ├── decision-scoring.js: công thức độc lập decision-v1.2.0 + rổ ngành
                         │    ├── scoring.js decisionInputs: dùng chung phép tính OHLCV, không đổi sàng lọc
-                        │    └── decision-news.js: HNX RSS → nội dung → AI tùy chọn → tác động giới hạn
+                        │    ├── decision-news.js: HNX RSS → nội dung → AI tùy chọn → tác động giới hạn
+                        │    └── noon-plan.js (23/10/2026): lượt 11:30/12:30 → Telegram tóm tắt kế hoạch chiều sơ bộ
+                        │        (khoá decision_control/noon); lượt 15:30 → đo plans.pm → plans.pmEvaluation
                         ├── tcbs-service.js: readTcbsPortfolio (callable owner, CHỈ ĐỌC)
                         │    └── openapi.tcbs.com.vn  iOTP → phiên → tài sản/tiền/lệnh khớp → bỏ phiên;
                         │        API Key + mã lưu ký ở Secret Manager; không ghi Firestore
@@ -125,6 +127,7 @@ Tầng 3 của mã: nút "Chi tiết" (`detailButton`) hoặc dòng điểm ở 
 | | `holdSignals(ticker,st,market,date)` `rideState(ticker,heldSince,date)` `sellPlanFor(h,ctx)` `sellPlanText(x)` `rideTag(h)` | luật bán/gồng 19/10/2026 (`SELL_VERSION`, `SELL_TIER_SHARE`): dấu hiệu giữ (MA bắt buộc + VN-Index/khối ngoại/cầu phiên trước), đang gồng suy từ kế hoạch đã chốt có mục `tier` giữ lại CP + lệnh bán cùng ngày (sàn = `floor` lần đầu), mục bán `tier`/`ride`/`exit`/`thin`; dòng chữ ở Khuyến nghị; nhãn "Gồng" ở ô mã |
 | | `marketState()` `roundTick(price,up)` `planRefPrice(ticker,date)` `buildPlan(s,date)` | thị trường yếu = cờ `MARKET_WEAK_FLAG` của lượt Điểm quyết định mới nhất (thiếu dữ liệu = chặn); bước giá HOSE; giá biên độ (tham chiếu ngày đó → giá app/đóng cửa bot mới hơn); dựng kế hoạch: mục bán/mua T+/theo dõi/MA thành lệnh giới hạn + cửa lọc mua (thị trường yếu → `maxBuys` → tiền mặt sau lệnh), mục bị lọc giữ `gate` |
 | | `frozenPlan(date)` `firstPlanDate()` `freezePlan(by)` `maybeAutoFreeze()` | kế hoạch đã chốt; ngày có kế hoạch đầu tiên; ghi `plans/{ngày}` (`merge`, giữ `peeks`); vào phiên chưa chốt thì tự chốt khi đủ `PLAN_INPUTS` (`loadedCollections`) |
+| | `inLunch()` `noonQuote(ticker,date)` `boughtTickersOn(date)` `pmPlanOf(date)` `pmNoonReady(date)` `pmSessionNo(date)` `freezePmPlan(by)` `maybeAutoFreezePm()` `pmPlanHtml(s,date,row)` | **kế hoạch chiều** (23/10/2026, chạy bóng `PM_LIVE=false`): giờ nghỉ trưa; giá 11:30 (`maTrendNoon.close`) + giá tham chiếu; mã đã mua/đặt mua trong ngày (trừ `maxBuys`); `buildPlan(s,date,true)` → `plans/{ngày}.pm`; mở app giờ trưa tự chốt khi bot đã có bản trưa; khối "Kế hoạch chiều" cuối Khuyến nghị (`data-freeze-pm`), không nút Đặt. `maTrendFor`/`maCandidates`/`holdSignals`/`sellPlanFor`/`rideState` nhận cờ `noon` |
 | | `planStatusFor(ticker,side,date)` `boughtOnGreen(t)` `refPriceFor(ticker,date)` `refreshTxPlan()` | lệnh theo/ngoài kế hoạch (suy ra; trước kế hoạch đầu tiên thì theo tín hiệu cùng ngày); mua > `refPrice` chép trên lệnh; cảnh báo `#tx-plan` ở form Giao dịch; nhãn ở Nhật ký |
 | | `renderDiscipline()` `lotPnlById()` | báo cáo Kỷ luật đầu tab Phân tích (7/30 ngày, `disciplineDays`): % theo kế hoạch, lãi/lỗ theo lô lệnh mua theo/ngoài, giá xanh, `peeks`, chốt tay/tự chốt |
 | | `dashboardData(summary)` `realizedEventsInRange(events,range)` `cashRatioFor(summary)` `cashRatioStatus(ratio,strategy)` | tính 4 chỉ số dashboard theo Tuần / Tháng / Quý / Tất cả và trạng thái tỷ lệ tiền mặt so với chiến lược |

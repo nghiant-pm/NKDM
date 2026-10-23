@@ -76,20 +76,30 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   tín hiệu, mua lúc giá xanh tốn nhất, T+ mua khi VN-Index yếu 1 thắng/16 thua). Khối Khuyến nghị = **kế hoạch ngày** `plans/{ngày}`
   (`buildPlan`): lệnh giới hạn đặt sẵn tại mốc (bán/mua thêm T+, giá kỳ vọng, vùng MA tại giá tham chiếu; mốc đã vượt → giá
   tham chiếu, mốc ngoài biên độ 7% → chưa vào). Ngoài phiên: nháp + nút Chốt (chốt lại tới 9:00). **Trong phiên 9:00–15:00 không
-  ra khuyến nghị mới**, chưa chốt thì tự chốt (`maybeAutoFreeze`, chờ đủ dữ liệu `PLAN_INPUTS`).
+  ra khuyến nghị mới** (ngoại lệ duy nhất: kế hoạch chiều giờ nghỉ trưa, xem dưới), chưa chốt thì tự chốt (`maybeAutoFreeze`, chờ đủ dữ liệu `PLAN_INPUTS`).
   **Cửa lọc MUA** (thứ tự): VN-Index yếu (`marketState`, cờ bot) → dừng T+ kể cả mã theo dõi, MA vẫn mua · quá `maxBuys`
   (mặc định 3, theo phiên bản `strategies`) · tiền mặt SAU lệnh < `minCashRatio` → không mua. Bán không qua cửa lọc.
   Mục bị lọc vẫn lưu trong kế hoạch kèm `gate` để đo — đừng bỏ. **Chế độ trong phiên** (`sessionLocked`): bảng mã bỏ
   mũi tên/%, ẩn cung cầu, biểu đồ bỏ nến hôm nay; nút lấy giá hỏi "Vẫn xem?" → mở 15 phút trên máy + đếm `plans.peeks`.
-  Lệnh theo kế hoạch hay không **suy ra** (`planStatusFor`), không lưu cờ. Đổi chiến lược: sớm nhất phiên chưa mở, cách bản
+  Lệnh theo kế hoạch hay không **suy ra** (`planStatusFor`), không lưu cờ. Còn lệnh chờ cùng mã cùng chiều (kể cả đặt ngày trước) → mục
+  kế hoạch không hiện lại ở Khuyến nghị, chỉ ghi chú trên dòng "Đã đặt" (owner báo 20/10/2026); mục vẫn nằm trong kế hoạch đã chốt. Đổi chiến lược: sớm nhất phiên chưa mở, cách bản
   mới nhất ≥ 5 phiên (`strategyEarliestFrom`). Fin2 không chặn được app TCBS — chỉ bớt kéo owner vào xem bảng giá.
 - **BÁN / GỒNG** (owner chốt 19/10/2026, `sell-v1.0.0`, chống bán non + bán cảm xúc): tới mốc bán T+ thì bán theo số **dấu hiệu giữ**
   (`holdSignals`): MA bắt buộc (đóng cửa trên MA `maLength`, MA đi lên) + VN-Index không yếu · khối ngoại mua ròng · cầu còn mạnh cuối phiên
   trước (cung cầu `sellAdvice.verdict === "hold"`). Không MA/MA+0 → bán hết · MA+1 → 1/2 · MA+2 → 1/3 · 4/4 → gồng hết (`SELL_TIER_SHARE`,
   cố định theo version — đổi là nâng `SELL_VERSION`; làm tròn lô, không chia được thì gồng cả). Phần gồng thoát khi đóng cửa dưới MA hoặc
   chạm **sàn = mốc T+ lúc bán đợt đầu** (lệnh điều kiện owner tự đặt ở TCBS; sàn KHÔNG đổi khi mua thêm theo MA). Lãi mỏng (vốn +1% →
-  mốc) chỉ bán khi dưới MA / VN-Index yếu. Đang gồng **suy ra** (`rideState`: kế hoạch đã chốt có mục `tier` `keepQty>0` + có lệnh bán
+  mốc) chỉ bán khi đóng cửa dưới MA — **sell-v1.1.0 (owner chốt 20/10/2026): VN-Index yếu KHÔNG còn tự bán lãi mỏng** (vụ TCB lãi 2%,
+  mã khỏe hơn thị trường bị khuyên bán hết). Đừng dựng lại. Đang gồng **suy ra** (`rideState`: kế hoạch đã chốt có mục `tier` `keepQty>0` + có lệnh bán
   ngày đó), không lưu cờ. Đang gồng vẫn được mua theo MA. Chỉ ở app (`sellPlanFor` trong `buildPlan`); `signals` + nhãn tầng mở chưa đổi.
+- **KẾ HOẠCH CHIỀU** (owner chốt 23/10/2026, `pm-v1.0.0`, **CHẠY BÓNG**): giờ nghỉ trưa 11:30–13:00 dựng thêm kế hoạch cho phiên chiều
+  (`buildPlan(s, ngày, noon=true)` → `plans/{ngày}.pm`). Giá so mốc = giá 11:30 của bot (`maTrendNoon.close`, `noonQuote`), MA tạm =
+  `decision_latest.maTrendNoon` (cất RIÊNG, không đè `maTrend`) và phải có **nền phiên trước** (`maTrend.streak > 0`) · giá mua ≤ giá
+  tham chiếu · `maxBuys` dùng chung cả ngày (`boughtTickersOn`) · tiền mặt trừ lệnh mua đang treo · gồng tính cả lệnh bán sáng (`rideState` sameDay).
+  Mở app giờ trưa → tự chốt (`maybeAutoFreezePm`), Chốt lại tới 13:00; nghỉ trưa `sessionLocked` mở xem giá. Telegram trưa chỉ là tóm tắt
+  sơ bộ (`functions/noon-plan.js`), bot KHÔNG chép luật kế hoạch. **Chạy bóng** (`PM_LIVE = false`): không nút Đặt, lệnh không tính
+  "theo kế hoạch"; bot đo sau đóng cửa → `plans/{ngày}.pmEvaluation` (khớp chiều từ mẫu phút `orderflow_daily` + lãi/lỗ 5 phiên).
+  Owner xem số sau 10 phiên rồi mới quyết mở — **đừng tự bật `PM_LIVE`**.
 - **REVIEW 360 ĐỘ TRƯỚC MỖI LỆNH** (owner chốt 20/10/2026, skill `review-ma`, `review-v1.0.0`): review MỌI lệnh — nhịp chính là buổi tối
   review cả kế hoạch phiên sắp tới (`keHoachSapToi` của file xuất) trước khi Chốt; lệnh ngoài kế hoạch review riêng và tốt nhất chỉ được
   "đưa vào kế hoạch / watchlist", không đặt ngay. Kết luận Đồng ý / Chờ / Không + giá + 3 lý do + phản biện; luật cứng đứng trước.
@@ -128,6 +138,9 @@ plans/{YYYY-MM-DD}          kế hoạch phiên đó: date, strategyId, maxBuys,
                             limitPrice, avgCost, score, maPriority?, gate null|market|market-unknown|cash|cap,
                             từ 19/10/2026 mục bán: mode tier|ride|exit|thin, keepQty, floor, holdCount, holdSignals{ma,market,foreign,demand}, rideSince?, why?, sellVersion }], frozenAt, frozenBy owner|auto,
                             peeks (số lần "Vẫn xem" trong phiên, increment — doc có thể chỉ có peeks mà chưa frozenAt), createdAt, updatedAt
+                            từ 23/10/2026: pm { …cùng dạng kế hoạch, version pm-v1.0.0, boughtBefore[], shadow, frozenAt, frozenBy } = kế hoạch chiều (app ghi);
+                            pmEvaluation { items [{ key, ticker, side, kind, limitPrice, inMorning, filled, afternoonLow/High, sessions,
+                            exitClose, returnPct }], complete, sessions 5, evaluatedAt } — CHỈ Cloud Function ghi (doc có 2 bên ghi, mỗi bên một field)
 orders/{autoId}             … từ 16/10/2026 planDate (lệnh đặt từ mục kế hoạch ngày đó); signalId chỉ còn ở lệnh cũ
 signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price, avgCost,
                             targetBuy, qty, strategyId, buyDrop, sellRise, createdAt, updatedAt
@@ -158,6 +171,7 @@ decision_latest/{TICKER}    điểm quyết định gần nhất: buyScore, sell
                             từ decision-v1.2.0: buyParts.foreign/sellParts.foreign (0–10) + foreign { …như trên }
                             từ 13/10/2026: maTrend { len, date, close, ma, streak, prevStreak, rise, prevRise, since, up, prevUp, down } — chỉ phiên
                             đã đóng cửa, không vào điểm
+                            từ 23/10/2026: maTrendNoon { …như maTrend, provisional } — lượt nghỉ trưa, nến hôm nay = giá 11:30; lượt khác cùng ngày chép lại
 decision_snapshots/{runId_MÃ} · decision_runs/{ngày_post|ngày_giờ} · decision_versions/{version}
 decision_events/{ngày_MÃ_chiều_engine_version}  sự kiện vượt ngưỡng + evaluation (engine decision|legacy)
 decision_news/{hash} · decision_control/{runtime|news}   (tất cả decision_*: chỉ Cloud Function ghi, owner đọc)
@@ -223,6 +237,9 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   Từ 13/10/2026 cả hai bên cùng có `maLength`/`maDays`/`maMaxDays` (mặc định 10 · 5 · 15) — thêm khoá chiến lược mới thì thêm cả hai bên.
 - **Cờ "VN-Index đang yếu"** trong `riskFlags` (`functions/decision-scoring.js`) cũng là `MARKET_WEAK_FLAG` của `marketState()` (cửa lọc
   mua của kế hoạch ngày). Đổi chữ cờ phía bot → sửa hằng số này, không thì app coi thị trường luôn "ổn".
+- **Giờ nghỉ trưa** `NOON_START`/`NOON_END` (`functions/decision-service.js`) ↔ `LUNCH_START_MIN`/`LUNCH_END_MIN` (`public/index.html`);
+  `PM_SHADOW_SESSIONS` (`functions/noon-plan.js`) ↔ cùng tên ở app. `noonSummary` (Telegram) chỉ là bản sơ bộ của `buildPlan(…, noon)`,
+  cố ý không chép gồng/cửa lọc — đổi luật kế hoạch chiều KHÔNG cần sửa bot.
 - **Luật vùng mua MA** `maInZone()` (`functions/decision-service.js`, Telegram dùng) ↔ `maInZone()` (`public/index.html`, bảng mã +
   Khuyến nghị + `signalMaAbove`). Đổi điều kiện vùng → sửa cả hai.
 - **Chuỗi cảnh báo `riskFlags`** (`functions/decision-scoring.js`) ↔ khoá của `DECISION_RISK_TEXT` (bản lời thường ở

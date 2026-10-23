@@ -4,6 +4,43 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-23 (Kế hoạch chiều — chạy bóng, pm-v1.0.0)
+
+Owner phỏng vấn + chốt 22–23/10/2026: thêm một lượt khuyến nghị giờ nghỉ trưa cho phiên chiều, ngoài kế hoạch tối như cũ.
+- **Bot lượt nghỉ trưa (11:30, thử lại 12:30)** tính thêm MA với giá 11:30 làm đóng cửa tạm → `decision_latest.maTrendNoon`, cất riêng:
+  bảng mã + kế hoạch tối vẫn chỉ theo phiên đã đóng cửa (`maTrend`).
+- **Telegram trưa**: tóm tắt sơ bộ (thị trường, mã bán tại mốc / mua T+ / mua theo MA) + nhắc mở Fin2 trước 13:00. Luật kế hoạch chỉ
+  nằm ở app, tin nhắn ghi rõ "sơ bộ". Mỗi ngày một lần (`decision_control/noon`).
+- **App: Kế hoạch chiều** trong khối Khuyến nghị (11:30–15:00). Cùng luật kế hoạch tối + 3 điểm owner chốt: mua theo MA tạm cần
+  nền phiên trước (phiên trước đã trên MA) · giá mua không vượt giá tham chiếu · số lệnh mua tối đa dùng chung cả ngày (mã đã mua/đặt
+  mua trong ngày trừ vào). Mở app giờ trưa thì tự chốt, "Chốt lại" được tới 13:00. Lưu ở `plans/{ngày}.pm`.
+- **Giờ nghỉ trưa mở xem giá** (giá đứng), 13:00 khoá lại như cũ.
+- **Chạy bóng**: chưa có nút Đặt, lệnh không tính "theo kế hoạch". Sau đóng cửa bot đo từng mục: chiều có khớp giá không (mẫu phút
+  cung cầu từ 13:00) + lãi/lỗ sau 5 phiên → `plans/{ngày}.pmEvaluation`. Tab Phân tích (Kỷ luật) thêm 2 ô: số phiên + mục mới so với
+  kế hoạch sáng, và lãi/lỗ 5 phiên của mục mới đã khớp. File xuất cho AI thêm `keHoachChieu`.
+
+· `functions/decision-service.js` · `functions/noon-plan.js` (mới) · `functions/index.js` · `functions/smoke.js` · `public/index.html` · `CHANGELOG.md` · `CLAUDE.md` · `CODEMAP.md`
+
+## 2026-10-20c (Lãi mỏng chỉ bán khi dưới MA — sell-v1.1.0)
+
+Owner hỏi vì sao TCB (lãi ~2%, chưa tới mốc bán 36) bị khuyên bán hết: luật lãi mỏng sell-v1.0.0 bán khi đóng cửa dưới MA10 HOẶC
+VN-Index yếu, nên mã khỏe hơn thị trường (TCB trên mọi đường MA, mạnh hơn VN-Index 9–13%, cung cầu "Giữ thêm") vẫn bị bán non.
+Owner chốt: **lãi mỏng chỉ bán khi đóng cửa dưới MA10**; VN-Index yếu không còn tự bán. Phần tới mốc T+ (dấu hiệu giữ, VN-Index vẫn là
+một dấu hiệu) không đổi. Kế hoạch đã chốt trước đó giữ nguyên mục cũ.
+
+· `public/index.html` · `.claude/skills/review-ma/SKILL.md` · `CHANGELOG.md` · `CLAUDE.md`
+
+## 2026-10-20 (Lệnh treo không bị khuyến nghị lại)
+
+Owner báo: đặt theo khuyến nghị nhưng chưa khớp, lệnh còn treo mà hôm sau kế hoạch lại ra mục y hệt.
+- Khuyến nghị coi mục kế hoạch là "đã đặt" khi còn **bất kỳ lệnh chờ cùng mã cùng chiều**, không chỉ lệnh đặt từ kế hoạch hôm nay.
+  Mục đó không hiện thêm dòng mới; lệnh treo vẫn ở nhóm "Đã đặt".
+- Lệnh treo từ ngày trước có thêm ghi chú so với kế hoạch hôm nay: giá khác → "Kế hoạch nay @X" (Hủy rồi Đặt lại nếu muốn theo giá mới) ·
+  bị cửa lọc chặn → "Kế hoạch lọc: …" · không còn trong kế hoạch → "Không còn trong kế hoạch" (nên cân nhắc Hủy).
+- Kế hoạch đã chốt vẫn giữ nguyên mục đó (vẫn tính vào số lệnh mua/ngày và tiền mặt; lệnh khớp vẫn tính "theo kế hoạch").
+
+· `public/index.html` · `CHANGELOG.md` · `CLAUDE.md`
+
 ## 2026-10-20 (Review 360 độ trước mỗi lệnh — giai đoạn 1)
 
 Owner phỏng vấn + chốt 20/10/2026: trước mỗi lệnh có một lượt rà soát độc lập để chắc không mua/bán theo cảm xúc. Giai đoạn 1 chỉ ở máy, chưa ghi Fin2.

@@ -555,10 +555,19 @@ exports.analyzeTicker = onCall({ timeoutSeconds: 120, memory: "256MiB", cors: tr
     throw new HttpsError("unavailable", "Chưa phân tích được mã này");
   }
 });
+// Kế hoạch chiều (owner chốt 23/10/2026): lượt 11:30 (thử lại 12:30) nhắn Telegram tóm tắt sơ bộ; lượt 15:30 đo kế hoạch chiều đã chốt.
+const noonPlan = require("./noon-plan");
+const { vnClock } = require("./decision-service");
 exports.closeDecisionScores = onSchedule({ schedule: "30 9-15 * * 1-5", timeZone: TIME_ZONE,
-  timeoutSeconds: 540, memory: "512MiB", retryCount: 0 }, async () => {
-  await runDecision(getFirestore(), decisionHelpers, { scheduled: true });
-  await orderflow.evaluateOrderflowEvents(getFirestore(), fetchHistory);
+  timeoutSeconds: 540, memory: "512MiB", retryCount: 0, secrets: [TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID] }, async () => {
+  const db = getFirestore(), clock = vnClock(new Date());
+  const result = await runDecision(db, decisionHelpers, { scheduled: true });
+  if (clock.noon && ["complete", "partial"].includes(result.status)) {
+    await noonPlan.sendNoonPlan(db, clock.date, (text) => sendTelegram(TELEGRAM_BOT_TOKEN.value(), TELEGRAM_CHAT_ID.value(), text))
+      .catch((error) => logger.error("noon plan telegram", error));
+  }
+  await orderflow.evaluateOrderflowEvents(db, fetchHistory);
+  if (clock.phase === "post") await noonPlan.evaluateNoonPlans(db, fetchHistory).catch((error) => logger.error("noon plan evaluation", error));
 });
 
 // Mốc đáy/đỉnh 5–20 phiên cho vùng giá tối ưu: cùng nguồn VNDirect với chấm điểm, chỉ cần ~45 ngày lịch.
