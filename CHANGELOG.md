@@ -4,6 +4,28 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-30b (Cắt lỗ thay cho "giảm thì mua thêm" — chép sang bản 23/10)
+
+Owner chốt sáng 30/10 (phiên cloud, sau bài học FPT/TCX) bỏ bình quân giá xuống, thêm cắt lỗ. Phiên cloud làm trên bản 24/09 nên
+không deploy lại được; chép phần luật sang bản 23/10, owner chọn lại chỗ đụng nhau: **giữ sell-v1.1.0** cho mã lãi (không lấy chốt
+lời đuổi MA20/8%), mua thêm chỉ qua vùng MA10 khi đang lãi, **vốn chết + mã thay thế + Telegram "Danh mục cần xử lý" để sau**.
+- **Cắt lỗ** (thay luật 07/10 "không bao giờ khuyến nghị bán lỗ"): mã lỗ/hoà mà lỗ ≥ 5% hoặc dưới MA50 → bán về 1/2 khối lượng lớn
+  nhất chu kỳ; chạm cả hai → bán hết. Áp dụng cả mã Giữ. Cách mức cắt ≤ 0,5 điểm → "Sắp cắt lỗ".
+- **Kế hoạch ngày**: mục "Bán · cắt lỗ" (chip đỏ, ghi mức cắt + lý do), đứng trước luật bán/gồng, không qua cửa lọc. Bỏ mục mua T+
+  của mã đang giữ; vùng MA10 bỏ mã đang lỗ/hoà. Kế hoạch chiều cũng theo luật này.
+- **Bảng mã**: cột "Mua" → "Cắt lỗ" (mức cắt màu đỏ, mã lãi vẫn hiện mốc bán); nhãn "Cắt lỗ x CP" / "Sắp cắt lỗ". Chi tiết mã: "Mức
+  cắt lỗ · bán". Biểu đồ: vạch "Mua" → vạch "Cắt lỗ".
+- **Cung cầu** không còn nhận xét chiều mua cho mã đang giữ.
+- **Tab Chiến lược**: ô "Giảm để mua" (điểm + %) → "Cắt lỗ (%)". Bản chiến lược cũ thiếu trường này dùng 5%.
+- **Tín hiệu (`signals`)**: cắt lỗ = `kind:"sell"`, `engine:"stop"`, kèm `reason`; mọi tín hiệu chép `stopLossPct`. File xuất AI
+  thêm `mucCatLo`, `lyDoCatLo`, `catLoPhanTram`, máy `cat-lo`.
+- **Bot**: `maTrend` thêm `ma50`; tin Telegram trưa có dòng "Cắt lỗ", bỏ "Mua T+" cho mã đang giữ. Smoke thêm ca MA50 + cắt lỗ trưa.
+- Đã kiểm: 11 ca luật (về 1/2, bán hết, chờ bước 2, sắp cắt, mã Giữ, mã lãi) đúng; trang chạy với dữ liệu thật không lỗi console.
+  Chưa thấy được kế hoạch nháp mới (kế hoạch 30/10 đã chốt từ sáng) — nháp phiên kế tiếp (sau 15:00) sẽ theo luật mới. MA50 chỉ có sau
+  lượt bot kế tiếp; trước đó chỉ cắt theo %.
+
+· `public/index.html` · `functions/decision-service.js` · `functions/noon-plan.js` · `functions/smoke.js` · `CHANGELOG.md` · `CLAUDE.md` · `CODEMAP.md`
+
 ## 2026-10-30 (Khôi phục bản 23/10 sau deploy nhầm bản cũ)
 
 Phiên cloud sáng 30/10 lấy code từ GitHub (`main`, dừng ở 24/09) để làm luật cắt lỗ rồi deploy, đè mất bản 23/10 chỉ có trên máy:

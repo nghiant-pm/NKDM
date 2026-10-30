@@ -50,11 +50,16 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   nhảy thành 15'; chờ là do luật 30 phút chứ không do nhịp quét). Khung 30 phút **nối qua nghỉ trưa**; từ phút thứ 15 có nhận xét
   **sơ bộ** (điểm trộn với nền theo số phút/30). Ngày trước **chỉ làm nền, KHÔNG trộn mẫu phút qua đêm** (sổ lệnh đã xoá):
   nền 5 phiên làm mới mỗi ngày, phiên tự thu đủ ≥150 mẫu dùng dữ liệu tự thu, thiếu thì Người Quan Sát, phiên gần nặng hơn.
-- ⚠️ **KHÔNG BAO GIỜ khuyến nghị bán lỗ** (owner chốt 07/10/2026): giá bán cung cầu luôn ≥ giá vốn TB +1% (`POLICY.minProfitPct`)
-  kể cả khi mốc T+ đặt thấp hơn; mã đang giữ chỉ mua thêm ≤ giá vốn −1%. App chặn thêm lớp cuối ở `orderflowAdvice`
-  (giá bán phải > giá vốn của app). "Giảm rủi ro" đã bỏ. Đừng dựng lại bán cắt lỗ.
-  Chi tiết công thức + ngưỡng: `POLICY` trong `functions/orderflow.js`, cố định theo version — đổi là nâng version.
-- ⚠️ **−2 / +3 / 100 CP chỉ là MẶC ĐỊNH.** Owner sửa được ở tab Chiến lược, mỗi lần
+- ⚠️ **CẮT LỖ — BỎ HẲN "GIẢM THÌ MUA THÊM"** (owner chốt 30/10/2026 sau bài học FPT/TCX, **thay luật 07/10/2026 "không bao giờ
+  khuyến nghị bán lỗ"**). `stopAdvice()`: mã đang lỗ/hoà mà lỗ ≥ `stopLossPct` (mặc định 5%, tab Chiến lược) HOẶC giá dưới MA50
+  (`decision_latest.maTrend.ma50`, bot, phiên đã đóng cửa) → bán về 1/2 khối lượng lớn nhất chu kỳ (`cycleMaxQty`, làm tròn lô);
+  chạm CẢ HAI → bán hết. **Áp dụng cả mã Giữ.** Cách mức cắt ≤ `nearRange` điểm → "Sắp cắt lỗ". Trong kế hoạch: mục bán
+  `engine:"stop"`, `mode:"stop"` tại giá so mốc, không qua cửa lọc, đứng trước luật bán/gồng. Mã đang giữ **không còn mốc mua T+**
+  (giá vốn −2), cung cầu không nhận xét chiều mua cho mã đang giữ, vùng MA10 bỏ mã đang lỗ/hoà. **Mã đang lỗ không bao giờ có gợi ý
+  mua thêm — đừng dựng lại.** Mã đang lãi vẫn theo sell-v1.1.0 (owner chọn giữ, KHÔNG lấy chốt lời đuổi MA20/8% của phiên cloud).
+  Chưa làm (owner để sau): vốn chết + mã thay thế, mục "Danh mục cần xử lý" ở Telegram sàng lọc. Tin Telegram trưa có dòng "Cắt lỗ".
+  Giá bán cung cầu vẫn ≥ giá vốn +1% (`POLICY.minProfitPct`) — chỉ áp cho mục bán T+, mục cắt lỗ không kèm cung cầu.
+- ⚠️ **+3 / 5% / 100 CP chỉ là MẶC ĐỊNH.** Owner sửa được ở tab Chiến lược, mỗi lần
   đổi tạo một phiên bản mới trong `strategies` có ngày hiệu lực. Code phải đọc qua
   `activeStrategy(ngày)`, **không nơi nào được gõ số**.
 - **Mã vừa mua còn lô chưa về (T+2, `awaitingShares`) → "Chờ hàng"**: không tín hiệu/nhận xét cung cầu chiều MUA tới khi hàng về;
@@ -66,8 +71,8 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   đang giảm về MA, MA chậm nên vẫn đi lên — vụ MWG 13/10/2026) → chỉ nhãn **"MA10 chờ"** ở bảng mã, không ghi `signals`
   (từ 16/10/2026 KHÔNG còn nhóm "Chờ bật lên" ở Khuyến nghị; `maCandidates` là nơi duy nhất lọc); mã đã có tín hiệu mua T+ cùng ngày thì chỉ gắn chip "Ưu tiên" vào dòng T+
   (một mã một lệnh mua/ngày). **Mỗi đợt chỉ tới khi mua** (`maBoughtInRun`: khớp mua / lệnh mua chờ từ ngày `since`).
-  ⚠️ **Ngoại lệ có chủ ý:** mua thêm theo MA được phép khi giá TRÊN giá vốn (owner chốt; dòng Khuyến nghị ghi "Giá vốn X → Y") —
-  khác luật cung cầu "mã đang giữ chỉ mua thêm ≤ giá vốn −1%". Không kèm nhận xét cung cầu (giá cung cầu bám mốc T+).
+  Từ 30/10/2026 đây là **đường mua thêm DUY NHẤT** cho mã đang giữ, và chỉ khi giá TRÊN giá vốn (mã lỗ/hoà bị `maCandidates` loại;
+  dòng Khuyến nghị ghi "Giá vốn X → Y"). Không kèm nhận xét cung cầu (giá cung cầu bám mốc T+).
   Chỉ tính phiên đã đóng cửa. Bot đếm (`maStreak` → `decision_latest.maTrend`), app so ngưỡng (`maTrendFor`);
   Telegram sau đóng cửa chỉ báo thay đổi vào/ra vùng (`maChanges`).
 - **Dòng chi tiết Khuyến nghị** (`adviceInsight`, owner chốt 13/10/2026): điểm quyết định · xu hướng MA · khối ngoại + so VN-Index,
@@ -106,7 +111,8 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   **Chạy bóng 20 phiên**: chỉ ghi kết luận, lệnh vẫn theo máy T+/MA — chưa có quyền chặn. Tin tức 3 mức, tin "ý định/tin đồn" KHÔNG cộng điểm
   (owner lo tin do đội lái tung). **Hộp giá 1–3 tháng chỉ tinh chỉnh giá trong 3% quanh mốc, không tự ra lệnh** — nói bằng số mẫu, không "đọc đội lái".
   Giai đoạn 2 (chưa làm): xuất file → nút "Nhập review" trong app (owner chọn, KHÔNG cất khoá quản trị trên máy) + chip trên mục kế hoạch + đo độ đúng.
-- `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán
+- `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán.
+  **Không ẩn cắt lỗ** (30/10/2026).
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.
 - Broker TCBS miễn phí môi giới; chỉ còn thuế TNCN 0.1% giá trị bán — chưa đưa vào tính toán.
 - **Quản lý theo lô** (owner chốt 14/10/2026, bước 1): mỗi lệnh mua là một lô, mã `FPT-L1-1203` (mã · thứ tự mua · ngày ddmm),
@@ -133,6 +139,8 @@ watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
 strategies/{autoId}         buyDrop, sellRise, lotSize, effectiveFrom (YYYY-MM-DD), reason, createdAt
                             từ 13/10/2026: maLength, maDays, maMaxDays (vùng mua MA; thiếu = 10 · 5 · 15)
                             từ 16/10/2026: maxBuys (lệnh mua tối đa mỗi kế hoạch ngày; thiếu = 3)
+                            từ 30/10/2026: stopLossPct (cắt lỗ %; thiếu = 5, áp dụng ngay cho bản cũ). Form không còn ô Giảm để mua:
+                            buyDrop/buyDropPct chép từ bản đang chạy (app không dùng, bot cung cầu/điểm còn đọc)
 plans/{YYYY-MM-DD}          kế hoạch phiên đó: date, strategyId, maxBuys, minCashRatio, cashRatio, market { weak, known, date },
                             items [{ key, ticker, side, kind buy|sell|watch|trend, engine tplus|ma, qty, level (mốc), ref (giá biên độ),
                             limitPrice, avgCost, score, maPriority?, gate null|market|market-unknown|cash|cap,
@@ -144,6 +152,8 @@ plans/{YYYY-MM-DD}          kế hoạch phiên đó: date, strategyId, maxBuys,
 orders/{autoId}             … từ 16/10/2026 planDate (lệnh đặt từ mục kế hoạch ngày đó); signalId chỉ còn ở lệnh cũ
 signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price, avgCost,
                             targetBuy, qty, strategyId, buyDrop, sellRise, createdAt, updatedAt
+                            từ 30/10/2026: cắt lỗ = kind "sell" + engine "stop" + reason; mọi tín hiệu chép stopLossPct.
+                            Mã đang giữ không còn tín hiệu kind "buy" (T+)
                             07/10/2026 (orderflow-v1.x, dữ liệu cũ): doc cung cầu riêng id _cungcau, engine "orderflow", action, suggestedPrice…
                             từ orderflow-v2.0.0: CHỈ doc T+, kèm nhận xét cung cầu cùng chiều: orderflowVersion, flowVerdict now|wait|hold,
                             flowPrice (giá nút Đặt điền), flowZoneLow/flowZoneHigh, flowReason

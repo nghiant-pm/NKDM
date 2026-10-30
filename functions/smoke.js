@@ -267,6 +267,9 @@ assert.deepEqual([r5.streak, r5.prevStreak, r5.rise, r5.since], [5, 4, 5, "2026-
 const fell = closesToBars([...base10, 11, 12, 13, 14, 15, 16, 9]);
 assert.deepEqual([maStreak(fell, 10).streak, maStreak(fell, 10).prevStreak], [0, 6], "Rơi xuống dưới MA10 → về 0");
 assert.equal(maStreak(closesToBars([10, 11, 12]), 10).streak, 0, "Chưa đủ 10 phiên thì không tính");
+// MA50 cho luật cắt lỗ của app (30/10/2026): trung bình 50 phiên cuối, thiếu 50 phiên → null.
+assert.equal(maStreak(closesToBars(Array.from({ length: 60 }, (_, i) => i + 1)), 10).ma50, 35.5, "MA50 = TB 50 phiên cuối");
+assert.equal(maStreak(closesToBars([10, 11, 12]), 10).ma50, null, "Chưa đủ 50 phiên thì MA50 null");
 const maRule = pickStrategy([], "2026-10-13");
 assert.deepEqual([maRule.maLength, maRule.maDays, maRule.maMaxDays], [10, 5, 15], "Mặc định MA10 · 5–15 phiên");
 assert.deepEqual([pickStrategy([{ effectiveFrom: "2026-10-01", maLength: 20, maDays: 3 }], "2026-10-13").maLength,
@@ -301,8 +304,9 @@ const noonRows = [
   { ticker: "OLD", riskFlags: [], maTrendNoon: { date: "2026-10-22", close: 1, streak: 6, rise: 6, up: true } }];
 const ns = noonPlan.noonSummary({ rows: noonRows, positions: { BBB: { qty: 100, avgCost: 23 } }, watch: {}, hold: new Set(),
   strategy: maRule, date: "2026-10-23" });
-assert.deepEqual([ns.weak, ns.buy, ns.ma, ns.sell], [true, ["BBB"], ["AAA"], []], "Trưa: MA tạm cần nền phiên trước, bỏ bản trưa ngày cũ");
-assert.match(noonPlan.noonText(ns, "2026-10-23", 1), /Chạy bóng phiên 1\/10[\s\S]*Mua T\+ \(bị dừng\): BBB[\s\S]*Mua theo MA: AAA/, "Tin trưa");
+// BBB đang giữ, lỗ 13% → cắt lỗ; mã đang giữ không còn "Mua T+" (30/10/2026).
+assert.deepEqual([ns.weak, ns.stop, ns.buy, ns.ma, ns.sell], [true, ["BBB"], [], ["AAA"], []], "Trưa: MA tạm cần nền phiên trước, bỏ bản trưa ngày cũ");
+assert.match(noonPlan.noonText(ns, "2026-10-23", 1), /Chạy bóng phiên 1\/10[\s\S]*Cắt lỗ: BBB[\s\S]*Mua theo MA: AAA/, "Tin trưa");
 const ev = noonPlan.evaluateNoonItem({ key: "buy_AAA", ticker: "AAA", side: "buy", kind: "buy", limitPrice: 49 },
   [{ capturedAt: "2026-10-23T03:00:00Z", price: 40 }, { capturedAt: "2026-10-23T06:05:00Z", price: 49.5 }],
   closesToBars([50, 51, 52, 53, 54]).map((b, i) => ({ ...b, date: "2026-10-2" + (4 + i) })), "2026-10-23", []);

@@ -9,7 +9,7 @@ const { decisionInputs: I } = require("./scoring");
    holdings() ↔ computeLedger() · buyAt/sellAt legacy ↔ strategyLevels() trong public/index.html.
    Đổi một bên phải đổi bên kia. Phiên bản thật luôn đọc từ strategies. */
 const DEFAULT_STRATEGY = { id: null, buyDrop: 2, sellRise: 3, buyDropPct: null, sellRisePct: null,
-  lotSize: 100, minCashRatio: 20, maxCashRatio: 30, maLength: 10, maDays: 5, maMaxDays: 15, maxBuys: 3 };
+  lotSize: 100, minCashRatio: 20, maxCashRatio: 30, maLength: 10, maDays: 5, maMaxDays: 15, maxBuys: 3, stopLossPct: 5 };
 function activeStrategy(rows, date) {
   const usable = rows.filter((r) => r.effectiveFrom && r.effectiveFrom <= date).sort((a, b) =>
     a.effectiveFrom.localeCompare(b.effectiveFrom) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
@@ -19,7 +19,7 @@ function activeStrategy(rows, date) {
   for (const key of ["buyDrop", "sellRise", "lotSize", "minCashRatio", "maxCashRatio"]) {
     if (Number.isFinite(Number(row[key]))) out[key] = Number(row[key]);
   }
-  for (const key of ["buyDropPct", "sellRisePct", "maLength", "maDays", "maMaxDays", "maxBuys"]) {
+  for (const key of ["buyDropPct", "sellRisePct", "maLength", "maDays", "maMaxDays", "maxBuys", "stopLossPct"]) {
     if (row[key] != null && Number.isFinite(Number(row[key])) && Number(row[key]) > 0) out[key] = Number(row[key]);
   }
   return out;
@@ -37,7 +37,8 @@ function maStreak(bars, len) {
   const streak = run(bars.length, above);
   // Đà giá (owner chốt 13/10/2026): MA chậm nên giá có thể đang giảm về MA mà MA vẫn đi lên → phiên cuối phải TĂNG mới mua.
   const upAt = (end) => end >= 2 && bars[end - 1].close > bars[end - 2].close;
-  return { len, date: last.date, close: last.close, ma: I.round(I.sma(bars, len)),
+  // ma50: luật cắt lỗ của app (owner chốt 30/10/2026) — mã đang lỗ mà đóng cửa dưới MA50 thì về 1/2 vị thế.
+  return { len, date: last.date, close: last.close, ma: I.round(I.sma(bars, len)), ma50: bars.length >= 50 ? I.round(I.sma(bars, 50)) : null,
     streak, prevStreak: run(bars.length - 1, above), rise: run(bars.length, rising), prevRise: run(bars.length - 1, rising),
     since: streak ? bars[bars.length - streak].date : null,
     up: upAt(bars.length), prevUp: upAt(bars.length - 1), down: run(bars.length, (end) => end >= 2 && bars[end - 1].close < bars[end - 2].close) };

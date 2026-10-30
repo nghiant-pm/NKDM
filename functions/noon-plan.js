@@ -16,14 +16,19 @@ const AFTERNOON_START = 13 * 60;
 
 function noonSummary({ rows, positions, watch, hold, strategy, date }) {
   const live = rows.filter((r) => !r.stale && r.maTrendNoon?.date === date && r.maTrendNoon.close > 0);
-  const out = { known: live.length > 0, weak: live.some((r) => (r.riskFlags || []).includes(MARKET_WEAK_FLAG)), sell: [], buy: [], ma: [] };
+  const out = { known: live.length > 0, weak: live.some((r) => (r.riskFlags || []).includes(MARKET_WEAK_FLAG)), stop: [], sell: [], buy: [], ma: [] };
   live.sort((a, b) => a.ticker.localeCompare(b.ticker)).forEach((r) => {
     const tk = r.ticker, price = r.maTrendNoon.close, pos = positions[tk]?.qty > 0 ? positions[tk] : null;
     const target = Number(watch[tk]?.targetBuy);
     const { buyAt, sellAt } = tplusLevels(pos, strategy, Number.isFinite(target) && target > 0 ? target : null);
+    // Cắt lỗ (owner chốt 30/10/2026, ↔ stopAdvice() ở app): mã lỗ/hoà mà lỗ ≥ stopLossPct hoặc dưới MA50 — kể cả mã Giữ.
+    const losing = !!pos && price <= pos.avgCost;
+    if (losing && (price <= pos.avgCost * (1 - strategy.stopLossPct / 100) || (r.maTrend?.ma50 > 0 && price < r.maTrend.ma50))) out.stop.push(tk);
     if (pos && !hold.has(tk) && price >= Math.max(sellAt, pos.avgCost * 1.01)) out.sell.push(tk);
     const n = r.maTrendNoon;
-    if (Number.isFinite(buyAt) && price <= buyAt) out.buy.push(tk);
+    // Mã đang giữ không còn mua T+ (bỏ bình quân giá xuống); mã lỗ không mua thêm theo MA.
+    if (losing) return;
+    if (!pos && Number.isFinite(buyAt) && price <= buyAt) out.buy.push(tk);
     // Nền phiên trước: phiên đã đóng cửa gần nhất cũng trên MA (maTrend.streak > 0).
     else if (maInZone(n.streak, n.rise, strategy) && n.up && r.maTrend?.streak > 0) out.ma.push(tk);
   });
@@ -40,10 +45,11 @@ function noonText(summary, date, session) {
     session <= PM_SHADOW_SESSIONS ? `Chạy bóng phiên ${session}/${PM_SHADOW_SESSIONS}: chỉ ghi lại để đo, chưa đặt lệnh`
       : "Chạy bóng: đã đủ phiên đo, chờ anh xem số", ""];
   lines.push(!summary.known ? "Thị trường: chưa rõ" : summary.weak ? "Thị trường yếu: dừng mua T+, MA vẫn mua" : "Thị trường ổn");
+  if (summary.stop?.length) lines.push(`Cắt lỗ: ${summary.stop.join(", ")}`);
   if (summary.sell.length) lines.push(`Bán tại mốc: ${summary.sell.join(", ")}`);
   if (summary.buy.length) lines.push(`Mua T+${summary.weak ? " (bị dừng)" : ""}: ${summary.buy.join(", ")}`);
   if (summary.ma.length) lines.push(`Mua theo MA: ${summary.ma.join(", ")}`);
-  if (!summary.sell.length && !summary.buy.length && !summary.ma.length) lines.push("Không mã nào chạm mốc lúc 11:30.");
+  if (!summary.stop?.length && !summary.sell.length && !summary.buy.length && !summary.ma.length) lines.push("Không mã nào chạm mốc lúc 11:30.");
   lines.push("", "Mở Fin2 trước 13:00 để xem và chốt.");
   return lines.join("\n");
 }

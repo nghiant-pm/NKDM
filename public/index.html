@@ -438,6 +438,7 @@
   .chip svg{ flex:none; }
   .chip.buy{ background:var(--brand-soft); color:var(--brand); }
   .chip.sell{ background:var(--pos-soft); color:var(--pos); }
+  .chip.stop{ background:var(--neg-soft); color:var(--neg); }
   .chip.hold{ background:var(--warn-soft); color:var(--warn); }
   .chip.stale{ background:var(--surface-2); color:var(--text-muted); }
   .chip.near-buy{ background:var(--brand-soft); color:var(--brand); }
@@ -714,6 +715,8 @@
   .compact-table tr.near-sell{ box-shadow:inset 2px 0 var(--pos); }
   .compact-table tr.near-buy.reached{ box-shadow:inset 5px 0 var(--brand); }
   .compact-table tr.near-sell.reached{ box-shadow:inset 5px 0 var(--pos); }
+  .compact-table tr.near-stop{ box-shadow:inset 2px 0 var(--neg); }
+  .compact-table tr.near-stop.reached{ box-shadow:inset 5px 0 var(--neg); }
   .compact-table tr.sorting{ opacity:.45; outline:2px solid var(--brand); }
   .compact-table td{ display:block; padding:0; min-width:0; text-align:right; white-space:nowrap; }
   .compact-table td.a-tk, .compact-table td.a-px{ text-align:left; }
@@ -759,7 +762,7 @@
   .compact-table .pos{ color:var(--pos); }
   .compact-table .neg{ color:var(--neg); }
   .compact-table .a-edge{ color:var(--text-muted); }
-  .compact-table .a-edge .buy{ color:var(--neg); } .compact-table .a-edge .sell{ color:var(--pos); }
+  .compact-table .a-edge .buy{ color:var(--neg); } .compact-table .a-edge .sell{ color:var(--pos); } .compact-table .a-edge .stop{ color:var(--neg); }
   .compact-quote{
     display:inline-flex; align-items:center; gap:4px; padding:1px 6px; border-radius:6px;
     background:var(--surface-2); color:var(--text); font-size:12px;
@@ -774,6 +777,7 @@
   .compact-alert{ font-size:var(--fs-label); font-weight:500; }
   .compact-alert.near-buy{ color:var(--brand); }
   .compact-alert.near-sell{ color:var(--pos); }
+  .compact-alert.near-stop{ color:var(--neg); }
   .compact-table .a-more .decision-score-button{ flex:1 1 100%; justify-content:flex-start; }
   .compact-table .a-more .detail-btn{ min-height:36px; padding:4px 14px; font-size:var(--fs-label); }
   .decision-score-button{ display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px 12px; min-height:44px;
@@ -886,7 +890,7 @@
   .chart-point{ fill:var(--surface); stroke:currentColor; stroke-width:2.5; vector-effect:non-scaling-stroke; }
   .chart-level{ stroke-width:1.5; stroke-dasharray:6 5; vector-effect:non-scaling-stroke; }
   .chart-level.avg{ stroke:var(--text-muted); stroke-dasharray:none; }
-  .chart-level.buy{ stroke:var(--brand); }
+  .chart-level.stop{ stroke:var(--neg); }
   .chart-level.sell{ stroke:var(--pos); stroke-dasharray:3 4; }
   .chart-level.watch{ stroke:var(--warn); stroke-dasharray:8 4; }
   .chart-level-label{ fill:var(--text-muted); font:11px Inter,system-ui,sans-serif; }
@@ -1374,8 +1378,8 @@
       <form id="st-form" novalidate>
         <div class="row">
           <div>
-            <label for="st-buy">Giảm để mua (điểm)</label>
-            <input id="st-buy" type="number" min="0" step="0.5" inputmode="decimal" required>
+            <label for="st-stop">Cắt lỗ (%)</label>
+            <input id="st-stop" type="number" min="0.5" max="50" step="0.5" inputmode="decimal" required>
           </div>
           <div>
             <label for="st-sell">Tăng để bán (điểm)</label>
@@ -1383,10 +1387,6 @@
           </div>
         </div>
         <div class="row">
-          <div>
-            <label for="st-buy-pct">Giảm để mua (%) · không bắt buộc</label>
-            <input id="st-buy-pct" type="number" min="0.01" max="100" step="0.1" inputmode="decimal">
-          </div>
           <div>
             <label for="st-sell-pct">Tăng để bán (%) · không bắt buộc</label>
             <input id="st-sell-pct" type="number" min="0.01" max="100" step="0.1" inputmode="decimal">
@@ -1809,6 +1809,7 @@ const RULE_MA_LENGTH = 10;
 const RULE_MA_DAYS = 5;
 const RULE_MA_MAX_DAYS = 15;
 const RULE_MAX_BUYS = 3;   // số lệnh mua tối đa mỗi kế hoạch ngày (owner chốt 16/10/2026)
+const RULE_STOP_LOSS_PCT = 5;   // cắt lỗ % từ giá vốn (owner chốt 30/10/2026); phiên bản cũ thiếu trường này dùng mặc định
 const SELL_TAX_RATE = 0.001;
 const FORECAST_LOT = 100;
 const PNL_RANGE_KEY = "fin2-pnl-range";
@@ -1982,12 +1983,13 @@ function computeLedger(transactions){
   const holdings = {};
   const realizedEvents = [];
   sorted.forEach((t) => {
-    const h = holdings[t.ticker] || { qty:0, avgCost:0, lotCost:0, lots:[], realizedPnl:0, cycleRealizedPnl:0, heldSince:null };
+    const h = holdings[t.ticker] || { qty:0, avgCost:0, lotCost:0, lots:[], realizedPnl:0, cycleRealizedPnl:0, heldSince:null, cycleMaxQty:0 };
     if(t.side === "buy"){
-      if(h.qty <= 0){ h.heldSince = t.date || null; h.cycleRealizedPnl = 0; }
+      if(h.qty <= 0){ h.heldSince = t.date || null; h.cycleRealizedPnl = 0; h.cycleMaxQty = 0; }
       const newQty = h.qty + t.qty;
       h.avgCost = newQty > 0 ? ((h.qty * h.avgCost) + (t.qty * t.price)) / newQty : 0;
       h.qty = newQty;
+      h.cycleMaxQty = Math.max(h.cycleMaxQty, newQty);   // cắt lỗ bước 1 đưa về 1/2 mức này
       h.lots.push({ id:t.id || "", ticker:t.ticker, no:h.lots.length + 1, date:t.date || "", price:t.price, qty:t.qty,
         remaining:t.qty, dividend:isStockDividend(t), realizedPnl:0 });
     } else {
@@ -2116,7 +2118,7 @@ function activeStrategy(dateStr){
     buyDropPct:RULE_BUY_DROP_PCT, sellRisePct:RULE_SELL_RISE_PCT,
     nearRange:RULE_NEAR_RANGE, watchNearRange:RULE_WATCH_NEAR_RANGE,
     minCashRatio:RULE_CASH_MIN, maxCashRatio:RULE_CASH_MAX, maLength:RULE_MA_LENGTH, maDays:RULE_MA_DAYS, maMaxDays:RULE_MA_MAX_DAYS,
-    maxBuys:RULE_MAX_BUYS, effectiveFrom:null, reason:""
+    maxBuys:RULE_MAX_BUYS, stopLossPct:RULE_STOP_LOSS_PCT, effectiveFrom:null, reason:""
   };
   return {
     id: v.id,
@@ -2133,6 +2135,7 @@ function activeStrategy(dateStr){
     maDays: v.maDays > 0 ? Number(v.maDays) : RULE_MA_DAYS,
     maMaxDays: v.maMaxDays > 0 ? Number(v.maMaxDays) : RULE_MA_MAX_DAYS,
     maxBuys: v.maxBuys > 0 ? Number(v.maxBuys) : RULE_MAX_BUYS,
+    stopLossPct: v.stopLossPct > 0 ? Number(v.stopLossPct) : RULE_STOP_LOSS_PCT,
     effectiveFrom: v.effectiveFrom,
     reason: v.reason || ""
   };
@@ -2174,8 +2177,10 @@ function maTag(ticker, st){
    chỉ còn nhãn "MA10 chờ" ở bảng mã (maTag), không vào Khuyến nghị từ 16/10/2026. Bỏ mã đã có tín hiệu mua T+ cùng ngày, chờ hàng
    T+2, đã mua trong đợt. Trạng thái MA là mới nhất → chỉ dùng cho hôm nay. */
 function maCandidates(s, st, buyingTickers, noon = false){
+  // Mã đang giữ mà đang lỗ/hoà thì không bao giờ mua thêm (owner chốt 30/10/2026).
+  const losing = (tk, meta) => s.holdings[tk]?.qty > 0 && !(Number(noon ? noonQuote(tk, todayStr())?.price : meta.lastPrice) > s.holdings[tk].avgCost);
   return priceTickers(s.held).map((tk) => ({ tk, t:maTrendFor(tk, st, noon), meta:state.tickers[tk] || {} }))
-    .filter(({ tk, t, meta }) => t?.inZone && meta.lastPrice > 0 && !buyingTickers.has(tk) &&
+    .filter(({ tk, t, meta }) => t?.inZone && meta.lastPrice > 0 && !buyingTickers.has(tk) && !losing(tk, meta) &&
       !awaitingBlocks(tk, "buy") && !maBoughtInRun(tk, t.since));
 }
 /* Mỗi đợt chỉ khuyến nghị tới khi mua (owner chốt 13/10/2026): đã khớp mua hoặc còn lệnh mua chờ của mã từ ngày
@@ -2260,7 +2265,7 @@ function planRefPrice(ticker, date){
    kế hoạch đã chốt + lệnh bán cùng ngày (rideState), không lưu cờ. */
 const SELL_VERSION = "sell-v1.1.0";
 const SELL_TIER_SHARE = [1, 1, 1/2, 1/3, 0];   // phần bán tại mốc theo số dấu hiệu giữ đạt (0 = MA không đạt)
-const SELL_MODE_TEXT = { tier:"chốt tại mốc", ride:"gồng", exit:"thoát gồng", thin:"lãi mỏng" };
+const SELL_MODE_TEXT = { tier:"chốt tại mốc", ride:"gồng", exit:"thoát gồng", thin:"lãi mỏng", stop:"cắt lỗ" };
 function prevSessionStr(date){
   const p = String(date).split("-").map(Number), d = new Date(p[0], p[1] - 1, p[2]);
   do d.setDate(d.getDate() - 1); while(!isWeekday(d));
@@ -2327,13 +2332,18 @@ function buildPlan(s, date = planDateStr(), noon = false){
     if(!q) return;
     const lv = strategyLevels(h.avgCost, st), minSell = h.avgCost * 1.01;
     const avail = computeSellAvailability(state.transactions, h.ticker, at).available;
+    // Cắt lỗ đứng trước luật bán/gồng và áp dụng cả mã Giữ; bán tại giá so mốc, không qua cửa lọc.
+    const stop = avail > 0 ? stopAdvice(h, st, q.price) : null;
+    if(stop?.reached){
+      items.push(item({ ticker:h.ticker, side:"sell", kind:"sell", engine:"stop", mode:"stop", qty:Math.min(stop.qty, avail), keepQty:0,
+        step:stop.step, reasons:stop.reasons, stopLossPct:st.stopLossPct, level:stop.stopAt, ref:q.ref,
+        limitPrice:roundTick(q.price, true), avgCost:h.avgCost }));
+      return;
+    }
     const sell = meta.hold || !(avail > 0) ? null
       : sellPlanFor(h, { st, market, date, ref:q.price, sellLevel:Math.max(lv.sellAt, minSell), minSell, avail, noon });
     if(sell && sell.level <= q.ref * (1 + band))
       items.push(item({ ticker:h.ticker, side:"sell", kind:"sell", engine:"tplus", ref:q.ref, avgCost:h.avgCost, ...sell }));
-    if(!awaitingBlocks(h.ticker, "buy", at) && lv.buyAt >= q.ref * (1 - band))
-      items.push(item({ ticker:h.ticker, side:"buy", kind:"buy", engine:"tplus", qty:st.lotSize, level:lv.buyAt, ref:q.ref,
-        limitPrice:roundTick(Math.min(lv.buyAt, q.price, q.ref), false), avgCost:h.avgCost }));
   });
   const heldSet = new Set(s.held.map((h) => h.ticker));
   Object.keys(state.watchlist).sort().forEach((tk) => {
@@ -2472,7 +2482,7 @@ function computeSummary(){
       held.push({
         ticker: tk, qty: h.qty, avgCost: h.avgCost, price: price, heldSince: h.heldSince,
         lotCost: h.lotCost, lots: h.lots.filter((l) => l.remaining > 0),
-        cycleRealizedPnl: h.cycleRealizedPnl,
+        cycleRealizedPnl: h.cycleRealizedPnl, cycleMaxQty: h.cycleMaxQty,
         netCost: (h.lotCost - h.cycleRealizedPnl) / h.qty,
         hasPrice: !!(state.tickers[tk] && isFinite(state.tickers[tk].lastPrice))
       });
@@ -2526,26 +2536,47 @@ function strategyLevels(avgCost, strategy){
   const sellByPct = strategy.sellRisePct ? avgCost * (1 + strategy.sellRisePct / 100) : null;
   return {
     buyAt:buyByPct === null ? buyByPoint : Math.max(buyByPoint, buyByPct),
-    sellAt:sellByPct === null ? sellByPoint : Math.min(sellByPoint, sellByPct)
+    sellAt:sellByPct === null ? sellByPoint : Math.min(sellByPoint, sellByPct),
+    stopAt:avgCost * (1 - strategy.stopLossPct / 100)
   };
 }
 
+/* ================= cắt lỗ (owner chốt 30/10/2026, sau bài học FPT/TCX) =================
+   Bỏ hẳn "giảm thì mua thêm": mã đang giữ không còn mốc mua T+ (giá vốn −2) và mã đang lỗ không bao giờ có gợi ý mua thêm.
+   Mã đang lỗ/hoà (giá ≤ giá vốn TB): lỗ ≥ stopLossPct HOẶC giá dưới MA50 (bot, phiên đã đóng cửa) → bán về 1/2 khối lượng
+   lớn nhất chu kỳ (làm tròn lô); chạm CẢ HAI → bán hết. Áp dụng cả mã Giữ dài hạn. Cách mức cắt ≤ nearRange điểm → "Sắp cắt
+   lỗ". Thiếu MA50 → chỉ còn cắt theo %. Thay luật 07/10/2026 "không bao giờ khuyến nghị bán lỗ". Mã đang lãi vẫn theo luật
+   bán/gồng sell-v1.1.0 (owner chọn giữ, không lấy chốt lời đuổi MA20/8%). */
+function ma50For(ticker){
+  const row = decisionState.latest[ticker], v = row && !row.stale ? row.maTrend?.ma50 : null;
+  return v > 0 ? Number(v) : null;
+}
+function stopAdvice(h, st, price = h.price){
+  if(!(h.qty > 0) || !(price > 0) || !(h.avgCost > 0) || price > h.avgCost) return null;
+  const stopAt = h.avgCost * (1 - st.stopLossPct / 100), ma50 = ma50For(h.ticker);
+  const lossHit = price <= stopAt, trendHit = ma50 !== null && price < ma50;
+  const reasons = (lossHit ? ["Lỗ " + ((1 - price / h.avgCost) * 100).toLocaleString("vi-VN", { maximumFractionDigits:1 }) + "%"] : [])
+    .concat(trendHit ? ["Dưới MA50 " + fmtPrice(ma50)] : []);
+  if(lossHit && trendHit) return { reached:true, qty:h.qty, step:2, stopAt, reasons };
+  if(lossHit || trendHit){
+    // Bước 1: đã về 1/2 rồi thì chờ bước 2 (chạm cả hai), không bán thêm.
+    const keep = Math.floor(Math.max(h.cycleMaxQty || 0, h.qty) / 2 / st.lotSize) * st.lotSize, qty = Math.max(0, h.qty - keep);
+    return qty > 0 ? { reached:true, qty, step:1, stopAt, reasons } : null;
+  }
+  const remaining = price - stopAt;
+  return remaining <= st.nearRange ? { reached:false, qty:0, step:0, stopAt, remaining, reasons } : null;
+}
+function stopReasonText(x){ return (x.step === 2 ? "Bán hết" : "Về 1/2") + (x.reasons?.length ? " · " + x.reasons.join(" · ") : ""); }
+
+// Cảnh báo theo giá của mã đang giữ: cắt lỗ (cả mã Giữ) trước, rồi mốc bán T+. Không còn chiều mua.
 function strategyAlert(h, strategy, meta){
   if(!h.hasPrice) return null;
-  const levels = strategyLevels(h.avgCost, strategy);
-  if(h.price <= levels.buyAt) return { kind:"buy", reached:true, remaining:0 };
-  if(!meta.hold && h.price >= levels.sellAt) return { kind:"sell", reached:true, remaining:0 };
-  const candidates = [];
-  const buyRemaining = h.price - levels.buyAt;
-  if(buyRemaining > 0 && buyRemaining <= strategy.nearRange){
-    candidates.push({ kind:"buy", reached:false, remaining:buyRemaining });
-  }
-  const sellRemaining = levels.sellAt - h.price;
-  if(!meta.hold && sellRemaining > 0 && sellRemaining <= strategy.nearRange){
-    candidates.push({ kind:"sell", reached:false, remaining:sellRemaining });
-  }
-  candidates.sort((a, b) => a.remaining - b.remaining);
-  return candidates[0] || null;
+  const stop = stopAdvice(h, strategy);
+  if(stop) return { kind:"stop", reached:stop.reached, remaining:stop.reached ? 0 : stop.remaining, qty:stop.qty, step:stop.step, reasons:stop.reasons };
+  if(meta.hold) return null;
+  const sellRemaining = strategyLevels(h.avgCost, strategy).sellAt - h.price;
+  if(sellRemaining <= 0) return { kind:"sell", reached:true, remaining:0 };
+  return sellRemaining <= strategy.nearRange ? { kind:"sell", reached:false, remaining:sellRemaining } : null;
 }
 
 function strategyRuleText(points, percent){
@@ -3677,7 +3708,7 @@ function renderTickerDetail(){
     facts = row('Giá hiện tại', h.hasPrice ? fmtPrice(h.price) : '—') +
       row('Khối lượng · giá vốn', h.qty.toLocaleString('vi-VN') + ' · ' + fmtPrice(h.avgCost)) +
       row('Lãi/lỗ chưa bán', pnl === null ? '—' : pnlMoney(pnl) + (cost > 0 ? ' · ' + pnlPercent(pnl / cost * 100) : ''), pnl === null ? '' : pnlClass(pnl)) +
-      row('Ngưỡng mua thêm · bán', fmtPrice(levels.buyAt) + ' · ' + (meta.hold ? 'Giữ' : fmtPrice(levels.sellAt))) +
+      row('Mức cắt lỗ · bán', fmtPrice(levels.stopAt) + ' · ' + (meta.hold ? 'Giữ' : fmtPrice(levels.sellAt))) +
       row('Vốn sau lướt', fmtPrice(h.netCost)) +
       row('Đã chốt chu kỳ', fmtVND(cycle), pnlClass(cycle)) +
       row('Nắm giữ', ageLabel(h.heldSince));
@@ -3840,7 +3871,7 @@ function render(){
 /* Cột bảng mã (Gọn + Đầy đủ) kiểu bảng tài sản TCBS: mỗi cột 2 dòng số, bấm tiêu đề để sắp xếp.
    Cột GTTT / Vốn chỉ hiện trên màn >768px (class c-wide). */
 const compactTableColumns = {
-  positions:[["ticker","Mã",""],["qty","KL","Giá vốn"],["value","GTTT (tr)","Vốn (tr)"],["edgeGap","Mua","Bán"],["pnl","Lãi (K)","Lãi %"]],
+  positions:[["ticker","Mã",""],["qty","KL","Giá vốn"],["value","GTTT (tr)","Vốn (tr)"],["edgeGap","Cắt lỗ","Bán"],["pnl","Lãi (K)","Lãi %"]],
   watchlist:[["ticker","Mã",""],["target","Kỳ vọng",""],["gap","Cách",""]]
 };
 const compactSort = { positions:null, watchlist:null };
@@ -4000,10 +4031,10 @@ function orderflowAdvice(ticker, side, date = todayStr()){
   const advice = side === "buy" ? row.buyAdvice : side === "sell" ? row.sellAdvice : null;
   if(!advice || !Number.isFinite(advice.price) || awaitingBlocks(ticker, side)) return null;
   const fitted = orderflowRefit(row, advice, side, state.tickers[ticker], date);
-  if(side === "sell"){
-    const position = computeLedger(state.transactions).holdings[ticker];
-    if(state.tickers[ticker]?.hold || !(position?.qty > 0) || !(fitted.price > position.avgCost)) return null;
-  }
+  const position = computeLedger(state.transactions).holdings[ticker];
+  // Mã đang giữ không còn mua thêm theo mốc giá vốn (bỏ bình quân giá xuống 30/10/2026) → không nhận xét chiều mua.
+  if(side === "buy" && position?.qty > 0) return null;
+  if(side === "sell" && (state.tickers[ticker]?.hold || !(position?.qty > 0) || !(fitted.price > position.avgCost))) return null;
   return { ...fitted, version:row.orderflowVersion, label:FLOW_VERDICT_LABEL[side][advice.verdict] || "Chờ" };
 }
 /* Nhận xét tính theo giá máy chủ thấy lúc đó. Giá app lấy SAU lượt tính mà đã tốt hơn mức đề xuất (mua: thấp hơn ·
@@ -4091,6 +4122,8 @@ function adviceInsight(signal){
 // Dòng mô tả mục bán của kế hoạch (luật bán/gồng 19/10/2026) + dấu hiệu giữ đạt mấy/4.
 function sellPlanText(x){
   const n = (q) => q.toLocaleString("vi-VN") + ' CP', ma = 'MA' + activeStrategy(todayStr()).maLength;
+  if(x.mode === "stop") return esc((x.step === 2 ? 'Bán hết ' : 'Bán ') + n(x.qty) + ' @' + fmtPrice(x.limitPrice) + ' · mức cắt ' + fmtPrice(x.level)) +
+    '<br>' + esc(stopReasonText(x));
   const head = x.mode === "tier" ? (x.keepQty > 0 ? 'Bán ' + n(x.qty) + ' @' + fmtPrice(x.limitPrice) + ' · gồng ' + n(x.keepQty) + ', sàn ' + fmtPrice(x.floor)
       : 'Bán hết ' + n(x.qty) + ' @' + fmtPrice(x.limitPrice)) + (Math.abs(x.limitPrice - x.level) >= 0.005 ? ' · mốc ' + fmtPrice(x.level) : '')
     : x.mode === "ride" ? 'Lệnh điều kiện: giá về ' + fmtPrice(x.floor) + ' thì bán ' + n(x.qty)
@@ -4132,7 +4165,7 @@ function renderAdvice(s){
     // Mua thêm theo MA khi đã có hàng: ghi giá vốn sau lệnh để owner tự cân nhắc (có thể cao hơn giá vốn hiện tại).
     const costAfter = x.side === "buy" && position?.qty > 0
       ? ' · Giá vốn ' + fmtPrice(position.avgCost) + ' → ' + fmtPrice((position.qty * position.avgCost + x.qty * x.limitPrice) / (position.qty + x.qty)) : '';
-    return row(x.ticker, '<span class="chip ' + x.side + '">' + orderSideLabel(x.side) +
+    return row(x.ticker, '<span class="chip ' + (x.mode === "stop" ? "stop" : x.side) + '">' + orderSideLabel(x.side) +
         (trend ? ' · theo MA' : x.kind === "watch" ? ' · theo dõi' : x.mode ? ' · ' + SELL_MODE_TEXT[x.mode] : '') + '</span>' +
       (x.maPriority ? '<span class="chip sell">Ưu tiên · MA↑</span>' : ''),
       x.mode ? sellPlanText(x) : x.qty.toLocaleString("vi-VN") + ' CP @' + fmtPrice(x.limitPrice) +
@@ -4191,7 +4224,7 @@ function pmPlanHtml(s, date, row){
     'Đã mua ' + (plan.boughtBefore || []).length + '/' + plan.maxBuys + ' trong ngày']
     .concat(Object.entries(gated).map(([g, list]) => 'Lọc ' + (PLAN_GATE_TEXT[g] || g) + ': ' + [...new Set(list)].join(', '))).join(' · ');
   const rows = (plan.items || []).filter((x) => !x.gate).map((x) => row(x.ticker,
-    '<span class="chip ' + x.side + '">' + orderSideLabel(x.side) +
+    '<span class="chip ' + (x.mode === "stop" ? "stop" : x.side) + '">' + orderSideLabel(x.side) +
       (x.kind === "trend" ? ' · theo MA' : x.kind === "watch" ? ' · theo dõi' : x.mode ? ' · ' + SELL_MODE_TEXT[x.mode] : '') + '</span>',
     (x.mode ? sellPlanText(x) : x.qty.toLocaleString("vi-VN") + ' CP @' + fmtPrice(x.limitPrice) +
       (Math.abs(x.limitPrice - x.level) >= 0.005 ? ' · ' + (x.kind === "trend" ? 'giá 11:30 ' : 'mốc ') + fmtPrice(x.level) : '')) +
@@ -4277,15 +4310,12 @@ function renderCompact(s){
     const meta = state.tickers[h.ticker] || {};
     const levels = h.hasPrice ? strategyLevels(h.avgCost, st) : null;
     const wait = awaitingShares(h.ticker), sellOnly = !!wait && wait.available > 0;  // chờ hàng: chỉ còn chiều bán của lô cũ
-    const rawAlert = !wait || sellOnly ? strategyAlert(h, st, meta) : null;
-    const strategyState = wait && rawAlert?.kind === "buy" ? null : rawAlert;
-    // Khi có cảnh báo, cột phải hiện đúng ngưỡng cùng chiều với Highlight.
-    // Chưa có cảnh báo mới dùng chiều trong ngày; đứng giá thì so với giá vốn.
-    const move = h.hasPrice ? dayMove(h.ticker, h.price).move : "";
-    const edge = !levels || (wait && !sellOnly) ? null : sellOnly ? "sell" : strategyState?.kind || (move === "down" || (move !== "up" && h.price < h.avgCost) ? "buy" : "sell");
+    const strategyState = !wait || sellOnly ? strategyAlert(h, st, meta) : null;
+    // Khi có cảnh báo, cột phải hiện đúng ngưỡng cùng chiều với Highlight. Chưa có thì mã lỗ/hoà hiện mức cắt lỗ, mã lãi hiện mốc bán.
+    const edge = !levels || (wait && !sellOnly) ? null : strategyState?.kind || (h.price <= h.avgCost ? "stop" : "sell");
     return { ...h, price:h.hasPrice ? h.price : null, pnl, levels, edge, wait, sellOnly,
       value:h.hasPrice ? h.qty * h.price * 1000 : null,
-      edgeGap:!edge ? null : edge === "buy" ? h.price - levels.buyAt : levels.sellAt - h.price,
+      edgeGap:!edge ? null : edge === "stop" ? h.price - levels.stopAt : levels.sellAt - h.price,
       strategyAlert:strategyState };
   }), "positions");
   // Số thứ tự đếm theo đúng thứ tự đang hiện (sau sắp xếp, nhóm ngành), liền mạch qua các nhóm; nhóm đang gập không đếm.
@@ -4297,13 +4327,13 @@ function renderCompact(s){
     const alert = strategyState
       ? '<span class="compact-alert near-' + strategyState.kind + '">' +
         (strategyState.reached
-          ? (strategyState.kind === "buy" ? "Mua thêm " : "Bán ") + st.lotSize.toLocaleString("vi-VN") + " CP"
-          : 'Sắp ' + (strategyState.kind === "buy" ? "mua" : "bán") + ' · ' + fmtPrice(strategyState.remaining) + ' điểm') + '</span>'
+          ? (strategyState.kind === "stop" ? "Cắt lỗ " + strategyState.qty.toLocaleString("vi-VN") : "Bán " + st.lotSize.toLocaleString("vi-VN")) + " CP"
+          : 'Sắp ' + (strategyState.kind === "stop" ? "cắt lỗ" : "bán") + ' · ' + fmtPrice(strategyState.remaining) + ' điểm') + '</span>'
       : '';
-    const edgePrice = h.edge === "buy" ? h.levels.buyAt : h.edge === "sell" ? h.levels.sellAt : null;
+    const edgePrice = h.edge === "stop" ? h.levels.stopAt : h.edge === "sell" ? h.levels.sellAt : null;
     const edgeCell = '<td class="a-edge c-edge">' + (h.wait && !h.sellOnly ? '<span class="hold">Chờ hàng</span>' : !h.edge ? '—'
       : h.edge === "sell" && meta.hold ? '<span class="hold">Giữ</span>'
-      : '<span class="' + h.edge + '" aria-label="Ngưỡng ' + (h.edge === "buy" ? "mua thêm " : "bán ") + fmtPrice(edgePrice) + '">' + fmtPrice(edgePrice) + '</span>') + '</td>';
+      : '<span class="' + h.edge + '" aria-label="' + (h.edge === "stop" ? "Mức cắt lỗ " : "Ngưỡng bán ") + fmtPrice(edgePrice) + '">' + fmtPrice(edgePrice) + '</span>') + '</td>';
     const cost = h.lotCost * 1000;
     const pnlCls = h.hasPrice ? compactPnlClass(h.pnl) : "";
     const cycle = h.cycleRealizedPnl * 1000;
@@ -4714,7 +4744,7 @@ function renderStockChart(){
   const overlays = [];
   if(holding && holding.qty > 0){
     overlays.push({ key:"avg", label:"Giá vốn", price:holding.avgCost });
-    overlays.push({ key:"buy", label:"Mua", price:strategyLevelsForChart.buyAt });
+    overlays.push({ key:"stop", label:"Cắt lỗ", price:strategyLevelsForChart.stopAt });
     if(!(state.tickers[chartTicker] || {}).hold) overlays.push({ key:"sell", label:"Bán", price:strategyLevelsForChart.sellAt });
   }
   if(watch && Number.isFinite(watch.targetBuy)) overlays.push({ key:"watch", label:"Kỳ vọng", price:watch.targetBuy });
@@ -4981,7 +5011,7 @@ function renderStrategy(){
   $("st-since").textContent = st.effectiveFrom ? "Từ " + fmtDateVN(st.effectiveFrom) : "Mặc định";
   $("st-current").innerHTML =
     '<div class="pos-facts">' +
-      '<div class="fact"><div class="k">Giảm để mua</div><div class="v num">' + strategyRuleText(st.buyDrop, st.buyDropPct) + '</div></div>' +
+      '<div class="fact"><div class="k">Cắt lỗ</div><div class="v num">' + st.stopLossPct.toLocaleString("vi-VN", { maximumFractionDigits:2 }) + '% hoặc dưới MA50</div></div>' +
       '<div class="fact"><div class="k">Tăng để bán</div><div class="v num">' + strategyRuleText(st.sellRise, st.sellRisePct) + '</div></div>' +
       '<div class="fact"><div class="k">Cảnh báo nắm giữ</div><div class="v num">' + fmtPrice(st.nearRange) + ' điểm</div></div>' +
       '<div class="fact"><div class="k">Cảnh báo theo dõi</div><div class="v num">' + fmtPrice(st.watchNearRange) + ' điểm</div></div>' +
@@ -4993,8 +5023,8 @@ function renderStrategy(){
     '</div>';
 
   // điền sẵn form bằng ngưỡng đang chạy, nhưng không giẫm lên chữ owner đang gõ
-  [["st-buy", st.buyDrop], ["st-sell", st.sellRise],
-    ["st-buy-pct", st.buyDropPct], ["st-sell-pct", st.sellRisePct], ["st-near", st.nearRange],
+  [["st-stop", st.stopLossPct], ["st-sell", st.sellRise],
+    ["st-sell-pct", st.sellRisePct], ["st-near", st.nearRange],
     ["st-watch-near", st.watchNearRange], ["st-lot", st.lotSize],
     ["st-cash-min", st.minCashRatio], ["st-cash-max", st.maxCashRatio],
     ["st-ma-len", st.maLength], ["st-ma-days", st.maDays], ["st-ma-max", st.maMaxDays], ["st-max-buys", st.maxBuys]].forEach((pair) => {
@@ -5022,7 +5052,8 @@ function renderStrategy(){
           '<span class="t">' + (on ? '<span class="chip buy">Đang áp dụng</span>' : "") + '</span>' +
         '</div>' +
         '<div class="log-facts">' +
-          '<span class="num">Giảm ' + strategyRuleText(v.buyDrop, v.buyDropPct) + ' → mua</span>' +
+          (v.stopLossPct > 0 ? '<span class="num">Cắt lỗ ' + Number(v.stopLossPct).toLocaleString("vi-VN", { maximumFractionDigits:2 }) + '%</span>'
+            : '<span class="num">Giảm ' + strategyRuleText(v.buyDrop, v.buyDropPct) + ' → mua</span>') +
           '<span class="num">Tăng ' + strategyRuleText(v.sellRise, v.sellRisePct) + ' → bán</span>' +
           '<span class="num">Cảnh báo nắm giữ ' + fmtPrice(isFinite(v.nearRange) ? v.nearRange : RULE_NEAR_RANGE) + ' điểm</span>' +
           '<span class="num">Cảnh báo theo dõi ' + fmtPrice(isFinite(v.watchNearRange) ? v.watchNearRange : RULE_WATCH_NEAR_RANGE) + ' điểm</span>' +
@@ -5416,12 +5447,12 @@ function buildSignals(dateStr, s){
     if(!h.hasPrice) return;
     const meta = state.tickers[h.ticker] || {};
     const alert = strategyAlert(h, st, meta);
-    // Mã vừa mua còn chờ hàng về: không mua; lô cũ đã về thì vẫn bán, tối đa số CP bán được.
-    const wait = awaitingShares(h.ticker);
-    if(alert?.reached && !awaitingBlocks(h.ticker, alert.kind)) out.push({
+    // Mã vừa mua còn chờ hàng về: lô cũ đã về thì vẫn bán, tối đa số CP bán được. Cắt lỗ ghi kind "sell", engine "stop".
+    const wait = awaitingShares(h.ticker), stop = alert?.kind === "stop";
+    if(alert?.reached && !awaitingBlocks(h.ticker, "sell")) out.push({
       ticker:h.ticker, price:h.price, avgCost:h.avgCost, targetBuy:null,
-      qty:alert.kind === "sell" ? Math.min(st.lotSize, h.qty, wait ? wait.available : h.qty) : st.lotSize,
-      kind:alert.kind
+      qty:Math.min(stop ? alert.qty : st.lotSize, h.qty, wait ? wait.available : h.qty),
+      kind:"sell", ...(stop ? { engine:"stop", reason:stopReasonText(alert) } : {})
     });
   });
   // Mã đang nắm giữ đã có tín hiệu theo giá vốn ở trên — không ra thêm "Theo dõi" để khỏi mua hai lần.
@@ -5449,15 +5480,17 @@ function buildSignals(dateStr, s){
   // Cung cầu v2.0.0 không ra dòng riêng: nhận xét cùng chiều chép vào chính tín hiệu T+ (giữ lịch sử máy nào nói gì).
   // Tín hiệu MA không kèm cung cầu: giá cung cầu bám mốc T+, không hợp với lệnh mua theo xu hướng.
   return out.map((x) => {
-    const trend = x.kind === "trend";
-    const flow = trend ? null : orderflowAdvice(x.ticker, x.kind === "sell" ? "sell" : "buy", dateStr);
+    const trend = x.kind === "trend", stop = x.engine === "stop";
+    // Cắt lỗ không kèm cung cầu: giá cung cầu bám mốc T+ và server chặn bán dưới giá vốn.
+    const flow = trend || stop ? null : orderflowAdvice(x.ticker, x.kind === "sell" ? "sell" : "buy", dateStr);
     // MA chỉ biết trạng thái mới nhất → lưu nhật ký ngày cũ không chép (null = không rõ).
     const ma = dateStr === todayStr() ? maTrendFor(x.ticker, st) : null;
     return {
-      date: dateStr, ticker: x.ticker, kind: x.kind, engine:trend ? "ma" : "tplus",
+      date: dateStr, ticker: x.ticker, kind: x.kind, engine:trend ? "ma" : stop ? "stop" : "tplus",
       price: x.price, avgCost: x.avgCost, targetBuy: x.targetBuy, qty: x.qty,
       strategyId: st.id, buyDrop: st.buyDrop, sellRise: st.sellRise,
-      buyDropPct: st.buyDropPct, sellRisePct: st.sellRisePct,
+      buyDropPct: st.buyDropPct, sellRisePct: st.sellRisePct, stopLossPct: st.stopLossPct,
+      ...(stop ? { reason:x.reason } : {}),
       maLength: st.maLength, maDays: st.maDays, maMaxDays: st.maMaxDays,
       maStreak: ma ? ma.streak : null, maRise: ma ? ma.rise : null, maSince: ma ? ma.since : null, maUp: ma ? ma.up : null,
       ...(flow ? { orderflowVersion:flow.version, flowVerdict:flow.verdict, flowPrice:flow.price,
@@ -5731,10 +5764,10 @@ function exportClean(v){
 }
 
 function exportPlanItems(p){
-  return (p.items || []).map((x) => ({ ma:x.ticker, loai:x.kind, may:x.engine === "ma" ? "MA" : "T+", soLuong:x.qty, giaDat:x.limitPrice,
+  return (p.items || []).map((x) => ({ ma:x.ticker, loai:x.kind, may:x.engine === "ma" ? "MA" : x.engine === "stop" ? "cat-lo" : "T+", soLuong:x.qty, giaDat:x.limitPrice,
     moc:x.level, giaThamChieu:x.ref, diemMua:x.score ?? null, loc:x.gate ? (PLAN_GATE_TEXT[x.gate] || x.gate) : null,
     cheDoBan:x.mode ? SELL_MODE_TEXT[x.mode] : null, dauHieuGiu:x.holdCount ?? null, giuLai:x.keepQty ?? null, san:x.floor ?? null,
-    gongTu:x.rideSince ?? null }));
+    gongTu:x.rideSince ?? null, lyDoCatLo:x.mode === "stop" ? stopReasonText(x) : null }));
 }
 function buildExport(days, priceHistory = {}){
   const today = todayStr();
@@ -5766,11 +5799,12 @@ function buildExport(days, priceHistory = {}){
       const tien = khop.reduce((n, t) => n + t.qty * t.price, 0);
       const thueTNCN = khop.reduce((n, t) => n + transactionTaxVND(t), 0);
       return {
-        ngay: x.date, ma: x.ticker, may: signalEngine(x) === "orderflow" ? "cung-cau" : signalEngine(x) === "ma" ? "MA" : "T+", loai: x.kind, hanhDong: x.action || null, mayKhuyenNghi: x.orderflowVersion || null,
+        ngay: x.date, ma: x.ticker, may: signalEngine(x) === "orderflow" ? "cung-cau" : signalEngine(x) === "ma" ? "MA" : signalEngine(x) === "stop" ? "cat-lo" : "T+", loai: x.kind, hanhDong: x.action || null, mayKhuyenNghi: x.orderflowVersion || null,
         doTinCay: x.confidence ?? null, giaLucRaTinHieu: x.price, giaVonTB: x.avgCost, giaMuonMua: x.targetBuy,
         soLuongGoiY: x.qty,
         nguongLucDo: { giam:x.buyDrop, tang:x.sellRise,
-          giamPhanTram:x.buyDropPct ?? null, tangPhanTram:x.sellRisePct ?? null, phienBan:x.strategyId },
+          giamPhanTram:x.buyDropPct ?? null, tangPhanTram:x.sellRisePct ?? null, catLoPhanTram:x.stopLossPct ?? null, phienBan:x.strategyId },
+        lyDo: x.reason ?? null,
         xuHuongMA: Number.isFinite(x.maStreak) ? { duongMA:x.maLength, soPhienTu:x.maDays, soPhienToiDa:x.maMaxDays ?? null, soPhienTrenMA:x.maStreak, soPhienMADiLen:x.maRise ?? null, tuNgay:x.maSince ?? null, trongVungMua:signalMaAbove(x) } : null,
         daDatLenh: lenh.length > 0,
         daLamTheo: khop.length > 0,
@@ -5793,7 +5827,7 @@ function buildExport(days, priceHistory = {}){
       dangApDung: activeStrategy(today),
       cacPhienBan: state.strategies.slice()
         .sort((a, b) => a.effectiveFrom < b.effectiveFrom ? -1 : 1)
-        .map((v) => ({ id:v.id, hieuLucTu:v.effectiveFrom, giam:v.buyDrop, tang:v.sellRise,
+        .map((v) => ({ id:v.id, hieuLucTu:v.effectiveFrom, giam:v.buyDrop, tang:v.sellRise, catLoPhanTram:v.stopLossPct ?? null,
           giamPhanTram:v.buyDropPct ?? null, tangPhanTram:v.sellRisePct ?? null,
           canhBaoTruoc:isFinite(v.nearRange) ? v.nearRange : RULE_NEAR_RANGE,
           canhBaoNamGiu:isFinite(v.nearRange) ? v.nearRange : RULE_NEAR_RANGE,
@@ -5868,7 +5902,7 @@ function buildExport(days, priceHistory = {}){
         const meta = state.tickers[h.ticker] || {};
         const levels = strategyLevels(h.avgCost, strategy);
         const alert = strategyAlert(h, strategy, meta);
-        const flowBuy = orderflowAdvice(h.ticker, "buy"), flowSell = meta.hold ? null : orderflowAdvice(h.ticker, "sell");
+        const flowSell = meta.hold ? null : orderflowAdvice(h.ticker, "sell");
         const value = h.qty * h.price * 1000, cost = h.lotCost * 1000;
         const decision = decisionState.latest[h.ticker];
         return {
@@ -5881,10 +5915,10 @@ function buildExport(days, priceHistory = {}){
           laiLoChuaChot:Math.round(value - cost), laiLoChuaChotPct:cost ? r2((value - cost) / cost * 100) : null,
           tyTrongPct:summary.total > 0 ? r2(value / summary.total * 100) : null,
           namTu:h.heldSince, soNgayNam:dayCount(h.heldSince),
-          nguongMua:r2(levels.buyAt), nguongBan:meta.hold ? null : r2(levels.sellAt),
-          cachNguongMua:r2(h.price - levels.buyAt), cachNguongBan:meta.hold ? null : r2(levels.sellAt - h.price),
-          trangThaiNguong:awaitingBlocks(h.ticker, alert?.kind || "buy") ? "cho-hang" : !alert ? "binh-thuong" : (alert.reached ? "da-cham-" : "gan-") + (alert.kind === "buy" ? "mua" : "ban"),
-          cungCauMua:flowBuy?.label ?? null, giaCungCauMua:flowBuy?.price ?? null,
+          mucCatLo:r2(levels.stopAt), nguongBan:meta.hold ? null : r2(levels.sellAt),
+          cachMucCatLo:r2(h.price - levels.stopAt), cachNguongBan:meta.hold ? null : r2(levels.sellAt - h.price),
+          trangThaiNguong:awaitingBlocks(h.ticker, "sell") ? "cho-hang" : !alert ? "binh-thuong" : (alert.reached ? "da-cham-" : "gan-") + (alert.kind === "stop" ? "cat-lo" : "ban"),
+          lyDoCatLo:alert?.kind === "stop" && alert.reached ? stopReasonText(alert) : null,
           cungCauBan:flowSell?.label ?? null, giaCungCauBan:flowSell?.price ?? null,
           diemQuyetDinh:decision ? { mua:decision.buyScore, ban:decision.sellScore, cu:!!decision.stale } : null,
           nhom:meta.hold ? "giu-dai-han" : "giao-dich"
@@ -5899,7 +5933,7 @@ function buildExport(days, priceHistory = {}){
       mucTieuTienMatPct: { toiThieu:strategy.minCashRatio, toiDa:strategy.maxCashRatio, danhGia:cashRatioStatus(cashRatio, strategy).label },
       maChuaCoGiaThat: summary.held.filter((h) => !h.hasPrice).map((h) => h.ticker),
       // Tính lại theo giá hiện có lúc xuất, CHƯA ghi vào signals (chỉ ghi khi bấm Lưu nhật ký).
-      tinHieuTheoGiaHienTai: buildSignals(today, summary).map((x) => ({ ma:x.ticker, may: signalEngine(x) === "orderflow" ? "cung-cau" : signalEngine(x) === "ma" ? "MA" : "T+", loai:x.kind, cungCau:x.flowVerdict || null, giaCungCau:x.flowPrice ?? null, gia:x.price, soLuong:x.qty,
+      tinHieuTheoGiaHienTai: buildSignals(today, summary).map((x) => ({ ma:x.ticker, may: signalEngine(x) === "orderflow" ? "cung-cau" : signalEngine(x) === "ma" ? "MA" : signalEngine(x) === "stop" ? "cat-lo" : "T+", loai:x.kind, cungCau:x.flowVerdict || null, giaCungCau:x.flowPrice ?? null, gia:x.price, soLuong:x.qty,
         giaVonTB:x.avgCost, giaMuonMua:x.targetBuy })),
       lenhDangCho: openOrders().map((o) => ({ ngayDat:o.orderDate, ma:o.ticker, loai:o.side, soLuong:o.qty,
         daKhop:o.filledQty || 0, giaDat:o.limitPrice, trangThai:o.status }))
@@ -6427,9 +6461,8 @@ function initForms(){
   $("st-form").addEventListener("submit", (e) => {
     e.preventDefault();
     if(!ready){ setMsg("st-msg", "err", "Chưa kết nối"); return; }
-    const buyDrop = parseFloat($("st-buy").value);
+    const stopLossPct = parseFloat($("st-stop").value);
     const sellRise = parseFloat($("st-sell").value);
-    const buyDropPct = $("st-buy-pct").value === "" ? null : parseFloat($("st-buy-pct").value);
     const sellRisePct = $("st-sell-pct").value === "" ? null : parseFloat($("st-sell-pct").value);
     const nearRange = parseFloat($("st-near").value);
     const watchNearRange = parseFloat($("st-watch-near").value);
@@ -6442,13 +6475,12 @@ function initForms(){
     const maxBuys = parseInt($("st-max-buys").value, 10);
     const effectiveFrom = $("st-from").value;
     const reason = $("st-reason").value.trim();
-    if(!(buyDrop > 0) || !(sellRise > 0) || !(nearRange > 0) || !(watchNearRange > 0) || !(lotSize > 0) || !effectiveFrom){
-      setMsg("st-msg", "err", "Kiểm tra mức tăng/giảm, cảnh báo, số cổ phiếu và ngày");
+    if(!(stopLossPct > 0 && stopLossPct <= 50) || !(sellRise > 0) || !(nearRange > 0) || !(watchNearRange > 0) || !(lotSize > 0) || !effectiveFrom){
+      setMsg("st-msg", "err", "Kiểm tra mức cắt lỗ (0–50%), mức tăng, cảnh báo, số cổ phiếu và ngày");
       return;
     }
-    if((buyDropPct !== null && (!(buyDropPct > 0) || buyDropPct > 100)) ||
-       (sellRisePct !== null && (!(sellRisePct > 0) || sellRisePct > 100))){
-      setMsg("st-msg", "err", "Phần trăm mua/bán phải lớn hơn 0 và không quá 100%");
+    if(sellRisePct !== null && (!(sellRisePct > 0) || sellRisePct > 100)){
+      setMsg("st-msg", "err", "Phần trăm bán phải lớn hơn 0 và không quá 100%");
       return;
     }
     if(!(minCashRatio >= 0) || !(maxCashRatio <= 100) || minCashRatio > maxCashRatio){
@@ -6473,7 +6505,8 @@ function initForms(){
       return;
     }
     addDoc(collection(fs, "strategies"),
-      { buyDrop, sellRise, buyDropPct, sellRisePct, nearRange, watchNearRange, lotSize,
+      // buyDrop/buyDropPct chép từ bản đang chạy: app không còn dùng (đã bỏ mua khi giảm), bot cung cầu/điểm vẫn đọc.
+      { buyDrop:activeStrategy(effectiveFrom).buyDrop, buyDropPct:activeStrategy(effectiveFrom).buyDropPct, stopLossPct, sellRise, sellRisePct, nearRange, watchNearRange, lotSize,
         minCashRatio, maxCashRatio, maLength, maDays, maMaxDays, maxBuys, effectiveFrom, reason, createdAt: nowISO() })
       .then(() => {
         setMsg("st-msg", "ok", "Đã lưu chiến lược");
