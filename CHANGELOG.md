@@ -4,6 +4,16 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-30 (Khôi phục bản 23/10 sau deploy nhầm bản cũ)
+
+Phiên cloud sáng 30/10 lấy code từ GitHub (`main`, dừng ở 24/09) để làm luật cắt lỗ rồi deploy, đè mất bản 23/10 chỉ có trên máy:
+giao diện lùi ~1 tháng, server chỉ còn bot sàng lọc (mất bot điểm quyết định, cung cầu, kế hoạch trưa, đối chiếu TCBS), rules mất
+nhánh `plans`, `decision_*`, `orderflow_*`. Dữ liệu Firestore không mất. Deploy lại nguyên bản 23/10 (`main-1isfwa` @ 29963c6).
+Luật cắt lỗ của phiên cloud (nhánh `ccr-557d6c94-qielpy`) **chưa** có trong bản này — sẽ chép sang sau khi owner chốt chỗ đụng với
+sell-v1.1.0.
+
+· `CHANGELOG.md`
+
 ## 2026-10-23 (Kế hoạch chiều — chạy bóng, pm-v1.0.0)
 
 Owner phỏng vấn + chốt 22–23/10/2026: thêm một lượt khuyến nghị giờ nghỉ trưa cho phiên chiều, ngoài kế hoạch tối như cũ.
