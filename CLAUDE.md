@@ -34,13 +34,28 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
 
 ## Chiến thuật giao dịch (nguồn của mọi công thức gợi ý)
 - Mua mã lớn trụ cột, tầm giá 40–70 (nghìn đ/CP)
-- Giá ≤ `avgCost − 2` → gợi ý **mua thêm 100 CP/phiên**
-- Giá ≥ `avgCost + 3` → gợi ý **bán 100 CP/phiên**
-- ⚠️ **−2 / +3 / 100 CP chỉ là MẶC ĐỊNH.** Owner sửa được ở tab Chiến lược, mỗi lần
-  đổi tạo một phiên bản mới trong `strategies` có ngày hiệu lực. Code phải đọc qua
-  `activeStrategy(ngày)`, **không nơi nào được gõ số**.
-- `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán**, hiện badge "Giữ"
-- **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.
+- ⚠️ **Từ 30/10/2026 BỎ HẲN "giảm thì mua thêm" (bình quân giá xuống / bắt dao rơi).** Owner
+  chốt sau bài học FPT/TCX. Luật hiện hành nằm ở `positionAdvice()`, mỗi mã chỉ một gợi ý,
+  ưu tiên từ trên xuống:
+  1. **Cắt lỗ** (mã đang lỗ/hoà): lỗ ≥ `stopLossPct` (5%) từ giá vốn HOẶC giá dưới MA50 →
+     đưa vị thế về 1/2 khối lượng lớn nhất chu kỳ (làm tròn lô); chạm CẢ HAI → bán hết.
+     Áp dụng **cả mã gắn cờ Giữ dài hạn**. Cách mức cắt ≤ `nearRange` điểm → "Sắp cắt lỗ".
+  2. **Chốt lời đuổi** (mã đang lãi): giá dưới MA20 HOẶC rơi ≥ `trailPct` (8%) từ đỉnh đóng cửa
+     của chu kỳ → bán hết. Thay cho luật cũ "+3 điểm thì bán".
+  3. **Vốn chết:** giữ ≥ `staleSessions` (20) phiên, lãi < 2%, điểm sức mạnh < 70 và đang có mã
+     đạt chuẩn trong sàng lọc → bán hết, kèm tối đa 3 mã thay thế (`rotationCandidates()`).
+  4. **Mua thêm** chỉ khi đang lãi, giá trên MA50 và cách MA20 từ 0 đến +3%.
+  **Mã đang lỗ không bao giờ có gợi ý mua thêm.** Đừng dựng lại luật mua khi giảm.
+- Số 5% / 8% / 20 phiên / 100 CP là MẶC ĐỊNH (`RULE_*`). Owner sửa ở tab Chiến lược, mỗi lần
+  đổi tạo một phiên bản mới trong `strategies` có ngày hiệu lực. Code đọc qua
+  `activeStrategy(ngày)`, **không nơi nào được gõ số**. Phiên bản cũ thiếu trường cắt lỗ thì
+  dùng mặc định (owner chọn áp dụng ngay cho cả mã đang giữ).
+- `tickers/{TICKER}.hold === true` → ẩn chốt lời đuổi và vốn chết, hiện badge "Giữ dài hạn".
+  **Không ẩn cắt lỗ.**
+- MA20/MA50/đỉnh chu kỳ/số phiên/điểm sức mạnh lấy từ lịch sử VNDirect khi bấm nút lấy giá chung,
+  lưu ở `tickers/{TICKER}.market`. Chưa có `market` thì chỉ còn cắt lỗ theo %.
+- **Ngưỡng cắt lỗ / chốt lời đuổi tính theo %** (owner chọn 30/10/2026). `nearRange` và
+  `watchNearRange` vẫn là **điểm** (giá tuyệt đối, nghìn đ).
 - Broker TCBS miễn phí môi giới; chỉ còn thuế TNCN 0.1% giá trị bán — chưa đưa vào tính toán.
 
 ---
@@ -49,12 +64,16 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
 ```
 transactions/{autoId}       ticker, side "buy"|"sell", qty, price (nghìn đ), date, note, createdAt
 cashflows/{autoId}          type "deposit"|"withdraw", amount (VND nguyên), date, note, createdAt
-tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, hold?, updatedAt
+tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, hold?, updatedAt,
+                            market? { date, since, ma20, ma50, peak, sessions, score }
 daily_snapshots/{YYYY-MM-DD}  date, cash, investedCost, marketValue, totalAssets, prices{}, createdAt, updatedAt
 watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
-strategies/{autoId}         buyDrop, sellRise, lotSize, effectiveFrom (YYYY-MM-DD), reason, createdAt
-signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price, avgCost,
-                            targetBuy, qty, strategyId, buyDrop, sellRise, createdAt, updatedAt
+strategies/{autoId}         stopLossPct, trailPct, staleSessions, nearRange, watchNearRange, lotSize,
+                            minCashRatio, maxCashRatio, effectiveFrom (YYYY-MM-DD), reason, createdAt
+                            (bản trước 30/10/2026: buyDrop, sellRise, buyDropPct?, sellRisePct? — chỉ còn là lịch sử)
+signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "stop"|"sell"|"rotate"|"buy"|"watch", price, avgCost,
+                            targetBuy, qty, reason, strategyId, stopLossPct, trailPct, staleSessions,
+                            createdAt, updatedAt (bản cũ: buyDrop, sellRise, buyDropPct?, sellRisePct?)
 settings/screening          slots { "0830"|"1030"|"1330"|"1530"|"1600"|"2000": bool }, updatedAt
                             (không có doc = chỉ bật 16:00). Owner bật/tắt khung giờ nhận tin Telegram
 screening_slots/{YYYY-MM-DD_HHMM}  khoá mỗi khung giờ: status, phase, marketDate, notificationAttemptedAt…
@@ -78,19 +97,24 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 ---
 
 ## ⚠️ Những chỗ NHÂN BẢN CÓ CHỦ Ý — sửa 1 chỗ phải sửa mấy chỗ
-- **Ngưỡng mua/bán có 3 tầng:** hằng số mặc định `RULE_BUY_DROP`/`RULE_SELL_RISE`/`RULE_LOT`
-  → phiên bản trong `strategies` → nơi dùng gọi `activeStrategy(ngày)`. Ba nơi dùng phải
-  ra cùng một số cho cùng một ngày: `renderPositions` (chip gợi ý), `buildSignals` (ghi log
-  tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"). **Thêm chỗ dùng mới thì gọi
-  `activeStrategy()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
+- **Ngưỡng chiến lược có 3 tầng:** hằng số mặc định `RULE_*` → phiên bản trong `strategies`
+  → nơi dùng gọi `activeStrategy(ngày)`. Mọi gợi ý cho mã đang giữ đi qua MỘT hàm
+  `holdingAdvice()` → `positionAdvice()`: `renderPositions`, `renderCompact`, dải Highlight,
+  `buildSignals` (ghi log tín hiệu), và `renderStrategy` hiện cùng ngưỡng. **Thêm chỗ dùng mới
+  thì gọi `activeStrategy()` / `holdingAdvice()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
   Phiên bản chiến lược **chỉ thêm, không sửa đè** — sửa đè là tín hiệu cũ mất ngưỡng gốc.
+- **Luật danh mục có bản sao cho bot Telegram:** `positionMarket()` + `positionAdvice()` trong
+  `public/index.html` được chép **nguyên văn** sang `functions/risk.js`; `RULE_*` ↔ `DEFAULTS`,
+  `activeStrategy()` ↔ `activeStrategy(strategies, ngày)`, `computeLedger()` ↔ `holdingsFrom()`
+  (bản rút gọn), `rotationCandidates()` ↔ `candidates` trong `runSlot`. Sửa một bên phải sửa
+  bên kia; `npm run smoke` trong `functions/` có ca kiểm tra luật.
 - **Phần đọc datafeed giá chỉ có MỘT chỗ là `fetchQuotes()`** (gọi từ nút lấy giá chung và nút
   xem giá trong form thêm mã). Thêm chỗ lấy giá mới thì gọi hàm đó, đừng chép lại phần đọc JSON.
 - **Khung giờ sàng lọc** `SLOTS` (`functions/index.js`) ↔ `SCREENING_SLOTS` (`public/index.html`) là
   bản sao có chủ ý, cùng id/giờ/phase. Bot chạy mỗi 30 phút, chỉ làm việc khi khung đang bật trong
   `settings/screening`. **Chỉ lượt "post" (sau đóng cửa) đầu tiên thành công trong ngày ghi
   `screening_runs`/`screening_results`**; lượt trước/trong phiên chỉ gửi Telegram có nhãn.
-- **Mỗi doc `signals` chép lại `buyDrop`/`sellRise`/`strategyId` của phiên bản lúc đó.**
+- **Mỗi doc `signals` chép lại `stopLossPct`/`trailPct`/`staleSessions`/`strategyId` của phiên bản lúc đó** (tín hiệu trước 30/10/2026 chép `buyDrop`/`sellRise`).
   Bản sao có chủ ý, cùng bản chất với `daily_snapshots`: đổi ngưỡng về sau thì tín hiệu cũ
   **vẫn giữ ngưỡng cũ** — đúng ý, vì đó mới là cái đã thực sự sinh ra tín hiệu hôm đó.
   Đừng "vá lại cho nhất quán".
@@ -108,7 +132,10 @@ Hiện **chưa có cặp nào** — app 1 người dùng, 1 màn hình. Gặp c�
 
 ## Đã CHỐT và CẤM dựng lại
 - **Firebase project đặt trên tài khoản công ty `nghiant@youmed.vn`.** Claude đã nêu rủi ro (IT admin tổ chức truy cập được dữ liệu tài chính cá nhân); owner cân nhắc và **chọn giữ**. Không nêu lại.
-- **Không có ngưỡng chặn mua thêm** (số lần / % vốn tối đa mỗi mã). Owner biết rủi ro dồn vốn và **chốt chưa làm**. Đừng tự thêm.
+- **Đã bỏ bình quân giá xuống (30/10/2026).** Mã đang lỗ không có gợi ý mua thêm; cắt lỗ
+  thắng cờ Giữ dài hạn. Owner chốt sau bài học FPT/TCX — đừng dựng lại luật "giảm thì mua thêm".
+  Vẫn **chưa có** ngưỡng % vốn tối đa mỗi mã; đừng tự thêm.
+- **Không mô phỏng ngược luật cắt lỗ** trên lịch sử FPT/TCX (cùng lý do mục mô phỏng ngược bên dưới).
 - **Giá lấy từ datafeed VPS** (`bgapidatafeed.vps.com.vn`) — nguồn duy nhất kiểm chứng được
   là cho gọi cross-origin. TCBS, SSI, VNDirect, CafeF, DNSE, Yahoo **đều bị CORS chặn**,
   đã đo thật ngày 10/09/2026 (từ trình duyệt). Đừng thử lại nếu chưa có bằng chứng mới.

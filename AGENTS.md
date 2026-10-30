@@ -34,14 +34,28 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
 
 ## Chiến thuật giao dịch (nguồn của mọi công thức gợi ý)
 - Mua mã lớn trụ cột, tầm giá 40–70 (nghìn đ/CP)
-- Giá ≤ `avgCost − 2` → gợi ý **mua thêm 100 CP/phiên**
-- Giá ≥ `avgCost + 3` → gợi ý **bán 100 CP/phiên**
-- ⚠️ **−2 / +3 / 100 CP chỉ là MẶC ĐỊNH.** Owner sửa được ở tab Chiến lược, mỗi lần
-  đổi tạo một phiên bản mới trong `strategies` có ngày hiệu lực. Code phải đọc qua
-  `activeStrategy(ngày)`, **không nơi nào được gõ số**.
-- `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán**, hiện badge "Giữ"
-- **"Điểm" = giá tuyệt đối (nghìn đ), tách biệt với %.** Mỗi chiều có ngưỡng điểm bắt buộc
-  và ngưỡng % tuỳ chọn; hai ngưỡng chạy song song, chạm cái nào trước thì kích hoạt.
+- ⚠️ **Từ 30/10/2026 BỎ HẲN "giảm thì mua thêm" (bình quân giá xuống / bắt dao rơi).** Owner
+  chốt sau bài học FPT/TCX. Luật hiện hành nằm ở `positionAdvice()`, mỗi mã chỉ một gợi ý,
+  ưu tiên từ trên xuống:
+  1. **Cắt lỗ** (mã đang lỗ/hoà): lỗ ≥ `stopLossPct` (5%) từ giá vốn HOẶC giá dưới MA50 →
+     đưa vị thế về 1/2 khối lượng lớn nhất chu kỳ (làm tròn lô); chạm CẢ HAI → bán hết.
+     Áp dụng **cả mã gắn cờ Giữ dài hạn**. Cách mức cắt ≤ `nearRange` điểm → "Sắp cắt lỗ".
+  2. **Chốt lời đuổi** (mã đang lãi): giá dưới MA20 HOẶC rơi ≥ `trailPct` (8%) từ đỉnh đóng cửa
+     của chu kỳ → bán hết. Thay cho luật cũ "+3 điểm thì bán".
+  3. **Vốn chết:** giữ ≥ `staleSessions` (20) phiên, lãi < 2%, điểm sức mạnh < 70 và đang có mã
+     đạt chuẩn trong sàng lọc → bán hết, kèm tối đa 3 mã thay thế (`rotationCandidates()`).
+  4. **Mua thêm** chỉ khi đang lãi, giá trên MA50 và cách MA20 từ 0 đến +3%.
+  **Mã đang lỗ không bao giờ có gợi ý mua thêm.** Đừng dựng lại luật mua khi giảm.
+- Số 5% / 8% / 20 phiên / 100 CP là MẶC ĐỊNH (`RULE_*`). Owner sửa ở tab Chiến lược, mỗi lần
+  đổi tạo một phiên bản mới trong `strategies` có ngày hiệu lực. Code đọc qua
+  `activeStrategy(ngày)`, **không nơi nào được gõ số**. Phiên bản cũ thiếu trường cắt lỗ thì
+  dùng mặc định (owner chọn áp dụng ngay cho cả mã đang giữ).
+- `tickers/{TICKER}.hold === true` → ẩn chốt lời đuổi và vốn chết, hiện badge "Giữ dài hạn".
+  **Không ẩn cắt lỗ.**
+- MA20/MA50/đỉnh chu kỳ/số phiên/điểm sức mạnh lấy từ lịch sử VNDirect khi bấm nút lấy giá chung,
+  lưu ở `tickers/{TICKER}.market`. Chưa có `market` thì chỉ còn cắt lỗ theo %.
+- **Ngưỡng cắt lỗ / chốt lời đuổi tính theo %** (owner chọn 30/10/2026). `nearRange` và
+  `watchNearRange` vẫn là **điểm** (giá tuyệt đối, nghìn đ).
 - Broker TCBS miễn phí môi giới. Lệnh bán ghi từ 15/09/2026 lưu `taxRate: 0.001` và
   `taxAmount` để trừ thuế TNCN khỏi tiền mặt và lãi/lỗ đã bán; lệnh cũ thiếu hai trường
   này giữ thuế bằng 0, không hồi tố.
@@ -53,15 +67,16 @@ Starter-Kit/         Bộ chuẩn dùng chung. Chỉ đọc, không sửa.
 transactions/{autoId}       ticker, side "buy"|"sell", qty, price (nghìn đ), date, note, createdAt,
                             taxRate?, taxAmount? (VND nguyên; chỉ lệnh bán mới từ 15/09/2026)
 cashflows/{autoId}          type "deposit"|"withdraw", amount (VND nguyên), date, note, createdAt
-tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, hold?, updatedAt
+tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, hold?, updatedAt,
+                            market? { date, since, ma20, ma50, peak, sessions, score }
 daily_snapshots/{YYYY-MM-DD}  date, cash, investedCost, marketValue, totalAssets, prices{}, createdAt, updatedAt
 watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
-strategies/{autoId}         buyDrop, sellRise, buyDropPct?, sellRisePct?, nearRange, watchNearRange, lotSize,
-                            minCashRatio, maxCashRatio,
-                            effectiveFrom (YYYY-MM-DD), reason, createdAt
-signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price, avgCost,
-                            targetBuy, qty, strategyId, buyDrop, sellRise,
-                            buyDropPct?, sellRisePct?, createdAt, updatedAt
+strategies/{autoId}         stopLossPct, trailPct, staleSessions, nearRange, watchNearRange, lotSize,
+                            minCashRatio, maxCashRatio, effectiveFrom (YYYY-MM-DD), reason, createdAt
+                            (bản trước 30/10/2026: buyDrop, sellRise, buyDropPct?, sellRisePct? — chỉ còn là lịch sử)
+signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "stop"|"sell"|"rotate"|"buy"|"watch", price, avgCost,
+                            targetBuy, qty, reason, strategyId, stopLossPct, trailPct, staleSessions,
+                            createdAt, updatedAt (bản cũ: buyDrop, sellRise, buyDropPct?, sellRisePct?)
 screening_runs/{YYYY-MM-DD}  date, status, trialSession, isTrial, universeCount, scannedCount,
                             missingCount, qualifiedCount, newCount, watchlistCount, scoreVersion,
                             startedAt, completedAt?, latestMarketDate?, notificationType?,
@@ -96,14 +111,17 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 ---
 
 ## ⚠️ Những chỗ NHÂN BẢN CÓ CHỦ Ý — sửa 1 chỗ phải sửa mấy chỗ
-- **Ngưỡng mua/bán có 3 tầng:** hằng số mặc định → phiên bản trong `strategies` → nơi dùng
-  gọi `activeStrategy(ngày)`. `buyDropPct` / `sellRisePct` thiếu hoặc null nghĩa là chỉ dùng điểm.
-  `strategyLevels()` quy đổi điểm + % theo luật mức nào đến trước; `strategyAlert()` là nguồn
-  chung cho highlight và tín hiệu. Ba nơi dùng phải
-  ra cùng một số cho cùng một ngày: `renderPositions` (chip gợi ý), `buildSignals` (ghi log
-  tín hiệu), `renderStrategy` (thẻ "Đang áp dụng"). **Thêm chỗ dùng mới thì gọi
-  `activeStrategy()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
+- **Ngưỡng chiến lược có 3 tầng:** hằng số mặc định `RULE_*` → phiên bản trong `strategies`
+  → nơi dùng gọi `activeStrategy(ngày)`. Mọi gợi ý cho mã đang giữ đi qua MỘT hàm
+  `holdingAdvice()` → `positionAdvice()`: `renderPositions`, `renderCompact`, dải Highlight,
+  `buildSignals` (ghi log tín hiệu), và `renderStrategy` hiện cùng ngưỡng. **Thêm chỗ dùng mới
+  thì gọi `activeStrategy()` / `holdingAdvice()`, đừng gõ số và cũng đừng đọc thẳng hằng số.**
   Phiên bản chiến lược **chỉ thêm, không sửa đè** — sửa đè là tín hiệu cũ mất ngưỡng gốc.
+- **Luật danh mục có bản sao cho bot Telegram:** `positionMarket()` + `positionAdvice()` trong
+  `public/index.html` được chép **nguyên văn** sang `functions/risk.js`; `RULE_*` ↔ `DEFAULTS`,
+  `activeStrategy()` ↔ `activeStrategy(strategies, ngày)`, `computeLedger()` ↔ `holdingsFrom()`
+  (bản rút gọn), `rotationCandidates()` ↔ `candidates` trong `runSlot`. Sửa một bên phải sửa
+  bên kia; `npm run smoke` trong `functions/` có ca kiểm tra luật.
 - **Phần đọc datafeed giá chỉ có MỘT chỗ là `fetchQuotes()`** (gọi từ nút lấy giá chung và nút
   xem giá trong form thêm mã). Thêm chỗ lấy giá mới thì gọi hàm đó, đừng chép lại phần đọc JSON.
 - **API lịch sử giá** có ba nơi gọi có chủ ý: `fetchPriceHistory()` ở client lấy giá đóng cửa từ
@@ -119,7 +137,7 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
   bản sao có chủ ý, cùng id/giờ/phase. Bot chạy mỗi 30 phút, chỉ làm việc khi khung đang bật trong
   `settings/screening`. **Chỉ lượt "post" (sau đóng cửa) đầu tiên thành công trong ngày ghi
   `screening_runs`/`screening_results`**; lượt trước/trong phiên chỉ gửi Telegram có nhãn.
-- **Mỗi doc `signals` chép lại `buyDrop`/`sellRise`/`strategyId` của phiên bản lúc đó.**
+- **Mỗi doc `signals` chép lại `stopLossPct`/`trailPct`/`staleSessions`/`strategyId` của phiên bản lúc đó** (tín hiệu trước 30/10/2026 chép `buyDrop`/`sellRise`).
   Bản sao có chủ ý, cùng bản chất với `daily_snapshots`: đổi ngưỡng về sau thì tín hiệu cũ
   **vẫn giữ ngưỡng cũ** — đúng ý, vì đó mới là cái đã thực sự sinh ra tín hiệu hôm đó.
   Đừng "vá lại cho nhất quán".
@@ -138,7 +156,7 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 - **Gọn ↔ Đầy đủ:** cùng dữ liệu Firestore, `computeSummary()` và thứ tự mã qua `sortTickers()`.
   `renderCompact()` phải giữ công thức lãi/lỗ và % tương ứng `renderPositions()`, chênh lệch điểm tương ứng `renderWatchlist()`.
   Gọn dùng vốn nạp ròng (tổng nạp − tổng rút); Đầy đủ giữ Tổng tài sản. Đây là khác biệt đã chốt.
-  Gọn có highlight mua/bán khi sắp đạt hoặc đã đạt ngưỡng, dùng chung `strategyAlert()` với
+  Gọn có highlight cắt lỗ / chốt lời / chuyển vốn / mua thêm, dùng chung `holdingAdvice()` với
   Đầy đủ; thiếu giá phải hiện rõ, tổng dùng giá vốn thay thế có nhãn tạm tính.
   Form giao dịch và form thêm mã theo dõi được di chuyển DOM để dùng chung handler; không sao chép form hoặc tạo thêm kết nối.
   Highlight "Chuẩn bị mua" của watchlist phải có ở cả Gọn và Đầy đủ, cùng gọi
@@ -156,7 +174,10 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 
 ## Đã CHỐT và CẤM dựng lại
 - **Firebase project đặt trên tài khoản công ty `nghiant@youmed.vn`.** Codex đã nêu rủi ro (IT admin tổ chức truy cập được dữ liệu tài chính cá nhân); owner cân nhắc và **chọn giữ**. Không nêu lại.
-- **Không có ngưỡng chặn mua thêm** (số lần / % vốn tối đa mỗi mã). Owner biết rủi ro dồn vốn và **chốt chưa làm**. Đừng tự thêm.
+- **Đã bỏ bình quân giá xuống (30/10/2026).** Mã đang lỗ không có gợi ý mua thêm; cắt lỗ
+  thắng cờ Giữ dài hạn. Owner chốt sau bài học FPT/TCX — đừng dựng lại luật "giảm thì mua thêm".
+  Vẫn **chưa có** ngưỡng % vốn tối đa mỗi mã; đừng tự thêm.
+- **Không mô phỏng ngược luật cắt lỗ** trên lịch sử FPT/TCX (cùng lý do mục mô phỏng ngược bên dưới).
 - **Giá lấy từ datafeed VPS** (`bgapidatafeed.vps.com.vn`) — nguồn duy nhất kiểm chứng được
   là cho gọi cross-origin. TCBS, SSI, VNDirect, CafeF, DNSE, Yahoo **đều bị CORS chặn**,
   đã đo thật ngày 10/09/2026 (từ trình duyệt). Đừng thử lại nếu chưa có bằng chứng mới.

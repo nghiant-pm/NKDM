@@ -69,4 +69,59 @@ assert.equal(marketDateFor("intraday", "2026-09-25", vn), null, "Không có nế
 assert.match(telegramHeader({ phase: "intraday", time: "10:30" }, "2026-09-24", "2026-09-24", null)[1], /Tạm tính/, "Trong phiên phải ghi tạm tính");
 assert.match(telegramHeader({ phase: "pre", time: "08:30" }, "2026-09-24", "2026-09-23", null)[1], /23\/09\/2026/, "Trước phiên ghi rõ phiên được chấm");
 
-console.log("Smoke scoring + khung giờ: OK");
+// Luật danh mục (cắt lỗ / chốt lời đuổi / vốn chết / mua thêm) — tình huống kiểu TCX, FPT.
+const { holdingsFrom, activeStrategy, positionAdvice } = require("./risk");
+const { portfolioAlerts, telegramText } = require("./index")._private;
+const rules = activeStrategy([{ effectiveFrom: "2026-01-01", buyDrop: 2, sellRise: 3, lotSize: 100 }], "2026-10-30");
+assert.equal(rules.stopLossPct, 5, "Phiên bản cũ thiếu trường cắt lỗ thì dùng mặc định 5%");
+const since = "2026-09-10";
+const tcx = { qty: 800, cycleMaxQty: 800, avgCost: 40.18, heldSince: since };
+const advise = (pos, market, ctx = {}) => positionAdvice(pos, rules, { since, ...market }, { minScore: 70, ...ctx });
+let advice = advise({ ...tcx, price: 37.9 }, { ma20: 39, ma50: 39.5 });
+assert.equal(advice.kind, "stop"); assert.equal(advice.step, 2); assert.equal(advice.qty, 800, "Lỗ ≥5% VÀ dưới MA50 thì bán hết");
+advice = advise({ ...tcx, price: 37.9 }, { ma20: 37, ma50: 36 });
+assert.equal(advice.step, 1); assert.equal(advice.qty, 400, "Chạm một điều kiện thì đưa vị thế về 1/2");
+advice = advise({ ...tcx, qty: 400, price: 37.9 }, { ma50: 36 });
+assert.equal(advice.reached, false); assert.equal(advice.qty, 0, "Đã giảm về 1/2 thì không bảo bán tiếp ở bước 1");
+advice = advise({ ...tcx, qty: 100, cycleMaxQty: 100, price: 39.8 }, { ma50: 40 });
+assert.equal(advice.qty, 100, "Vị thế 100 CP thì bước 1 bán cả lô");
+advice = advise({ ...tcx, price: 38.4 }, { ma50: 36 });
+assert.equal(advice.step, 0); assert.equal(advice.reached, false, "Cách ngưỡng cắt ≤ 0,5 điểm thì cảnh báo sắp cắt");
+advice = advise({ ...tcx, price: 37.9 }, {}, { hold: true });
+assert.equal(advice.kind, "stop", "Cờ Giữ dài hạn không chặn cắt lỗ");
+advice = advise({ ...tcx, price: 39.5 }, { ma20: 39, ma50: 38 });
+assert.equal(advice, null, "Đang lỗ thì không bao giờ gợi ý mua thêm (bỏ bắt dao rơi)");
+const fpt = { qty: 100, cycleMaxQty: 100, avgCost: 72.62, heldSince: since };
+advice = advise({ ...fpt, price: 75 }, { ma20: 76, ma50: 70, peak: 76 });
+assert.equal(advice.kind, "sell"); assert.equal(advice.qty, 100, "Đang lãi mà thủng MA20 thì chốt hết");
+advice = advise({ ...fpt, price: 75 }, { ma20: 76, ma50: 70, peak: 76 }, { hold: true });
+assert.equal(advice, null, "Mã Giữ dài hạn không bị chốt lời đuổi");
+advice = advise({ ...fpt, price: 80 }, { ma20: 79, ma50: 70, peak: 88 });
+assert.equal(advice.kind, "sell", "Rơi ≥8% từ đỉnh chu kỳ thì chốt");
+advice = advise({ ...fpt, price: 79 }, { ma20: 78, ma50: 72, peak: 80 });
+assert.equal(advice.kind, "buy"); assert.equal(advice.qty, 100, "Đang lãi, trên MA50, sát MA20 thì mua thêm");
+advice = advise({ ...fpt, price: 73 }, { ma20: 74, ma50: 70, sessions: 25, score: 50 }, { hasCandidates: true });
+assert.equal(advice.kind, "sell", "Lãi nhỏ dưới MA20: chốt lời đuổi đi trước vốn chết");
+advice = advise({ ...fpt, price: 73 }, { ma20: 72, ma50: 70, sessions: 25, score: 50 }, { hasCandidates: true });
+assert.equal(advice.kind, "rotate", "Giữ ≥20 phiên, lãi <2%, điểm <70, có mã tốt hơn thì chuyển vốn");
+assert.equal(advise({ ...fpt, price: 73 }, { ma20: 72, ma50: 70, sessions: 25, score: 50 }, { hasCandidates: false })?.kind, "buy",
+  "Không có mã thay thế thì không gợi ý chuyển vốn");
+assert.equal(advise({ ...fpt, price: 73 }, { since: "2026-01-01", ma20: 72.5, ma50: 70, sessions: 99, score: 50 }, { hasCandidates: true })?.kind, "buy",
+  "Số phiên của chu kỳ cũ không được tính");
+const ledger = holdingsFrom([
+  { ticker: "TCX", side: "buy", qty: 800, price: 40.18, date: "2026-09-10" },
+  { ticker: "TCX", side: "sell", qty: 400, price: 38, date: "2026-10-01" }
+]);
+assert.equal(ledger.TCX.qty, 400); assert.equal(ledger.TCX.cycleMaxQty, 800, "Sổ vị thế nhớ khối lượng lớn nhất chu kỳ");
+const tcxBars = bars({ count: 80, start: 42, step: -0.06 }).map((row, index) => ({ ...row, date: dateAt(250 + index) }));
+const alerts = portfolioAlerts({
+  transactions: [{ ticker: "TCX", side: "buy", qty: 800, price: 40.18, date: tcxBars[30].date }],
+  strategies: [], tickerMeta: {}, date: tcxBars.at(-1).date,
+  historyByTicker: new Map([["TCX", tcxBars]]), benchmarkBars: benchmark, hasCandidates: true
+});
+assert.equal(alerts[0]?.advice.kind, "stop", "Bot phát hiện mã cần cắt lỗ từ giao dịch + lịch sử giá");
+const text = telegramText(["Fin2"], [], [], alerts, [{ ticker: "HPG", totalScore: 82 }]);
+assert.match(text, /Danh mục cần xử lý\n- TCX · Cắt lỗ 800 CP/, "Tin Telegram đưa cắt lỗ lên đầu");
+assert.match(text, /Thay bằng: HPG 82/, "Tin Telegram kèm mã thay thế");
+
+console.log("Smoke scoring + khung giờ + luật danh mục: OK");

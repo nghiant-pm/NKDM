@@ -4,6 +4,26 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-10-30 (Kỷ luật cắt lỗ thay cho "giảm thì mua thêm")
+
+Owner nhìn lại bài học FPT/TCX: mua bình quân giá xuống, gồng chờ về vốn, vốn chết lâu, không đặt điểm cắt từ trước. Sau buổi phỏng vấn, owner chốt bỏ hẳn luật bắt dao rơi và thay bằng bộ luật theo trường phái chuyên nghiệp (O'Neil, Minervini, chốt lời đuổi).
+
+- **Bỏ luật "giá ≤ giá vốn − 2 thì mua thêm" và "giá ≥ giá vốn + 3 thì bán".** Mỗi mã giờ chỉ có một gợi ý, theo thứ tự ưu tiên:
+  1. **Cắt lỗ:** đang lỗ mà lỗ ≥ 5% hoặc giá dưới MA50 thì bán về 1/2 vị thế; chạm cả hai thì bán hết. Áp dụng cả mã gắn cờ Giữ dài hạn. Cách mức cắt ≤ 0,5 điểm thì báo "Sắp cắt lỗ".
+  2. **Chốt lời đuổi:** đang lãi mà giá dưới MA20 hoặc rơi 8% từ đỉnh của chu kỳ thì bán hết (mã Giữ dài hạn không bị chốt).
+  3. **Vốn chết:** giữ ≥ 20 phiên, lãi dưới 2%, điểm sức mạnh dưới 70 trong khi sàng lọc có mã đạt chuẩn thì gợi ý chuyển vốn.
+  4. **Mua thêm:** chỉ khi đang lãi, giá trên MA50 và sát MA20 (0 đến +3%). **Mã đang lỗ không bao giờ được gợi ý mua thêm.**
+- **Kèm mã thay thế:** khuyến nghị cắt lỗ / chốt lời / chuyển vốn hiện tối đa 3 mã điểm cao nhất từ sàng lọc (không tính mã đang giữ).
+- **Nút lấy giá chung** lấy thêm lịch sử VNDirect của mã đang giữ để tính MA20, MA50, đỉnh chu kỳ, số phiên và điểm sức mạnh, lưu vào `tickers/{MÃ}.market`. Mã thiếu dữ liệu báo "Thiếu MA" và vẫn cắt lỗ theo %.
+- **Tab Chiến lược:** thay 4 ô Giảm/Tăng bằng Cắt lỗ (%), Chốt lời đuổi (% từ đỉnh), Vốn chết sau (phiên). Phiên bản cũ thiếu các trường này dùng mặc định 5% / 8% / 20 phiên, nên luật áp dụng ngay cho cả mã đang giữ (owner chọn). Lịch sử phiên bản cũ vẫn hiện ngưỡng Giảm/Tăng gốc.
+- **Giao diện:** thẻ vị thế có chip "Mức cắt lỗ" và chip gợi ý (đỏ = cắt lỗ, xanh lá = chốt lời, vàng = chuyển vốn, xanh brand = mua thêm) kèm dòng lý do. View Gọn, Highlight hôm nay và khối Quyết định ghi đúng tên hành động. Biểu đồ thay vạch Mua/Bán bằng vạch Cắt lỗ.
+- **Tín hiệu (`signals`):** thêm loại `stop` và `rotate`, chép `reason`, `stopLossPct`, `trailPct`, `staleSessions` của phiên bản lúc đó. Tín hiệu cũ giữ nguyên `buyDrop`/`sellRise`. File xuất cho AI có thêm các trường này và hướng dẫn đánh giá cắt lỗ.
+- **Bot Telegram:** mọi lượt quét đọc thêm giao dịch, chiến lược và cờ Giữ, đưa mục **"Danh mục cần xử lý"** lên đầu tin, kèm "Thay bằng". Luật chép nguyên văn sang `functions/risk.js` (bản sao có chủ ý, đã khai trong CLAUDE.md / AGENTS.md).
+- **Đã kiểm:** smoke test thêm 28 phép kiểm luật danh mục kiểu TCX/FPT (đều đạt; hai bản luật client và bot so `diff` giống hệt). Bấm thử trên trình duyệt thật với dữ liệu giả (không chạm Firestore thật) ở 375px sáng và 1120px tối: 1 lần gọi VPS + 5 lần gọi VNDirect, TCX ra "Cắt lỗ 800 CP", FPT ra "Chốt lời 100 CP", VTP ra "Mua thêm 100 CP"; Lưu nhật ký ghi đúng 4 tín hiệu kèm ngưỡng; không cuộn ngang, không lỗi JS. Chưa kiểm được bot gửi Telegram thật (cần deploy).
+- **Rủi ro đã nêu với owner:** chốt lời đuổi theo MA20 có thể bán sớm khi mã dao động quanh MA20; MA và giá so trong phiên là giá tạm tính, không phải giá đóng cửa.
+
+· `public/index.html` · `functions/index.js` · `functions/risk.js` · `functions/smoke.js` · `CLAUDE.md` · `AGENTS.md` · `CODEMAP.md` · `CHANGELOG.md`
+
 ## 2026-09-24h (Bot sàng lọc chạy lại được + owner chọn khung giờ nhận Telegram)
 
 Owner muốn tự chọn giờ nhận tin quét mã tiềm năng, có khung trước/trong/sau phiên và bật tắt được. Điều kiện tiên quyết: bot phải lấy được dữ liệu từ máy chủ (#012).
