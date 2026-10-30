@@ -8,6 +8,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const UNIVERSE = require("./universe");
 const { scoreTicker, evaluateCandidate, SCORE_VERSION, MIN_SCORE } = require("./scoring");
+const { holdingsFrom, activeStrategy, positionMarket, positionAdvice } = require("./risk");
 
 initializeApp();
 setGlobalOptions({ region: "asia-southeast1", maxInstances: 1 });
@@ -169,8 +170,43 @@ function telegramHeader(slot, date, marketDate, trial) {
     (trial && trial.isTrial ? `Thử nghiệm ${trial.trialSession}/20 · ` : "") + `Công thức ${SCORE_VERSION}`];
 }
 
-function telegramText(header, fresh, watched) {
-  const lines = header.slice();
+const ADVICE_LABEL = { stop: "Cắt lỗ", sell: "Chốt lời", rotate: "Chuyển vốn", buy: "Mua thêm" };
+
+/* Gợi ý cho mã đang giữ theo luật danh mục (functions/risk.js), giá = nến mới nhất đã chấm. */
+function portfolioAlerts({ transactions, strategies, tickerMeta, date, historyByTicker, benchmarkBars, hasCandidates }) {
+  const strategy = activeStrategy(strategies, date);
+  const holdings = holdingsFrom(transactions);
+  const rows = [];
+  Object.keys(holdings).sort().forEach((ticker) => {
+    const h = holdings[ticker];
+    const bars = historyByTicker.get(ticker);
+    if (!(h.qty > 0) || !bars?.length) return;
+    const scored = scoreTicker(ticker, bars, benchmarkBars);
+    const market = { ...positionMarket(bars, h.heldSince), score: Number.isFinite(scored.totalScore) ? scored.totalScore : null };
+    const advice = positionAdvice({ ...h, price: bars.at(-1).close }, strategy, market,
+      { hold: tickerMeta[ticker]?.hold === true, minScore: MIN_SCORE, hasCandidates });
+    if (advice && (advice.reached || advice.step === 0)) rows.push({ ticker, advice });
+  });
+  return rows;
+}
+
+function portfolioLines(alerts, candidates) {
+  if (!alerts.length) return [];
+  const lines = ["", "Danh mục cần xử lý"];
+  alerts.forEach(({ ticker, advice }) => {
+    const action = advice.reached
+      ? `${ADVICE_LABEL[advice.kind]} ${advice.qty} CP`
+      : `Sắp cắt lỗ · còn ${advice.remaining.toFixed(2)} điểm`;
+    lines.push(`- ${ticker} · ${action}` + (advice.reasons.length ? ` · ${advice.reasons.join(" · ")}` : ""));
+  });
+  if (alerts.some(({ advice }) => advice.reached && advice.kind !== "buy") && candidates.length) {
+    lines.push(`Thay bằng: ${candidates.slice(0, 3).map((row) => `${row.ticker} ${row.totalScore}`).join(", ")}`);
+  }
+  return lines;
+}
+
+function telegramText(header, fresh, watched, alerts = [], candidates = []) {
+  const lines = header.concat(portfolioLines(alerts, candidates));
   if (!fresh.length && !watched.length) return lines.concat("", "Không có mã đạt chuẩn 70 điểm.").join("\n");
   if (fresh.length) {
     lines.push("", "Cơ hội mới");
@@ -268,7 +304,7 @@ async function markFailure(db, slotRef, runRef, date, slot, error, token, chatId
 
 /* Tải + chấm điểm, không ghi gì. `marketDate === null` nghĩa là không có phiên để chấm. */
 async function scanMarket({ phase, date, held, watchlist, extraTickers }) {
-  const symbols = [...new Set([...UNIVERSE, ...watchlist, ...extraTickers])].filter(Boolean).sort();
+  const symbols = [...new Set([...UNIVERSE, ...watchlist, ...held, ...extraTickers])].filter(Boolean).sort();
   const benchmarkAll = await fetchHistory("VNINDEX", HISTORY_DAYS, 3);
   const marketDate = marketDateFor(phase, date, benchmarkAll);
   if (!marketDate) return { marketDate: null, latestMarketDate: benchmarkAll.at(-1)?.date || null };
@@ -353,16 +389,20 @@ async function runSlot(db, slot, date, token, chatId) {
   if (lock.skip) { logger.info(`Bỏ qua ${date} ${slot.time}: ${lock.reason}`); return; }
   const runRef = slot.phase === "post" ? db.collection("screening_runs").doc(date) : null;
   try {
-    const [transactionsSnap, watchlistSnap, oldResultsSnap] = await Promise.all([
+    const [transactionsSnap, watchlistSnap, oldResultsSnap, strategiesSnap, tickersSnap] = await Promise.all([
       db.collection("transactions").get(),
       db.collection("watchlist").get(),
-      db.collection("screening_results").get()
+      db.collection("screening_results").get(),
+      db.collection("strategies").get(),
+      db.collection("tickers").get()
     ]);
+    const transactions = transactionsSnap.docs.map((item) => item.data());
+    const held = heldTickers(transactions);
     const pendingTickers = oldResultsSnap.docs.filter((item) => item.data()?.evaluation?.complete !== true).map((item) => item.data().ticker);
     const scan = await scanMarket({
       phase: slot.phase,
       date,
-      held: heldTickers(transactionsSnap.docs.map((item) => item.data())),
+      held,
       watchlist: new Set(watchlistSnap.docs.map((item) => item.id)),
       extraTickers: slot.phase === "post" ? pendingTickers : []
     });
@@ -375,13 +415,24 @@ async function runSlot(db, slot, date, token, chatId) {
       return;
     }
     const trial = runRef ? await recordOfficialRun(db, date, scan, oldResultsSnap) : null;
+    // Mã thay thế: cùng quy tắc rotationCandidates() ở client — kết quả đạt chuẩn, bỏ mã đang giữ.
+    const candidates = scan.selected.filter((row) => !held.has(row.ticker)).sort((a, b) => b.totalScore - a.totalScore);
+    const alerts = portfolioAlerts({
+      transactions,
+      strategies: strategiesSnap.docs.map((item) => item.data()),
+      tickerMeta: Object.fromEntries(tickersSnap.docs.map((item) => [item.id, item.data()])),
+      date: scan.marketDate,
+      historyByTicker: scan.historyByTicker,
+      benchmarkBars: scan.benchmarkBars,
+      hasCandidates: candidates.length > 0
+    });
     const notificationType = scan.selected.length ? "results" : "empty";
     await lock.ref.set({
       status: "completed", marketDate: scan.marketDate, scannedCount: scan.historyByTicker.size,
       missingCount: scan.failures.length, selectedCount: scan.selected.length, updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
     if (await claimNotification(db, lock.ref, notificationType)) {
-      await sendTelegram(token, chatId, telegramText(telegramHeader(slot, date, scan.marketDate, trial), scan.fresh, scan.watched));
+      await sendTelegram(token, chatId, telegramText(telegramHeader(slot, date, scan.marketDate, trial), scan.fresh, scan.watched, alerts, candidates));
       await lock.ref.set({ notificationSentAt: FieldValue.serverTimestamp() }, { merge: true });
     }
     logger.info(`Hoàn tất ${date} ${slot.time}`, { selected: scan.selected.length, missing: scan.failures.length });
@@ -413,5 +464,5 @@ exports.screenShortTermOpportunities = onSchedule({
 
 exports._private = {
   dateInZone, slotAt, slotEnabled, marketDateFor, parseHistory, fetchHistory, mapWithConcurrency,
-  heldTickers, rank, selectResults, telegramHeader, telegramText, scanMarket, SLOTS
+  heldTickers, rank, selectResults, telegramHeader, telegramText, portfolioAlerts, scanMarket, SLOTS
 };
