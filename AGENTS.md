@@ -98,7 +98,7 @@ decision_news/{hash} · decision_control/{runtime|news}   (tất cả decision_*
 `transactions` (note "Đồng bộ TCBS", `createdAt` = giờ khớp), lệch tiền vào `cashflows` "adjust" (note "Đối chiếu TCBS").
 Id của `signals` là **tất định** (ngày_mã_loại) ⇒ lưu lại trong ngày là ghi đè, không đẻ bản trùng.
 **Lưu ở MÁY (localStorage, KHÔNG đồng bộ giữa thiết bị):** `fin2-theme` (sáng/tối) ·
-`fin2-tab` (tab đang mở) · `fin2-view` (Gọn/Đầy đủ) · `fin2-sort-positions` / `fin2-sort-watchlist`
+`fin2-tab` (tab đang mở) · `fin2-sort-positions` / `fin2-sort-watchlist`
 (cột và chiều sort bảng mã) · `fin2-collapsed` (section nào đang gập) · `fin2-skip-highlight` (tín hiệu đã Bỏ qua ở khối Khuyến nghị,
 tự hết hạn khi sang ngày) · `fin2-pnl-range`
 (Tuần/Tháng/Quý/Tất cả) · `fin2-hide-pnl` (ẩn/hiện lãi lỗ) · `fin2-exclude-hold-pnl`
@@ -173,20 +173,14 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 ---
 
 ## Các cặp VIEW SONG SONG (hỏi phạm vi trước khi code)
-- **Gọn ↔ Đầy đủ:** cùng dữ liệu Firestore, `computeSummary()` và thứ tự mã qua `sortTickers()`.
-  Bảng mã nắm giữ / theo dõi là MỘT DOM (`#positions-body`, `#watchlist-body`) do `renderCompact()` dựng, `showView()` chuyển
-  qua lại giữa slot Gọn và slot Đầy đủ — không có bản thứ hai để giữ khớp.
-  Một thanh tab chung (từ 02/10/2026): Gọn/Đầy đủ chỉ khác ở tab Danh mục + Theo dõi; tab Cơ hội (`screening-hub`),
-  Chiến lược, Phân tích (`decision-hub` = Hiệu quả tín hiệu, ở đầu) là một bản dùng chung. Ẩn/hiện chỉ qua `syncPanels()`.
-  Vốn nạp ròng (Σ nạp − Σ rút, bỏ "adjust") + Lãi/lỗ từ đầu (= Tổng tài sản − vốn nạp ròng) nằm cạnh Tổng tài sản trong `#overview-more`, dùng chung hai view (owner chốt 02/10/2026).
-  Gọn có highlight mua/bán khi sắp đạt hoặc đã đạt ngưỡng, dùng chung `strategyAlert()` với
-  Đầy đủ; thiếu giá phải hiện rõ, tổng dùng giá vốn thay thế có nhãn tạm tính.
-  Form giao dịch và form thêm mã theo dõi được di chuyển DOM để dùng chung handler; không sao chép form hoặc tạo thêm kết nối.
-  Highlight "Chuẩn bị mua" của watchlist phải có ở cả Gọn và Đầy đủ, cùng gọi
-  `watchProximity()`; không sao chép công thức theo từng view.
-  Thay đổi nội dung/luồng ở một view cần hỏi phạm vi áp dụng trước khi code.
-- **Dashboard dòng tiền:** hai view dùng chung `dashboardData()`. Gọn chỉ có 4 chỉ số chính;
-  Đầy đủ thêm phân nhóm vị thế và lãi/lỗ đã chốt theo mã. Kỳ xem là sở thích localStorage.
+- **Một view duy nhất** (view Đầy đủ đã gỡ 01/11/2026 — đừng dựng lại): bảng mã nắm giữ / theo dõi (`#positions-body`,
+  `#watchlist-body`) do `renderCompact()` dựng. Form nhập nằm ẩn trong `#form-store`, mượn vào popup qua `openCompactForm`.
+  5 tab Danh mục · Theo dõi · Cơ hội · Chiến lược · Phân tích; ẩn/hiện chỉ qua `syncPanels()`.
+  Vốn nạp ròng (Σ nạp − Σ rút, bỏ "adjust") + Lãi/lỗ từ đầu (= Tổng tài sản − vốn nạp ròng) nằm cạnh Tổng tài sản trong `#overview-more` (owner chốt 02/10/2026).
+  Highlight mua/bán khi sắp đạt hoặc đã đạt ngưỡng qua `strategyAlert()`; thiếu giá phải hiện rõ, tổng dùng giá vốn thay thế có nhãn tạm tính.
+  Highlight "Chuẩn bị mua" của watchlist gọi `watchProximity()`.
+- **Dashboard dòng tiền:** `dashboardData()`. Hiện 4 chỉ số chính; `#overview-more` (bấm mở)
+  thêm phân nhóm vị thế và lãi/lỗ đã chốt theo mã. Kỳ xem là sở thích localStorage.
   Mục tiêu tiền mặt phải đọc qua `activeStrategy()`, bản cũ thiếu trường dùng 20–30%.
   Forecast 30/50/100% chỉ mô phỏng vị thế đang lãi theo giá hiện tại, làm tròn xuống bội số
   100 CP của từng mã, trừ thuế và không ghi Firestore.

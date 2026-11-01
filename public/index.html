@@ -140,7 +140,6 @@
   .icon-btn:active{ transform:scale(.96); }
   .icon-btn.on{ background:var(--brand-soft); color:var(--brand); border-color:var(--brand); }
   .icon-btn:focus-visible, .icon-action:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; }
-  .mobile-view-toggle{ display:none; }
   .ui-icon{ width:19px; height:19px; display:block; flex:none; }
   .icon-action{
     width:44px; height:44px; flex:none; padding:0;
@@ -222,19 +221,6 @@
     padding:16px;
   }
 
-  /* ---------- stats ---------- */
-  .stats{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
-  @media (min-width:720px){ .stats{ grid-template-columns:repeat(4,1fr); } }
-  .stat{
-    background:var(--surface); border:1px solid var(--border);
-    border-radius:var(--r-card); box-shadow:var(--shadow); padding:14px;
-  }
-  .stat .k{ font-size:var(--fs-label); color:var(--text-muted); margin-bottom:6px; }
-  .stat .v{ font-size:var(--fs-title); font-weight:500; letter-spacing:-.01em; word-break:break-word; }
-  .stat .s{ font-size:var(--fs-label); color:var(--text-muted); margin-top:4px; }
-  .stat .s.pos{ color:var(--pos); }
-  .stat .s.neg{ color:var(--neg); }
-  .stat .s.warn{ color:var(--warn); }
   .v.pos{ color:var(--pos); }
   .v.neg{ color:var(--neg); }
   .v.warn{ color:var(--warn); }
@@ -253,14 +239,6 @@
   .range-switch button:focus-visible{ outline:2px solid var(--brand); outline-offset:1px; }
   .dashboard-controls{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
   .dashboard-controls .range-switch{ margin-bottom:0; }
-  .pnl-scope-toggle{
-    min-height:44px; padding:8px 12px; border:1px solid var(--border); border-radius:var(--r-input);
-    background:var(--surface); color:var(--text-muted); font:inherit; font-size:var(--fs-label); cursor:pointer;
-  }
-  .pnl-scope-toggle:hover{ background:var(--surface-2); color:var(--text); }
-  .pnl-scope-toggle:active{ transform:scale(.98); }
-  .pnl-scope-toggle[aria-pressed="true"]{ background:var(--brand-soft); border-color:var(--brand); color:var(--brand); }
-  .pnl-scope-toggle:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; }
   .overview-context{
     display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:10px; padding:10px 12px;
     border:1px solid var(--border); border-radius:var(--r-input);
@@ -372,7 +350,7 @@
   @media(max-width:430px){
     .range-switch{ display:flex; width:100%; }
     .range-switch button{ flex:1; min-width:0; padding-inline:6px; }
-    .dashboard-controls, .dashboard-controls .pnl-scope-toggle{ width:100%; }
+    .dashboard-controls{ width:100%; }
     .metric-row{ grid-template-columns:minmax(0,1fr) auto; }
     .metric-row .share{ grid-column:2; }
   }
@@ -458,8 +436,6 @@
   .hold-btn.icon-only{ width:44px; height:44px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:var(--r-input); }
 
   /* ---------- forms ---------- */
-  .forms{ display:grid; grid-template-columns:1fr; gap:16px; }
-  @media (min-width:900px){ .forms{ grid-template-columns:3fr 2fr; } }
   .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
   .row.full{ grid-template-columns:1fr; }
   @media (max-width:430px){ .row{ grid-template-columns:1fr; } }
@@ -632,10 +608,6 @@
     }
   }
 
-  /* View Gọn: cùng dữ liệu, form và nút lưu với view Đầy đủ. */
-  .view-switch{ display:flex; border:1px solid var(--border); border-radius:var(--r-input); overflow:hidden; }
-  .view-switch button{ border:0; padding:8px; min-height:44px; min-width:44px; background:var(--surface); font-size:var(--fs-label); }
-  .view-switch button[aria-pressed="true"]{ background:var(--brand-soft); color:var(--brand); }
   .compact-dashboard-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
   .compact-dashboard-head h2{ font-size:var(--fs-section); }
   .compact-dashboard-head .range-switch{ margin-bottom:0; }
@@ -705,7 +677,7 @@
   .ticker-search-form .form-actions{ margin-top:0; }
   .compact-summary-toggle .analysis-chevron{ margin-left:auto; transition:transform .18s var(--ease); }
   .compact-summary-toggle[aria-expanded="true"] .analysis-chevron{ transform:rotate(180deg); }
-  /* ---------- bảng mã (Gọn + Đầy đủ), kiểu bảng tài sản TCBS ----------
+  /* ---------- bảng mã, kiểu bảng tài sản TCBS ----------
      Mỗi dòng là lưới đặt ô theo vùng (a-tk, a-px, a-qty…); ô 2 số dùng subgrid để thẳng hàng.
      Hàng 3 (a-more, a-drag trên điện thoại) chỉ hiện khi bấm mở dòng. Vạch trái: đậm = đã tới ngưỡng, mảnh = sắp tới. */
   .compact-table, .compact-table tbody{ display:block; width:100%; }
@@ -955,8 +927,6 @@
     .wrap{ padding-bottom:calc(104px + env(safe-area-inset-bottom)); }
     .top{ flex-wrap:nowrap; justify-content:flex-end; }
     .top h1{ display:none; }
-    .top .view-switch{ display:none; }
-    .mobile-view-toggle{ display:inline-flex; }
     #global-price-refresh{
       position:fixed; z-index:40; right:16px; bottom:calc(16px + env(safe-area-inset-bottom));
       width:52px; height:52px; border:0; background:var(--brand); color:var(--surface); box-shadow:var(--shadow-lift);
@@ -993,13 +963,6 @@
 
   <header class="top">
     <h1>Danh Mục</h1>
-    <div class="view-switch" role="group" aria-label="Chế độ xem">
-      <button type="button" id="view-compact" aria-pressed="false">Gọn</button>
-      <button type="button" id="view-full" aria-pressed="true">Đầy đủ</button>
-    </div>
-    <button class="icon-btn mobile-view-toggle" id="view-mobile-toggle" type="button" aria-label="Chuyển sang Đầy đủ" title="Chuyển sang Đầy đủ">
-      <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="5" rx="1"/><rect x="4" y="14" width="16" height="5" rx="1"/></svg>
-    </button>
     <button class="btn" id="install-btn" type="button" hidden>Cài đặt</button>
     <button class="icon-btn" id="ticker-search-btn" type="button" aria-label="Chấm một mã HOSE" title="Chấm một mã HOSE">
       <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
@@ -1036,8 +999,8 @@
       data-tab="phan-tich" aria-controls="panel-phan-tich" aria-selected="false">Phân tích</button>
   </nav>
 
-  <div id="compact-view" class="summary-collapsed" hidden>
-  <div id="compact-panel-danh-muc">
+  <div id="compact-view" class="summary-collapsed">
+  <div class="panel" id="panel-danh-muc" role="tabpanel" aria-labelledby="tab-danh-muc">
     <section class="card setup-card" id="setup-card" aria-labelledby="setup-title" hidden>
       <div class="sec-head"><h2 id="setup-title">Thiết lập sổ</h2><button class="btn" type="button" id="setup-hide">Ẩn</button></div>
       <div class="setup-list" id="setup-list"></div>
@@ -1049,7 +1012,7 @@
     <div class="compact-dashboard-head">
       <h2>Dòng tiền &amp; lãi/lỗ</h2>
       <div class="dashboard-controls">
-        <button class="icon-action" type="button" data-exclude-hold-pnl data-icon-control aria-pressed="false" aria-label="Không tính mã dài hạn" title="Không tính mã dài hạn">
+        <button class="icon-action" type="button" data-exclude-hold-pnl aria-pressed="false" aria-label="Không tính mã dài hạn" title="Không tính mã dài hạn">
           <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg>
         </button>
         <div class="range-switch" role="group" aria-label="Khoảng thời gian lãi lỗ">
@@ -1070,7 +1033,29 @@
       <span id="compact-overview-line"></span>
       <svg class="ui-icon analysis-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
-    <div id="compact-overview-slot" hidden></div>
+    <div id="compact-overview-slot" hidden><div id="overview-more">
+    <div class="overview-context num">
+      <span>Tổng tài sản <strong id="s-total">—</strong></span>
+      <span>Giá trị cổ phiếu <strong id="s-mkt">—</strong></span>
+      <span>Vốn mua <strong id="s-invested">—</strong></span>
+      <span>Vốn nạp ròng <strong id="s-net-capital">—</strong></span>
+      <span>Lãi/lỗ từ đầu <strong id="s-total-pnl">—</strong></span>
+    </div>
+    <div class="dashboard-details">
+      <div class="card dashboard-card">
+        <h3>Phân nhóm vị thế</h3>
+        <div class="metric-list" id="position-groups"></div>
+      </div>
+      <div class="card dashboard-card">
+        <h3 id="realized-breakdown-title">Đã chốt theo mã</h3>
+        <div class="metric-list" id="realized-breakdown"></div>
+      </div>
+    </div>
+    <div class="card forecast-card">
+      <h3>Nếu chốt các mã đang lãi</h3>
+      <div class="forecast-grid" id="sell-forecast"></div>
+    </div>
+    </div></div>
     <div id="compact-advice-slot"><section class="card compact-today" id="advice-section" aria-labelledby="compact-today-title">
       <div class="compact-today-head sec-head" data-sec="khuyen-nghi"><h2 id="compact-today-title">Khuyến nghị</h2><span class="compact-today-count" id="compact-today-count"></span></div>
       <div class="compact-today-list" id="compact-today-list"></div>
@@ -1095,9 +1080,30 @@
       </table>
       </div></div>
     </section>
-    <div id="compact-journal-slot"></div>
+    <div id="compact-journal-slot">
+  <section id="journal-section">
+    <div class="sec-head" data-sec="nhat-ky">
+      <h2>Nhật ký</h2>
+      <span class="meta" id="log-count"></span>
+    </div>
+    <div class="journal-export">
+      <label for="ex-range">Xuất cho AI
+        <select id="ex-range">
+          <option value="15">15 ngày</option>
+          <option value="30" selected>30 ngày</option>
+          <option value="45">45 ngày</option>
+          <option value="0">Tất cả</option>
+        </select>
+      </label>
+      <button class="btn primary" id="ex-btn" type="button">Xuất nhật ký</button>
+    </div>
+    <div class="form-msg" id="ex-msg"></div>
+    <div class="log-list" id="log-list"></div>
+    <div class="card empty" id="log-empty" hidden>Chưa có nhật ký</div>
+  </section>
+    </div>
   </div>
-  <div id="compact-panel-theo-doi" hidden>
+  <div class="panel" id="panel-theo-doi" role="tabpanel" aria-labelledby="tab-theo-doi" hidden>
     <section class="compact-panel">
       <div class="compact-head sec-head" data-sec="gon-theo-doi"><h2>Đang theo dõi</h2><button class="icon-action" id="compact-add-watch" type="button" aria-label="Thêm mã theo dõi" title="Thêm mã theo dõi">
         <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -1113,79 +1119,9 @@
   </div>
   </div>
 
-  <div id="full-view">
-
-  <div class="panel" id="panel-danh-muc" role="tabpanel" aria-labelledby="tab-danh-muc">
-
-  <section>
-    <div class="sec-head" data-sec="tong-quan">
-      <h2>Tổng quan</h2>
-      <span class="meta num only-collapsed" id="ov-sub"></span>
-    </div>
-    <div class="dashboard-controls">
-      <button class="pnl-scope-toggle" type="button" data-exclude-hold-pnl aria-pressed="false">Không tính mã dài hạn</button>
-      <div class="range-switch" role="group" aria-label="Khoảng thời gian lãi lỗ">
-        <button type="button" data-pnl-range="week" aria-pressed="false">Tuần</button>
-        <button type="button" data-pnl-range="month" aria-pressed="true">Tháng</button>
-        <button type="button" data-pnl-range="quarter" aria-pressed="false">Quý</button>
-        <button type="button" data-pnl-range="all" aria-pressed="false">Tất cả</button>
-      </div>
-    </div>
-    <div class="stats">
-      <div class="stat">
-        <div class="k" id="s-realized-label">Lãi/lỗ đã chốt · Tháng</div>
-        <div class="v num" id="s-realized">—</div>
-        <div class="s" id="s-realized-sub"></div>
-      </div>
-      <div class="stat">
-        <div class="k">Lãi/lỗ chưa bán</div>
-        <div class="v num" id="s-pnl">—</div>
-        <div class="s" id="s-pnl-sub"></div>
-      </div>
-      <div class="stat">
-        <div class="k">Tiền mặt</div>
-        <div class="v num" id="s-cash">—</div>
-        <div class="s" id="s-cash-sub"></div>
-      </div>
-      <div class="stat">
-        <div class="k">Tỷ lệ tiền mặt</div>
-        <div class="v num" id="s-cash-ratio">—</div>
-        <div class="s" id="s-cash-ratio-sub"></div>
-      </div>
-    </div>
-    <div id="full-overview-slot"><div id="overview-more">
-    <div class="overview-context num">
-      <span>Tổng tài sản <strong id="s-total">—</strong></span>
-      <span>Giá trị cổ phiếu <strong id="s-mkt">—</strong></span>
-      <span>Vốn mua <strong id="s-invested">—</strong></span>
-      <span>Vốn nạp ròng <strong id="s-net-capital">—</strong></span>
-      <span>Lãi/lỗ từ đầu <strong id="s-total-pnl">—</strong></span>
-    </div>
-    <div class="dashboard-details">
-      <div class="card dashboard-card">
-        <h3>Phân nhóm vị thế</h3>
-        <div class="metric-list" id="position-groups"></div>
-      </div>
-      <div class="card dashboard-card">
-        <h3 id="realized-breakdown-title">Đã chốt theo mã</h3>
-        <div class="metric-list" id="realized-breakdown"></div>
-      </div>
-    </div>
-    <div class="card forecast-card">
-      <h3>Nếu chốt các mã đang lãi</h3>
-      <div class="forecast-grid" id="sell-forecast"></div>
-    </div>
-    </div></div>
-  </section>
-
-  <div id="full-advice-slot"></div>
-
-  <section>
-    <div class="sec-head" data-sec="hom-nay">
-      <h2>Hôm nay</h2>
-      <span class="meta" id="today-label"></span>
-    </div>
-    <div class="card"><div id="today-body">
+  <!-- Form nhập: chỉ hiện khi mượn vào popup (openCompactForm). -->
+  <div id="form-store" hidden>
+    <div id="today-body">
       <div id="today-banner"></div>
       <div class="price-list" id="price-list"></div>
       <div class="muted" id="price-empty" style="font-size:var(--fs-meta);"></div>
@@ -1193,20 +1129,7 @@
         <button class="btn primary" id="save-snap" type="button">Lưu</button>
       </div>
       <div class="price-source" id="price-source" role="status" aria-live="polite"></div>
-    </div></div>
-  </section>
-
-  <section>
-    <div class="sec-head" data-sec="vi-the">
-      <h2>Danh mục</h2>
     </div>
-    <div id="full-positions-slot"></div>
-  </section>
-
-  <section>
-    <div class="forms">
-      <div class="card">
-        <div class="sec-head" data-sec="ghi-gd"><h2>Giao dịch</h2></div>
         <form id="tx-form" novalidate>
           <div class="row">
             <div>
@@ -1254,10 +1177,6 @@
           </div>
           <div class="form-msg" id="tx-msg"></div>
         </form>
-      </div>
-
-      <div class="card">
-        <div class="sec-head" data-sec="nap-rut"><h2>Nạp / rút vốn</h2></div>
         <form id="cf-form" novalidate>
           <div class="row full">
             <div>
@@ -1288,46 +1207,6 @@
           <button class="btn primary wide" type="submit">Lưu</button>
           <div class="form-msg" id="cf-msg"></div>
         </form>
-      </div>
-    </div>
-  </section>
-
-  <div id="full-journal-slot">
-  <section id="journal-section">
-    <div class="sec-head" data-sec="nhat-ky">
-      <h2>Nhật ký</h2>
-      <span class="meta" id="log-count"></span>
-    </div>
-    <div class="journal-export">
-      <label for="ex-range">Xuất cho AI
-        <select id="ex-range">
-          <option value="15">15 ngày</option>
-          <option value="30" selected>30 ngày</option>
-          <option value="45">45 ngày</option>
-          <option value="0">Tất cả</option>
-        </select>
-      </label>
-      <button class="btn primary" id="ex-btn" type="button">Xuất nhật ký</button>
-    </div>
-    <div class="form-msg" id="ex-msg"></div>
-    <div class="log-list" id="log-list"></div>
-    <div class="card empty" id="log-empty" hidden>Chưa có nhật ký</div>
-  </section>
-  </div>
-  </div><!-- /panel Danh mục -->
-
-  <div class="panel" id="panel-theo-doi" role="tabpanel" aria-labelledby="tab-theo-doi" hidden>
-
-  <section>
-    <div class="sec-head" data-sec="watchlist">
-      <h2>Đang theo dõi</h2>
-    </div>
-    <div id="full-watchlist-slot"></div>
-  </section>
-
-  <section>
-    <div class="card">
-      <div class="sec-head" data-sec="them-wl"><h2>Thêm mã</h2></div>
       <form id="wl-form" novalidate>
         <div class="row full">
           <div>
@@ -1348,11 +1227,7 @@
         <button class="btn primary wide" id="wl-save" type="submit">Lưu</button>
         <div class="form-msg" id="wl-msg"></div>
       </form>
-    </div>
-  </section>
-
-  </div><!-- /panel Theo dõi -->
-  </div><!-- /full-view -->
+  </div>
 
   <div class="panel" id="panel-co-hoi" role="tabpanel" aria-labelledby="tab-co-hoi" hidden>
   <section id="screening-hub">
@@ -3881,9 +3756,6 @@ async function refreshDecisionScores(){
 function render(){
   const s = computeSummary();
   const dashboard = dashboardData(s);
-  const pnlScope = unrealizedPnlScope(s);
-  const rangeLabel = pnlRangeLabel(pnlRange);
-  const valueClass = (n) => pnlClass(n);
   renderPrivacyControl();
   renderPnlScopeControls();
   renderSetup();
@@ -3895,34 +3767,6 @@ function render(){
   $("s-net-capital").textContent = fmtVND(netCapital);
   $("s-total-pnl").textContent = pnlMoney(totalPnl) + (netCapital > 0 ? " · " + pnlPercent(totalPnl / netCapital * 100) : "");
   $("s-total-pnl").className = pnlClass(totalPnl).trim();
-  $("ov-sub").textContent = "Đã chốt " + pnlMoney(dashboard.realizedVND);
-
-  $("s-realized-label").textContent = "Lãi/lỗ đã chốt · " + rangeLabel;
-  const realizedEl = $("s-realized");
-  realizedEl.textContent = pnlMoney(dashboard.realizedVND);
-  realizedEl.className = "v num" + valueClass(dashboard.realizedVND);
-  $("s-realized-sub").textContent = dashboard.events.length + " lệnh bán · sau thuế";
-
-  $("s-cash").textContent = fmtVND(s.cash);
-  $("s-cash").className = "v num" + (s.cash < 0 ? " neg" : "");
-  const cashSub = $("s-cash-sub");
-  cashSub.textContent = s.cash < 0 ? "Số dư âm" : "";
-  cashSub.className = "s" + (s.cash < 0 ? " neg" : "");
-
-  const pnlEl = $("s-pnl"), pnlSub = $("s-pnl-sub");
-  const hasPos = pnlScope.investedCost > 0 || pnlScope.marketValue > 0;
-  pnlEl.textContent = hasPos ? pnlMoney(pnlScope.unrealizedPnl) : "—";
-  pnlEl.className = "v num" + pnlClass(pnlScope.unrealizedPnl);
-  const pnlPct = pnlScope.investedCost > 0 ? (pnlScope.unrealizedPnl / pnlScope.investedCost * 100) : null;
-  pnlSub.textContent = pnlPct === null ? "" : pnlPercent(pnlPct) + (pnlScope.missing ? " · Tạm tính" : "");
-  pnlSub.className = "s" + pnlClass(pnlScope.unrealizedPnl);
-
-  const ratioEl = $("s-cash-ratio"), ratioSub = $("s-cash-ratio-sub");
-  ratioEl.textContent = dashboard.cashRatio === null ? "—" : dashboard.cashRatio.toFixed(1) + "%";
-  ratioEl.className = "v num" + (dashboard.cashStatus.key ? " " + dashboard.cashStatus.key : "");
-  ratioSub.textContent = dashboard.cashStatus.label + " · mục tiêu " +
-    dashboard.strategy.minCashRatio.toFixed(0) + "–" + dashboard.strategy.maxCashRatio.toFixed(0) + "%";
-  ratioSub.className = "s" + (dashboard.cashStatus.key ? " " + dashboard.cashStatus.key : "");
 
   renderRangeSwitches();
   renderDashboardDetails(s, dashboard);
@@ -3944,7 +3788,7 @@ function render(){
   if($("ticker-dialog").open) renderTickerDetail();
 }
 
-/* Cột bảng mã (Gọn + Đầy đủ) kiểu bảng tài sản TCBS: mỗi cột 2 dòng số, bấm tiêu đề để sắp xếp.
+/* Cột bảng mã kiểu bảng tài sản TCBS: mỗi cột 2 dòng số, bấm tiêu đề để sắp xếp.
    Cột GTTT / Vốn chỉ hiện trên màn >768px (class c-wide). */
 const compactTableColumns = {
   positions:[["ticker","Mã",""],["qty","KL","Giá vốn"],["value","GTTT (tr)","Vốn (tr)"],["edgeGap","Cắt lỗ","Bán"],["pnl","Lãi (K)","Lãi %"]],
@@ -4379,7 +4223,7 @@ function renderCompact(s){
   $("compact-save-day").setAttribute("aria-label", "Lưu nhật ký hôm nay" + (savedToday ? " · đã lưu" : " · chưa lưu"));
   renderAdvice(s);
   $("global-price-refresh").disabled = priceRefreshBusy || (!s.held.length && !Object.keys(state.watchlist).length);
-  // Bảng mã dùng chung Gọn + Đầy đủ (một DOM, chuyển chỗ khi đổi view). Đang kéo thả thì không dựng lại.
+  // Đang kéo thả thì không dựng lại.
   if(dragSort) return;
   const st = activeStrategy(todayStr());
   const tr1 = (n) => (n / 1e6).toFixed(1);
@@ -4538,26 +4382,6 @@ function initCompact(){
   window.addEventListener("beforeunload", (e) => {
     if(pendingDrafts.size){ e.preventDefault(); e.returnValue = ""; }
   });
-  function showView(view){
-    const compact = view === "compact";
-    compactView = compact;
-    syncPanels();
-    $("view-compact").setAttribute("aria-pressed", String(compact));
-    $("view-full").setAttribute("aria-pressed", String(!compact));
-    const mobileViewLabel = compact ? "Chuyển sang Đầy đủ" : "Chuyển sang Gọn";
-    $("view-mobile-toggle").setAttribute("aria-label", mobileViewLabel);
-    $("view-mobile-toggle").title = mobileViewLabel;
-    $(compact ? "compact-positions-slot" : "full-positions-slot").appendChild($("positions-body"));
-    $(compact ? "compact-watchlist-slot" : "full-watchlist-slot").appendChild($("watchlist-body"));
-    $(compact ? "compact-overview-slot" : "full-overview-slot").appendChild($("overview-more"));
-    $(compact ? "compact-advice-slot" : "full-advice-slot").appendChild($("advice-section"));
-    $(compact ? "compact-journal-slot" : "full-journal-slot").appendChild($("journal-section"));
-    renderCompact(computeSummary());
-    try { localStorage.setItem("fin2-view", compact ? "compact" : "full"); } catch(e) {}
-  }
-  $("view-compact").addEventListener("click", () => showView("compact"));
-  $("view-full").addEventListener("click", () => showView("full"));
-  $("view-mobile-toggle").addEventListener("click", () => showView(compactView ? "full" : "compact"));
   $("compact-trade").addEventListener("click", () => openCompactForm("trade"));
   $("compact-add-watch").addEventListener("click", () => openCompactForm("watch"));
   $("compact-save-day").addEventListener("click", () => openCompactForm("day"));
@@ -4711,9 +4535,9 @@ function initCompact(){
   }, { passive:true });
   $("compact-close").addEventListener("click", closeCompactForm);
   $("compact-dialog").addEventListener("close", () => { if(!$("compact-dialog").open) restoreCompactForm(); });
-  let saved = "compact";
-  try { saved = localStorage.getItem("fin2-view"); } catch(e) {}
-  showView(saved);
+  // View Đầy đủ đã gỡ (01/11/2026) — dọn khoá cũ trên máy.
+  try { localStorage.removeItem("fin2-view"); } catch(e) {}
+  renderCompact(computeSummary());
 }
 
 function openScreeningWatch(ticker, price){
@@ -4725,13 +4549,7 @@ function openScreeningWatch(ticker, price){
   $("wl-ticker").dispatchEvent(new Event("input", { bubbles:true }));
   $("wl-quote").textContent = "Giá lúc đề cử: " + fmtPrice(price);
   pendingDrafts.add("wl-form");
-  if(compactView){
-    openCompactForm("watch");
-  }else{
-    showTab("theo-doi");
-    $("wl-form").scrollIntoView({ behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"center" });
-    $("wl-target").focus({ preventScroll:true });
-  }
+  openCompactForm("watch");
 }
 
 function initScreening(){
@@ -5062,7 +4880,6 @@ function renderPriceInputs(tickers){
 function renderTodayBanner(tickers){
   const el = $("today-banner");
   const today = todayStr();
-  $("today-label").textContent = fmtDateVN(today);
   if(tickers.length === 0){ el.innerHTML = ""; return; }
   const snap = state.snapshots.find((s) => s.date === today);
   if(snap){
@@ -6659,10 +6476,7 @@ function initForms(){
 /* Tab đang mở thuộc về MÁY, không phải dữ liệu → localStorage, không đồng bộ.
    Panel ẩn vẫn nằm trong DOM: render() không cần biết tab nào đang mở. */
 const TABS = ["danh-muc", "theo-doi", "co-hoi", "chien-luoc", "phan-tich"];
-// Gọn / Đầy đủ chỉ khác nhau ở hai tab này; Cơ hội, Chiến lược, Phân tích là một bản dùng chung.
-const VIEW_TABS = ["danh-muc", "theo-doi"];
 let currentTab = TABS[0];
-let compactView = false;
 
 function renderPrivacyControl(){
   const btn = $("pnl-privacy-btn");
@@ -6680,11 +6494,9 @@ function renderPnlScopeControls(){
   document.querySelectorAll("[data-exclude-hold-pnl]").forEach((btn) => {
     btn.setAttribute("aria-pressed", String(excludeHoldPnl));
     const label = "Không tính mã dài hạn · " + (excludeHoldPnl ? "Bật" : "Tắt");
-    if(btn.hasAttribute("data-icon-control")){
-      btn.setAttribute("aria-label", label);
-      btn.title = label;
-      btn.classList.toggle("on", excludeHoldPnl);
-    }else btn.textContent = label;
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+    btn.classList.toggle("on", excludeHoldPnl);
   });
 }
 
@@ -6715,9 +6527,6 @@ function syncPanels(){
     btn.setAttribute("aria-selected", on ? "true" : "false");
     $("panel-" + t).hidden = !on;
   });
-  VIEW_TABS.forEach((t) => { $("compact-panel-" + t).hidden = t !== currentTab; });
-  $("compact-view").hidden = !compactView;
-  $("full-view").hidden = compactView;
 }
 
 function showTab(name){

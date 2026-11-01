@@ -4,6 +4,20 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-01 (Gỡ view Đầy đủ)
+
+Owner chốt: view Đầy đủ lâu nay không dùng → gỡ hẳn (bước 2 của việc gom view từ 02/10/2026).
+- Bỏ nút Gọn/Đầy đủ ở header (cả nút chuyển view trên điện thoại) và toàn bộ trang Đầy đủ của tab Danh mục + Theo dõi
+  (4 ô thống kê lớn, khu "Hôm nay", khu form Giao dịch / Nạp rút / Thêm mã). Bỏ khoá máy `fin2-view` (app tự xoá).
+- Mọi chức năng vẫn còn ở view Gọn: Tổng quan mở rộng, Nhật ký nằm luôn trong tab Danh mục; 4 form nhập nằm ẩn, mở qua các nút
+  popup như trước (Ghi giao dịch · Nạp/rút · Lưu nhật ký · Thêm mã theo dõi). Nút "Theo dõi" ở Cơ hội luôn mở popup.
+- Đã kiểm trên bản chạy máy, dữ liệu thật: đổi tab, mở/đóng đủ 4 popup (form về lại chỗ cũ), mở Tổng quan, khổ điện thoại + máy tính,
+  không lỗi console. Không ghi gì vào Firestore khi thử.
+
+· `public/index.html`
+
+---
+
 ## 2026-11-01 (Nhiều tài khoản — đợt 1 + hướng dẫn lần đầu)
 
 Owner chốt 01/11 (phỏng vấn): mở Fin2 cho dưới 10 người bạn, mỗi người sổ riêng; owner gõ email để cấp/khoá; chia 3 đợt

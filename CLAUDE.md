@@ -304,16 +304,13 @@ Rules Firestore (01/11/2026): `isOwner()` gõ cứng email owner (không bao gi�
 
 ---
 
-## Các cặp VIEW SONG SONG (hỏi phạm vi trước khi code)
-- **Gọn ↔ Đầy đủ** (`fin2-view`): một thanh tab chung 5 tab Danh mục · Theo dõi · Cơ hội · Chiến lược · Phân tích.
-  Hai view chỉ khác nhau ở **Danh mục** và **Theo dõi** (`VIEW_TABS`); bảng mã vẫn là MỘT DOM được chuyển slot.
-  Cơ hội (Cơ hội ngắn hạn + báo cáo 5 phiên), Chiến lược, Phân tích (Hiệu quả tín hiệu ở đầu) là một bản dùng chung.
-  Khối Khuyến nghị (`#advice-section`) chuyển slot giữa Gọn và Đầy đủ như bảng mã.
-  Ẩn/hiện panel chỉ đi qua `syncPanels()` — thêm tab mới thì thêm vào `TABS`, đừng tự bật `hidden` chỗ khác.
-  **Đang gom về một view (owner chốt 02/10/2026):** Gọn là view chính, 3 tầng: dòng → bấm mở → **Chi tiết**.
-  Bước 1 xong: phần Tổng quan mở rộng (`#overview-more`) và Nhật ký (`#journal-section`) chuyển slot như bảng mã;
-  Lưu nhật ký (`#today-body`), Nạp/rút (`#cf-form`) mượn vào popup qua `openCompactForm`; Chi tiết mã là
-  `#ticker-dialog` (`renderTickerDetail`). Bước 2 (CHỜ owner dùng thử): gỡ view Đầy đủ + nút Gọn/Đầy đủ + `fin2-view`.
+## Một view duy nhất (đã gỡ Đầy đủ 01/11/2026)
+- **Chỉ còn view Gọn** (owner chốt gom từ 02/10/2026, gỡ hẳn view Đầy đủ + nút Gọn/Đầy đủ + `fin2-view` ngày 01/11/2026 — đừng dựng lại).
+  Một thanh tab 5 tab Danh mục · Theo dõi · Cơ hội · Chiến lược · Phân tích; Danh mục/Theo dõi nằm trong `#compact-view`, 3 tầng:
+  dòng → bấm mở → **Chi tiết** (`#ticker-dialog`, `renderTickerDetail`). Ẩn/hiện panel chỉ đi qua `syncPanels()` — thêm tab mới thì
+  thêm vào `TABS`, đừng tự bật `hidden` chỗ khác.
+  Form nhập (`#tx-form`, `#cf-form`, `#wl-form`, `#today-body`) nằm ẩn trong `#form-store`, chỉ hiện khi mượn vào popup qua
+  `openCompactForm` — thêm form nhập mới thì đặt vào đây, đừng làm khu form riêng.
 
 ---
 
