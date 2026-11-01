@@ -4,6 +4,48 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-01 (Nhiều tài khoản — đợt 1 + hướng dẫn lần đầu)
+
+Owner chốt 01/11 (phỏng vấn): mở Fin2 cho dưới 10 người bạn, mỗi người sổ riêng; owner gõ email để cấp/khoá; chia 3 đợt
+(1: tài khoản + sổ riêng + hướng dẫn · 2: bot + Telegram theo người · 3: TCBS).
+- **Sổ riêng**: 11 collection sổ chuyển xuống `users/{uid}/…` (`bookCol`/`bookDoc`), chỉ chính chủ đọc/ghi. Dữ liệu bot (Cơ hội, điểm quyết định,
+  MA, settings) vẫn chung — thành viên đọc được; cung cầu (`orderflow_*`) đợt 1 chỉ owner vì còn bám giá vốn owner.
+- **Danh sách được vào** `members/{email}`: menu **?** → Tài khoản (chỉ owner) để thêm email Google, khoá/mở, xem ai đã vào/đã xem hướng dẫn.
+  Khoá thì giữ nguyên sổ. Email lạ / bị khoá thấy màn chặn. Owner luôn vào được (rules gõ cứng email owner).
+- **Chuyển sổ owner**: lần đầu owner mở bản mới, app gọi `migrateOwnerBook` chép sổ cũ sang `users/{uid}` (CHÉP, không xoá; đếm lại cho khớp;
+  chạy lại an toàn). Bản cũ ở cấp ngoài cùng giữ làm dự phòng, trình duyệt không đọc được nữa — xoá tay sau 2 tuần.
+- **Bot**: đọc sổ owner qua `ownerBook()` (chưa chuyển thì đọc chỗ cũ — không có quãng trống); Điểm quyết định chấm thêm mã các bạn đang giữ/theo dõi
+  (`memberTickers`, chỉ lấy tên mã). Mốc T+ legacy, Telegram, kế hoạch trưa, cung cầu vẫn chỉ theo sổ owner (đợt 2).
+  Callable `analyzeTicker` + `refreshDecisionScores` mở cho thành viên đang active.
+- **Thành viên không thấy**: nút TCBS, khung giờ Telegram, thông số sàng lọc, phần "Quy tắc giá vốn" ở tab Phân tích.
+- **Hướng dẫn lần đầu** (chép phần chạy từ YMLC `guide.js`): nút **?** cạnh nút sáng/tối, tour "Làm quen với Fin2" 10 bước tự chạy lần đầu
+  (`guide-tours.js`), khung **Thiết lập sổ** đầu tab Danh mục (nạp tiền · ghi mã đang giữ · xem chiến lược · Telegram "sắp có", tự đánh dấu),
+  trang **/guide.html** giải thích chiến thuật (không cần đăng nhập). Đã xem lưu ở `members/{email}.guideSeen`. Thêm Đăng xuất ở menu ?.
+- Đã kiểm: rules 31 ca trên emulator (owner/bạn/bị khoá/lạ/email chưa xác minh — đọc ghi sổ mình, sổ người khác, dữ liệu bot, members);
+  chuyển sổ + `ownerBook` + `memberTickers` trên emulator; smoke functions; cú pháp app; trang hướng dẫn trên điện thoại không tràn ngang.
+  Sau deploy (bản thật, tài khoản owner): chuyển sổ tự chạy, đếm khớp đủ 11 collection (68 lệnh, 11 dòng tiền, 219 tín hiệu, 371 giá theo dõi…);
+  tour 10 bước chạy trên khổ điện thoại; menu ? + màn Tài khoản mở được. Sửa: bản chuyển sổ đặt tên owner "Owner" → để trống (đã đổi tay
+  thành tên Google). Chưa thử bằng tài khoản thành viên thật.
+
+· `public/index.html` · `public/guide.js` · `public/guide-tours.js` · `public/guide.html` · `firestore.rules` · `firebase.json`
+· `functions/members.js` · `functions/index.js` · `functions/decision-service.js` · `functions/noon-plan.js` · `functions/orderflow-service.js`
+· `CHANGELOG.md` · `CLAUDE.md` · `CODEMAP.md`
+
+## 2026-10-30c (Bán chia bậc 100 CP — sell-v1.2.0)
+
+Owner chốt 30/10: lệnh bán tách thành từng lệnh 1 lô 100 CP ở các mức giá tăng dần, để khớp giá tốt hơn thay vì bán cả khối một giá.
+- **Áp dụng mọi lệnh bán giới hạn của kế hoạch**: cắt lỗ, chốt tại mốc, thoát gồng, lãi mỏng. Lệnh điều kiện sàn gồng giữ một lệnh.
+- **Bậc giá**: bậc đầu = giá kế hoạch, mỗi bậc sau +0,5% (làm tròn bước giá gần nhất, tối thiểu 1 bước giá), không vượt giá trần;
+  chạm trần thì các bậc còn lại gộp ở giá trần. Phần lẻ dưới 100 CP là một lệnh riêng ở giá bậc đầu. Dưới 200 CP vẫn một lệnh.
+- **Khuyến nghị** ghi thêm "· 8 lệnh @52,7 → 54,8". **Nút Đặt** hiện danh sách bậc trong popup (sửa số lượng/giá thì bậc tính lại),
+  bấm Xác nhận ghi đủ các lệnh chờ một lượt, ghi chú "bậc i/n". Kiểm phần bán được một lần cho tổng số lượng.
+- Mục kế hoạch thêm `ladder` [{ qty, price }] + `sellVersion`; kế hoạch đã chốt trước bản này tự tính bậc lúc hiện.
+- Đo kế hoạch chiều vẫn so theo giá bậc đầu (`limitPrice`).
+- Đã kiểm: FPT 800 CP → 8 lệnh 52,7 → 54,8; BVB 1.500 CP → 15 lệnh 10,2 → 10,9; 100 CP vẫn một lệnh; popup tính lại khi đổi số lượng;
+  không lỗi console. Chưa bấm Xác nhận thật (sẽ ghi lệnh chờ vào dữ liệu).
+
+· `public/index.html` · `CHANGELOG.md` · `CLAUDE.md` · `CODEMAP.md`
+
 ## 2026-10-30b (Cắt lỗ thay cho "giảm thì mua thêm" — chép sang bản 23/10)
 
 Owner chốt sáng 30/10 (phiên cloud, sau bài học FPT/TCX) bỏ bình quân giá xuống, thêm cắt lỗ. Phiên cloud làm trên bản 24/09 nên

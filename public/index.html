@@ -590,6 +590,25 @@
   .gate-card h1{ font-size:var(--fs-page); margin-bottom:8px; }
   .gate-card p{ color:var(--text-muted); font-size:var(--fs-meta); margin:0 0 20px; }
 
+  /* ---------- nhiều tài khoản ---------- */
+  body:not(.is-owner) [data-owner-only]{ display:none !important; }
+  .setup-card .sec-head{ display:flex; align-items:center; gap:8px; }
+  .setup-card .sec-head h2{ flex:1; }
+  .setup-list{ display:grid; gap:4px; margin-top:8px; }
+  .setup-row{ display:flex; align-items:center; gap:10px; min-height:44px; padding:0 4px; border-radius:var(--r-input); }
+  .setup-row .mark{ flex:none; width:22px; height:22px; border-radius:50%; display:grid; place-items:center;
+    border:1.5px solid var(--border); color:transparent; font-size:13px; }
+  .setup-row.done .mark{ background:var(--pos); border-color:var(--pos); color:#fff; }
+  .setup-row.done .name{ color:var(--text-muted); }
+  .setup-row .name{ flex:1; font-size:var(--fs-body); }
+  .setup-row .btn{ min-height:34px; padding:0 12px; }
+  .members-list{ display:grid; margin-top:16px; border-top:1px solid var(--border); }
+  .member-row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+  .member-row .who{ flex:1; min-width:0; }
+  .member-row .who div{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .member-row .who .meta{ color:var(--text-muted); font-size:var(--fs-label); }
+  .member-row .btn{ min-height:34px; padding:0 12px; }
+
   /* ---------- toast ---------- */
   #toast{
     position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom));
@@ -988,7 +1007,7 @@
     <button class="icon-btn" id="global-price-refresh" type="button" aria-label="Cập nhật giá tất cả mã" title="Cập nhật giá tất cả mã">
       <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M18.5 9A7 7 0 0 0 6.2 6.2L4 8M5.5 15A7 7 0 0 0 17.8 17.8L20 16"/></svg>
     </button>
-    <button class="icon-btn" id="tcbs-btn" type="button" aria-label="Đối chiếu TCBS" title="Đối chiếu TCBS">
+    <button class="icon-btn" id="tcbs-btn" type="button" data-owner-only aria-label="Đối chiếu TCBS" title="Đối chiếu TCBS">
       <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10h18"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 21h18"/><path d="M12 3 3 8h18z"/></svg>
     </button>
     <button class="icon-btn" id="pnl-privacy-btn" type="button" aria-pressed="false" aria-label="Ẩn lãi lỗ dashboard" title="Ẩn lãi lỗ dashboard">
@@ -1019,6 +1038,10 @@
 
   <div id="compact-view" class="summary-collapsed" hidden>
   <div id="compact-panel-danh-muc">
+    <section class="card setup-card" id="setup-card" aria-labelledby="setup-title" hidden>
+      <div class="sec-head"><h2 id="setup-title">Thiết lập sổ</h2><button class="btn" type="button" id="setup-hide">Ẩn</button></div>
+      <div class="setup-list" id="setup-list"></div>
+    </section>
     <button class="compact-summary-toggle" id="compact-summary-toggle" type="button" data-toggle-summary aria-expanded="false" aria-label="Dòng tiền và lãi/lỗ">
       <span id="compact-summary-line"></span>
       <svg class="ui-icon analysis-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
@@ -1340,7 +1363,7 @@
         <button class="btn primary" id="screening-scan" type="button">Quét ngay</button>
       </div>
     </div>
-    <div class="screening-slots" id="screening-slots" role="group" aria-label="Giờ nhận tin Telegram"></div>
+    <div class="screening-slots" id="screening-slots" data-owner-only role="group" aria-label="Giờ nhận tin Telegram"></div>
     <div class="screening-groups">
       <div class="card decision-card">
         <h3>Cơ hội mới</h3>
@@ -1454,7 +1477,7 @@
     </div>
   </section>
 
-  <section>
+  <section data-owner-only>
     <div class="card">
       <div class="sec-head" data-sec="st-sang-loc">
         <h2>Sàng lọc cơ hội</h2>
@@ -1621,6 +1644,7 @@
       <div><label for="order-qty">Số lượng đặt</label><input id="order-qty" type="number" min="1" step="1" inputmode="numeric" required></div>
       <div><label for="order-price">Giá đặt</label><input id="order-price" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>
     </div>
+    <div class="form-msg" id="order-ladder" hidden></div>
     <div class="row">
       <div><label for="order-date">Ngày đặt</label><input id="order-date" type="date" required></div>
       <div><label for="order-note">Ghi chú</label><input id="order-note"></div>
@@ -1682,6 +1706,19 @@
   <div class="form-msg" id="tcbs-msg" role="status" aria-live="polite"></div>
 </dialog>
 
+<dialog class="edit-dialog workflow-dialog" id="members-dialog" aria-labelledby="members-dialog-title">
+  <div class="compact-head"><h2 id="members-dialog-title">Tài khoản</h2><button class="icon-action" type="button" data-members-close aria-label="Đóng" title="Đóng"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <form id="members-form" novalidate>
+    <div class="row">
+      <div><label for="members-email">Email Google</label><input id="members-email" type="email" autocomplete="off" required></div>
+      <div><label for="members-name">Tên</label><input id="members-name" type="text" autocomplete="off" maxlength="40"></div>
+    </div>
+    <button class="btn primary wide" id="members-add" type="submit">Thêm</button>
+    <div class="form-msg" id="members-msg" role="status" aria-live="polite"></div>
+  </form>
+  <div class="members-list" id="members-list"></div>
+</dialog>
+
 <dialog class="edit-dialog" id="wl-edit" aria-labelledby="wl-edit-label">
   <form id="wl-edit-form">
     <label id="wl-edit-label" for="wl-edit-price">Giá muốn mua</label>
@@ -1711,12 +1748,13 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, setDoc, updateDoc, writeBatch, deleteDoc, onSnapshot,
-  query, orderBy, limit, where, increment
+  query, orderBy, limit, where, increment, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { initGuide } from "/guide.js";
 
 "use strict";
 
@@ -1730,6 +1768,14 @@ const FIREBASE_CONFIG = {
   appId: "1:141185690222:web:a2e989a2682abe6011147f"
 };
 const OWNER_EMAIL = "nghiant@youmed.vn";
+/* Nhiều tài khoản (đợt 1, 01/11/2026): sổ mỗi người ở users/{uid}/…, chỉ chính chủ đọc/ghi (firestore.rules).
+   ↔ BOOK_COLLECTIONS ở functions/members.js. Dữ liệu bot (screening_*, decision_*, orderflow_*, settings) vẫn ở cấp ngoài cùng.
+   Mọi chỗ đọc/ghi sổ đi qua bookCol()/bookDoc() — đừng gọi thẳng collection(fs, "transactions"). */
+const BOOK_COLLECTIONS = new Set(["transactions", "cashflows", "tickers", "daily_snapshots", "watchlist", "strategies",
+  "signals", "watch_prices", "orders", "theses", "plans"]);
+const me = { uid:"", email:"", name:"", owner:false, guideSeen:{} };   // người đang đăng nhập, điền ở initGate
+const bookCol = (name) => collection(fs, "users", me.uid, name);
+const bookDoc = (name, id) => doc(fs, "users", me.uid, name, id);
 
 /* Datafeed giá của VPS. Trả JSON, cho gọi cross-origin, `lastPrice` đã sẵn
    đơn vị NGHÌN ĐỒNG — trùng đơn vị `price` của app, không phải quy đổi.
@@ -1823,6 +1869,7 @@ const fs = getFirestore(app);
 const decisionApi = httpsCallable(getFunctions(app, "asia-southeast1"), "refreshDecisionScores", { timeout:540000 });
 const tickerAnalysisApi = httpsCallable(getFunctions(app, "asia-southeast1"), "analyzeTicker", { timeout:120000 });
 const tcbsReadApi = httpsCallable(getFunctions(app, "asia-southeast1"), "readTcbsPortfolio", { timeout:90000 });
+const migrateBookApi = httpsCallable(getFunctions(app, "asia-southeast1"), "migrateOwnerBook", { timeout:300000 });
 const decisionState = { latest:{}, runs:[], events:[], control:null, busy:false, error:"" };
 const orderflowState = { latest:{}, events:[], control:null };
 const tickerAnalysisState = new Map();
@@ -2263,8 +2310,32 @@ function planRefPrice(ticker, date){
    tại giá tham chiếu — từ sell-v1.1.0 (20/10/2026) VN-Index yếu KHÔNG còn tự bán lãi mỏng (vụ TCB: mã khỏe hơn thị trường
    bị bán non). Mục cũ why:"market" chỉ còn ở kế hoạch đã chốt trước đó. Mọi giá bán ≥ giá vốn +1% (luật không bán lỗ). Đang gồng hay không SUY RA từ
    kế hoạch đã chốt + lệnh bán cùng ngày (rideState), không lưu cờ. */
-const SELL_VERSION = "sell-v1.1.0";
+const SELL_VERSION = "sell-v1.2.0";
 const SELL_TIER_SHARE = [1, 1, 1/2, 1/3, 0];   // phần bán tại mốc theo số dấu hiệu giữ đạt (0 = MA không đạt)
+/* Bán chia bậc (owner chốt 30/10/2026, sell-v1.2.0): mọi lệnh bán giới hạn (trừ lệnh điều kiện gồng) tách thành từng lệnh 1 lô,
+   bậc đầu = giá kế hoạch, mỗi bậc sau cao hơn SELL_LADDER_STEP_PCT %, không vượt giá trần. Phần lẻ dưới 1 lô = lệnh riêng ở giá bậc đầu. */
+const SELL_LADDER_STEP_PCT = 0.5;
+function sellLadder(qty, price, lot, ref){
+  const n = Math.floor(qty / lot), odd = qty - n * lot;
+  if(n < 2) return [{ qty, price }];
+  const cap = ref > 0 ? roundTick(ref * (1 + PRICE_BAND_PCT / 100), false) : Infinity, out = [];
+  // Bậc sau = giá +0,5% làm tròn bước giá gần nhất, tối thiểu một bước giá (mã giá thấp: 0,5% nhỏ hơn bước giá).
+  const next = (p) => { const t = p * (1 + SELL_LADDER_STEP_PCT / 100), lo = roundTick(t, false), hi = roundTick(t, true);
+    return Math.max(t - lo < hi - t ? lo : hi, roundTick(p + 0.001, true)); };
+  for(let i = 0, p = price; i < n; i++, p = next(p)){
+    const at = Math.min(p, cap), last = out[out.length - 1];
+    if(last && last.price === at) last.qty += lot; else out.push({ qty:lot, price:at });
+  }
+  if(odd > 0) out.unshift({ qty:odd, price });
+  return out;
+}
+// Kế hoạch chốt trước sell-v1.2.0 chưa có ladder: tính lại từ số lượng + giá của mục.
+function planLadder(x){
+  return x.side !== "sell" || x.mode === "ride" ? null : x.ladder || sellLadder(x.qty, x.limitPrice, activeStrategy(todayStr()).lotSize, x.ref);
+}
+function ladderText(ladder){
+  return ladder?.length > 1 ? ' · ' + ladder.length + ' lệnh @' + fmtPrice(ladder[0].price) + ' → ' + fmtPrice(ladder[ladder.length - 1].price) : '';
+}
 const SELL_MODE_TEXT = { tier:"chốt tại mốc", ride:"gồng", exit:"thoát gồng", thin:"lãi mỏng", stop:"cắt lỗ" };
 function prevSessionStr(date){
   const p = String(date).split("-").map(Number), d = new Date(p[0], p[1] - 1, p[2]);
@@ -2377,7 +2448,10 @@ function buildPlan(s, date = planDateStr(), noon = false){
       : !(s.total > 0) || (cash - cost) / s.total * 100 < st.minCashRatio ? "cash" : null;
     if(!x.gate){ count++; cash -= cost; taken.add(x.ticker); }
   });
-  items.filter((x) => x.side === "sell").forEach((x) => { x.gate = null; x.score = null; });
+  items.filter((x) => x.side === "sell").forEach((x) => {
+    x.gate = null; x.score = null;
+    if(x.mode !== "ride"){ x.ladder = sellLadder(x.qty, x.limitPrice, st.lotSize, x.ref); x.sellVersion = SELL_VERSION; }
+  });
   const order = (x) => x.side === "sell" ? -1 : buys.indexOf(x);
   return { date, strategyId:st.id, maxBuys:st.maxBuys, minCashRatio:st.minCashRatio, cashRatio:cashRatioFor(s),
     market:{ weak:market.weak, known:market.known, date:market.date },
@@ -2404,7 +2478,7 @@ async function freezePmPlan(by){
   const date = todayStr();
   if(!inLunch() || !pmNoonReady(date)) return;
   const plan = buildPlan(computeSummary(), date, true);
-  await setDoc(doc(fs, "plans", date), { pm:{ ...plan, shadow:!PM_LIVE, frozenAt:nowISO(), frozenBy:by }, updatedAt:nowISO(),
+  await setDoc(bookDoc("plans", date), { pm:{ ...plan, shadow:!PM_LIVE, frozenAt:nowISO(), frozenBy:by }, updatedAt:nowISO(),
     createdAt:state.plans[date]?.createdAt || nowISO() }, { merge:true });
 }
 // Mở app giờ nghỉ trưa mà chưa chốt chiều: tự chốt khi bot đã có giá 11:30 (chốt lại được tới 13:00).
@@ -2436,7 +2510,7 @@ async function freezePlan(by){
   const date = planDateStr();
   if(inSession() && frozenPlan(date)) return;
   const plan = buildPlan(computeSummary(), date);
-  await setDoc(doc(fs, "plans", date), { ...plan, frozenAt:nowISO(), frozenBy:by, updatedAt:nowISO(),
+  await setDoc(bookDoc("plans", date), { ...plan, frozenAt:nowISO(), frozenBy:by, updatedAt:nowISO(),
     createdAt:state.plans[date]?.createdAt || nowISO() }, { merge:true });
 }
 /* Vào phiên mà chưa chốt: tự chốt bản nháp — chỉ khi mọi dữ liệu dựng kế hoạch đã về (tránh chốt kế hoạch rỗng). */
@@ -3784,8 +3858,9 @@ function renderDecisionPilot(){
     (policy ? '<p>Cách chấm: điểm Mua được tính là đúng nếu trong ' + policy.sessions + ' phiên sau đó giá tăng ' + policy.winPct +
       '% trước khi giảm ' + policy.lossPct + '%. Áp lực Bán thì ngược lại.</p>' : '') +
     '<h4>Điểm chấm</h4><p>' + esc(summarize('buy','decision')) + '</p><p>' + esc(summarize('sell','decision')) + '</p>' +
-    '<h4>Quy tắc giá vốn của anh</h4><p>' + esc(summarize('buy','legacy')) + '</p><p>' + esc(summarize('sell','legacy')) + '</p>' +
-    (weakBuy || extraBuy || earlySell ? '<h4>Khác biệt giữa hai cách</h4>' +
+    // Quy tắc giá vốn của bot đợt 1 còn tính theo sổ owner → thành viên khác không xem phần so sánh này.
+    (!me.owner ? '' : '<h4>Quy tắc giá vốn của anh</h4><p>' + esc(summarize('buy','legacy')) + '</p><p>' + esc(summarize('sell','legacy')) + '</p>') +
+    (me.owner && (weakBuy || extraBuy || earlySell) ? '<h4>Khác biệt giữa hai cách</h4>' +
       (weakBuy ? '<p>' + weakBuy + ' lần quy tắc báo Mua khi giá đang trong đà giảm</p>' : '') +
       (extraBuy ? '<p>' + extraBuy + ' lần điểm thấy cơ hội Mua mà quy tắc chưa báo</p>' : '') +
       (earlySell ? '<p>' + earlySell + ' lần quy tắc báo Bán khi áp lực bán còn thấp</p>' : '') : '') +
@@ -3811,6 +3886,7 @@ function render(){
   const valueClass = (n) => pnlClass(n);
   renderPrivacyControl();
   renderPnlScopeControls();
+  renderSetup();
 
   $("s-total").textContent = fmtVND(s.total);
   $("s-mkt").textContent = fmtVND(s.marketValue);
@@ -4122,7 +4198,7 @@ function adviceInsight(signal){
 // Dòng mô tả mục bán của kế hoạch (luật bán/gồng 19/10/2026) + dấu hiệu giữ đạt mấy/4.
 function sellPlanText(x){
   const n = (q) => q.toLocaleString("vi-VN") + ' CP', ma = 'MA' + activeStrategy(todayStr()).maLength;
-  if(x.mode === "stop") return esc((x.step === 2 ? 'Bán hết ' : 'Bán ') + n(x.qty) + ' @' + fmtPrice(x.limitPrice) + ' · mức cắt ' + fmtPrice(x.level)) +
+  if(x.mode === "stop") return esc((x.step === 2 ? 'Bán hết ' : 'Bán ') + n(x.qty) + ' @' + fmtPrice(x.limitPrice) + ' · mức cắt ' + fmtPrice(x.level) + ladderText(planLadder(x))) +
     '<br>' + esc(stopReasonText(x));
   const head = x.mode === "tier" ? (x.keepQty > 0 ? 'Bán ' + n(x.qty) + ' @' + fmtPrice(x.limitPrice) + ' · gồng ' + n(x.keepQty) + ', sàn ' + fmtPrice(x.floor)
       : 'Bán hết ' + n(x.qty) + ' @' + fmtPrice(x.limitPrice)) + (Math.abs(x.limitPrice - x.level) >= 0.005 ? ' · mốc ' + fmtPrice(x.level) : '')
@@ -4130,7 +4206,7 @@ function sellPlanText(x){
     : x.mode === "exit" ? 'Bán hết ' + n(x.qty) + ' @' + fmtPrice(x.limitPrice) + (x.why === "ma" ? ' · đóng cửa dưới ' + ma : ' · chạm sàn ' + fmtPrice(x.floor))
     : 'Bán hết ' + n(x.qty) + ' @' + fmtPrice(x.limitPrice) + (x.why === "ma" ? ' · đóng cửa dưới ' + ma : ' · thị trường yếu');
   const s = x.holdSignals || {}, mark = (ok, label) => label + (ok ? ' ✓' : ' ✗');
-  return esc(head) + '<br>' + esc('Giữ ' + x.holdCount + '/4: ' + [mark(s.ma, ma), mark(s.market, 'VN-Index'),
+  return esc(head + ladderText(planLadder(x))) + '<br>' + esc('Giữ ' + x.holdCount + '/4: ' + [mark(s.ma, ma), mark(s.market, 'VN-Index'),
     mark(s.foreign, 'Khối ngoại'), mark(s.demand, 'Cầu')].join(' · '));
 }
 /* Khuyến nghị = KẾ HOẠCH NGÀY (owner chốt 16/10/2026, thay danh sách tín hiệu theo giá sống của 02/10/2026).
@@ -4156,7 +4232,9 @@ function renderAdvice(s){
     const x = (plan.items || []).find((i) => i.ticker === o.ticker && i.side === o.side);
     if(!x) return ' · <span class="neg">Không còn trong kế hoạch</span>';
     if(x.gate) return ' · <span class="neg">Kế hoạch lọc: ' + esc(PLAN_GATE_TEXT[x.gate] || x.gate) + '</span>';
-    return Math.abs(x.limitPrice - Number(o.limitPrice)) >= 0.005 ? ' · Kế hoạch nay @' + fmtPrice(x.limitPrice) : '';
+    // Lệnh bán chia bậc: khớp một bậc bất kỳ của kế hoạch nay là cùng giá.
+    const prices = (planLadder(x) || [{ price:x.limitPrice }]).map((r) => r.price);
+    return prices.every((p) => Math.abs(p - Number(o.limitPrice)) >= 0.005) ? ' · Kế hoạch nay @' + fmtPrice(x.limitPrice) : '';
   };
   const all = (plan.items || []).filter((x) => !x.gate && !done(x)).map((x) => ({ x, key:"plan_" + date + "_" + x.key }));
   const visible = all.filter((y) => !skipped.includes(y.key));
@@ -5162,7 +5240,7 @@ function writeWatchPriceHistory(dateStr, prices){
     if(!w || !Number.isFinite(value) || value <= 0 || (addedDate && dateStr < addedDate)) return;
     const id = dateStr + "_" + ticker;
     const old = state.watchPrices.find((x) => x.id === id);
-    writes.push(setDoc(doc(fs, "watch_prices", id), {
+    writes.push(setDoc(bookDoc("watch_prices", id), {
       date: dateStr, ticker, price: value,
       createdAt: old ? old.createdAt : now,
       updatedAt: now
@@ -5174,7 +5252,7 @@ function writeWatchPriceHistory(dateStr, prices){
 function toggleHold(ticker){
   if(!ready) return;
   const cur = state.tickers[ticker] || {};
-  setDoc(doc(fs, "tickers", ticker), { ...cur, hold: !cur.hold, updatedAt: nowISO() })
+  setDoc(bookDoc("tickers", ticker), { ...cur, hold: !cur.hold, updatedAt: nowISO() })
     .catch((e) => { console.error(e); toast("Chưa lưu được"); });
 }
 
@@ -5224,7 +5302,7 @@ async function refreshAllPrices(){
       if(!item){ missing.push(ticker); return; }
       if(item.ref) reference.push(ticker);
       const current = state.tickers[ticker] || {};
-      jobs.push({ ticker, promise:setDoc(doc(fs, "tickers", ticker),
+      jobs.push({ ticker, promise:setDoc(bookDoc("tickers", ticker),
         { ...current, lastPrice:item.p, lastPriceDate:today, refPrice:item.r, refPriceDate:item.r ? today : null, updatedAt:nowISO() }) });
     });
     if(!jobs.length) throw new Error("không mã nào có giá");
@@ -5293,7 +5371,7 @@ function saveTodaySnapshot(){
     if(isFinite(v) && v > 0){
       prices[tk] = v;
       const cur = state.tickers[tk] || {};
-      writes.push(setDoc(doc(fs, "tickers", tk),
+      writes.push(setDoc(bookDoc("tickers", tk),
         { ...cur, lastPrice: v, lastPriceDate: today, updatedAt: nowISO() }));
     }
   });
@@ -5308,7 +5386,7 @@ function saveTodaySnapshot(){
     });
     const s = computeSummary();
     const old = state.snapshots.find((x) => x.date === today);
-    return setDoc(doc(fs, "daily_snapshots", today), {
+    return setDoc(bookDoc("daily_snapshots", today), {
       date: today,
       cash: s.cash,
       investedCost: s.investedCost,
@@ -5334,17 +5412,17 @@ function saveTodaySnapshot(){
 function addWatch(ticker, targetBuy, quote){
   const old = state.watchlist[ticker] || {};
   const batch = writeBatch(fs);
-  batch.set(doc(fs, "watchlist", ticker), {
+  batch.set(bookDoc("watchlist", ticker), {
     targetBuy: targetBuy,
     addedAt: old.addedAt || nowISO(),
     updatedAt: nowISO()
   });
   if(quote && quote.ticker === ticker){
-    batch.set(doc(fs, "tickers", ticker), {
+    batch.set(bookDoc("tickers", ticker), {
       lastPrice: quote.price, lastPriceDate: quote.date, updatedAt: nowISO()
     }, { merge:true });
     const historyId = quote.date + "_" + ticker;
-    batch.set(doc(fs, "watch_prices", historyId), {
+    batch.set(bookDoc("watch_prices", historyId), {
       date: quote.date, ticker, price: quote.price,
       createdAt: nowISO(), updatedAt: nowISO()
     });
@@ -5379,7 +5457,7 @@ function editSector(ticker){
 function removeWatch(ticker){
   if(!ready) return;
   if(!window.confirm("Bỏ theo dõi " + ticker + "?")) return;
-  deleteDoc(doc(fs, "watchlist", ticker))
+  deleteDoc(bookDoc("watchlist", ticker))
     .then(() => toast("Đã bỏ " + ticker))
     .catch((e) => { console.error(e); toast("Lỗi xoá · Thử lại"); });
 }
@@ -5392,7 +5470,7 @@ function removeTransaction(id, btn){
     : (t.side === "buy" ? "Mua " : "Bán ") + Number(t.qty).toLocaleString("vi-VN") + " " + t.ticker + " @" + fmtPrice(t.price);
   if(!window.confirm("Xóa giao dịch " + label + " ngày " + fmtDateVN(t.date) + "?")) return;
   if(btn) btn.disabled = true;
-  deleteDoc(doc(fs, "transactions", id))
+  deleteDoc(bookDoc("transactions", id))
     .then(() => toast("Đã xóa giao dịch " + t.ticker))
     .catch((e) => {
       console.error(e);
@@ -5427,7 +5505,7 @@ function removeCashflow(id, btn){
   if(!c){ toast("Khoản tiền không còn tồn tại"); return; }
   if(!window.confirm("Xóa " + cashflowLabel(c) + " ngày " + fmtDateVN(c.date) + "?")) return;
   if(btn) btn.disabled = true;
-  deleteDoc(doc(fs, "cashflows", id))
+  deleteDoc(bookDoc("cashflows", id))
     .then(() => toast("Đã xóa " + cashflowLabel(c)))
     .catch((e) => {
       console.error(e);
@@ -5508,12 +5586,12 @@ function writeSignals(dateStr){
     const id = signalDocId(r);
     keep[id] = true;
     const old = state.signals.find((x) => x.id === id);
-    return setDoc(doc(fs, "signals", id),
+    return setDoc(bookDoc("signals", id),
       { ...r, createdAt: old ? old.createdAt : nowISO(), updatedAt: nowISO() });
   });
   state.signals.forEach((x) => {
     const hasEvidence = state.orders.some((o) => o.signalId === x.id) || signalMatchedQty(x) > 0;
-    if(x.date === dateStr && !keep[x.id] && !hasEvidence) writes.push(deleteDoc(doc(fs, "signals", x.id)));
+    if(x.date === dateStr && !keep[x.id] && !hasEvidence) writes.push(deleteDoc(bookDoc("signals", x.id)));
   });
   return Promise.all(writes).then(() => rows.length);
 }
@@ -5531,24 +5609,32 @@ function validateOrderSell(ticker, qty, excludeId){
   const available = Math.max(0, sellable - reservedSellQty(ticker, excludeId));
   return { held, available, ok:qty <= available };
 }
-async function createOrder(data){
+function orderData(data){
   const ticker = String(data.ticker || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
   const side = data.side === "sell" ? "sell" : "buy";
   const qty = Number(data.qty), limitPrice = Number(data.limitPrice), orderDate = data.orderDate;
   if(!ticker || !(qty > 0) || !(limitPrice > 0) || !orderDate) throw new Error("invalid-order");
-  if(side === "sell"){
-    const check = validateOrderSell(ticker, qty);
-    if(!check.ok) throw new Error("sell-reserved:" + check.available);
-  }
-  const orderRef = doc(collection(fs, "orders"));
-  const orderData = {
+  return {
     // planDate: lệnh đặt từ mục kế hoạch ngày đó (từ 16/10/2026). signalId chỉ còn ở lệnh cũ đặt từ tín hiệu.
     ticker, side, qty, limitPrice, orderDate, note:data.note || "", signalId:null, planDate:data.planDate || null,
     ...(side === "sell" && data.lots?.length ? { lots:data.lots } : {}),
     status:"pending", filledQty:0, averageFillPrice:null, createdAt:nowISO(), updatedAt:nowISO()
   };
-  await setDoc(orderRef, orderData);
-  return orderRef;
+}
+async function createOrder(data){
+  return (await createOrders([data]))[0];
+}
+// Nhiều lệnh cùng mã (bán chia bậc): kiểm phần bán được một lần cho tổng số lượng, ghi chung một lượt.
+async function createOrders(list){
+  const rows = list.map(orderData), sell = rows.filter((o) => o.side === "sell");
+  if(sell.length){
+    const check = validateOrderSell(sell[0].ticker, sell.reduce((a, o) => a + o.qty, 0));
+    if(!check.ok) throw new Error("sell-reserved:" + check.available);
+  }
+  const batch = writeBatch(fs), refs = rows.map(() => doc(bookCol("orders")));
+  rows.forEach((o, i) => batch.set(refs[i], o));
+  await batch.commit();
+  return refs;
 }
 /* Đặt lệnh từ một mục kế hoạch: điền sẵn giá kế hoạch, ngày = phiên của kế hoạch (đặt trước phiên được). */
 function openOrderDialog(item, date){
@@ -5563,9 +5649,24 @@ function openOrderDialog(item, date){
   $("order-date").value = date;
   $("order-note").value = "Theo kế hoạch" + (item.kind === "trend" ? " · MA" : item.kind === "watch" ? " · theo dõi"
     : item.mode === "ride" ? " · lệnh điều kiện sàn gồng" : item.mode ? " · " + SELL_MODE_TEXT[item.mode] : "");
+  dialog.dataset.ladder = item.side === "sell" && item.mode && item.mode !== "ride" ? "1" : "";
+  dialog.dataset.ref = item.ref || "";
+  syncOrderLadder();
   setMsg("order-msg", "", "");
   dialog.showModal();
   $("order-price").focus();
+}
+// Lệnh bán của kế hoạch: chia bậc theo số lượng + giá đang nhập (owner sửa thì bậc tính lại). null = một lệnh như cũ.
+function orderLadder(){
+  const dialog = $("order-dialog");
+  if(!dialog.dataset.ladder) return null;
+  const qty = Math.floor(Number($("order-qty").value) || 0), price = Number($("order-price").value);
+  return qty > 0 && price > 0 ? sellLadder(qty, price, activeStrategy(dialog.dataset.planDate).lotSize, Number(dialog.dataset.ref)) : null;
+}
+function syncOrderLadder(){
+  const ladder = orderLadder(), box = $("order-ladder");
+  box.hidden = !(ladder?.length > 1);
+  box.textContent = box.hidden ? "" : ladder.map((r) => r.qty.toLocaleString("vi-VN") + " @" + fmtPrice(r.price)).join(" · ");
 }
 function openFillDialog(order){
   const dialog = $("fill-dialog"), remaining = remainingOrderQty(order);
@@ -5617,10 +5718,10 @@ async function fillOrder(order, qty, price, date, lots){
     if(lots?.length) transaction.lots = lots;
   }
   const batch = writeBatch(fs);
-  batch.set(doc(collection(fs, "transactions")), transaction);
-  batch.update(doc(fs, "orders", order.id), { filledQty:nextFilled, averageFillPrice, status, updatedAt:nowISO(), filledAt:status === "filled" ? nowISO() : null });
+  batch.set(doc(bookCol("transactions")), transaction);
+  batch.update(bookDoc("orders", order.id), { filledQty:nextFilled, averageFillPrice, status, updatedAt:nowISO(), filledAt:status === "filled" ? nowISO() : null });
   const cur = state.tickers[order.ticker] || {};
-  batch.set(doc(fs, "tickers", order.ticker), { ...cur, lastPrice:price, lastPriceDate:date, updatedAt:nowISO() });
+  batch.set(bookDoc("tickers", order.ticker), { ...cur, lastPrice:price, lastPriceDate:date, updatedAt:nowISO() });
   await batch.commit();
 }
 function openThesisDialog(ticker){
@@ -5663,12 +5764,13 @@ function initDecisionTools(){
       const order = state.orders.find((o) => o.id === cancel.dataset.cancelOrder);
       if(!order || !window.confirm("Hủy lệnh " + orderSideLabel(order.side).toLowerCase() + " " + remainingOrderQty(order).toLocaleString("vi-VN") + " " + order.ticker + "?")) return;
       cancel.disabled = true;
-      updateDoc(doc(fs, "orders", order.id), { status:"cancelled", cancelledAt:nowISO(), updatedAt:nowISO() })
+      updateDoc(bookDoc("orders", order.id), { status:"cancelled", cancelledAt:nowISO(), updatedAt:nowISO() })
         .then(() => toast("Đã hủy lệnh " + order.ticker))
         .catch((err) => { console.error(err); toast("Lỗi hủy lệnh · Thử lại"); cancel.disabled = false; });
     }
   });
   $("order-cancel").addEventListener("click", () => $("order-dialog").close());
+  ["order-qty", "order-price"].forEach((id) => $(id).addEventListener("input", syncOrderLadder));
   $("fill-cancel").addEventListener("click", () => $("fill-dialog").close());
   ["fill-qty", "fill-price", "fill-date", "fill-lots"].forEach((id) => $(id).addEventListener("input", () => {
     const order = state.orders.find((o) => o.id === $("fill-dialog").dataset.orderId);
@@ -5680,12 +5782,16 @@ function initDecisionTools(){
     const save = $("order-save"); if(save.disabled) return;
     save.disabled = true; setMsg("order-msg", "", "Đang lưu…");
     try{
-      await createOrder({
+      const data = {
         ticker:$("order-ticker").value, side:$("order-side").dataset.value,
         qty:Number($("order-qty").value), limitPrice:Number($("order-price").value),
         orderDate:$("order-date").value, note:$("order-note").value.trim(), planDate:$("order-dialog").dataset.planDate
-      });
-      $("order-dialog").close(); toast("Đã ghi nhận lệnh chờ");
+      };
+      const ladder = orderLadder();
+      if(ladder?.length > 1) await createOrders(ladder.map((r, i) => ({ ...data, qty:r.qty, limitPrice:r.price,
+        note:data.note + " · bậc " + (i + 1) + "/" + ladder.length })));
+      else await createOrder(data);
+      $("order-dialog").close(); toast(ladder?.length > 1 ? "Đã ghi nhận " + ladder.length + " lệnh chờ" : "Đã ghi nhận lệnh chờ");
     }catch(err){
       console.error(err);
       setMsg("order-msg", "err", String(err.message).startsWith("sell-reserved:") ? "Số lượng bán vượt phần chưa được dành cho lệnh khác" : "Kiểm tra mã, số lượng, giá và ngày");
@@ -5717,7 +5823,7 @@ function initDecisionTools(){
     if(!ticker || !thesis){ setMsg("thesis-msg", "err", "Nhập lý do nắm giữ hoặc theo dõi"); return; }
     const save = $("thesis-save"); save.disabled = true; setMsg("thesis-msg", "", "Đang lưu…");
     try{
-      await setDoc(doc(fs, "theses", ticker), {
+      await setDoc(bookDoc("theses", ticker), {
         thesis, invalidation:$("thesis-invalidation").value.trim(), reviewDate:$("thesis-review-date").value || null,
         updatedAt:nowISO(), createdAt:state.theses[ticker]?.createdAt || nowISO()
       });
@@ -6177,7 +6283,7 @@ function initForms(){
     if(err){ setMsg("lot-msg", "err", err); return; }
     save.disabled = true; setMsg("lot-msg", "", "Đang lưu…");
     try{
-      await updateDoc(doc(fs, "transactions", t.id), { lots:readLotPicker(box) });
+      await updateDoc(bookDoc("transactions", t.id), { lots:readLotPicker(box) });
       $("lot-dialog").close(); toast("Đã lưu lô · " + t.ticker);
     }catch(err){ console.error(err); setMsg("lot-msg", "err", "Lỗi lưu · Thử lại"); }
     finally{ save.disabled = false; }
@@ -6199,7 +6305,7 @@ function initForms(){
     $("wl-edit-price").disabled = true;
     setMsg("wl-edit-msg", "", "Đang lưu…");
     try {
-      await updateDoc(doc(fs, "watchlist", ticker), { targetBuy, updatedAt: nowISO() });
+      await updateDoc(bookDoc("watchlist", ticker), { targetBuy, updatedAt: nowISO() });
       $("wl-edit").close();
       toast("Đã lưu " + ticker);
     } catch(err){
@@ -6223,7 +6329,7 @@ function initForms(){
     $("sector-edit-save").disabled = true;
     setMsg("sector-edit-msg", "", "Đang lưu…");
     try {
-      await setDoc(doc(fs, "tickers", ticker), { sector, updatedAt: nowISO() }, { merge:true });
+      await setDoc(bookDoc("tickers", ticker), { sector, updatedAt: nowISO() }, { merge:true });
       $("sector-edit").close();
       toast(ticker + " · " + (sector || defaultSector(ticker)));
     } catch(err){
@@ -6310,10 +6416,10 @@ function initForms(){
       const lots = readLotPicker($("tx-lots"));
       if(lots.length) transaction.lots = lots;
     }
-    addDoc(collection(fs, "transactions"), transaction)
+    addDoc(bookCol("transactions"), transaction)
       .then(() => {
         const cur = state.tickers[ticker] || {};
-        return setDoc(doc(fs, "tickers", ticker),
+        return setDoc(bookDoc("tickers", ticker),
           { ...cur, lastPrice: price, lastPriceDate: date, updatedAt: nowISO() });
       })
       .then(() => {
@@ -6350,7 +6456,7 @@ function initForms(){
       ? Math.round(input) - Math.round(computeCashVND(state.transactions, state.cashflows))
       : Math.round(input * 1000000);
     if(type === "adjust" && amount === 0){ setMsg("cf-msg", "ok", "Đã khớp."); return; }
-    addDoc(collection(fs, "cashflows"),
+    addDoc(bookCol("cashflows"),
       { type, amount, date, note, createdAt: nowISO() })
       .then(() => {
         setMsg("cf-msg", "ok", type === "adjust" ? "Đã điều chỉnh " + (amount > 0 ? "+" : "") + fmtVND(amount) : "Đã lưu.");
@@ -6373,7 +6479,7 @@ function initForms(){
     if(sessionLocked()){
       if(!window.confirm("Đang trong phiên. Lần xem giá này được ghi vào báo cáo Kỷ luật. Vẫn xem?")) return;
       peekUntil = Date.now() + PEEK_MINUTES * 60000;
-      setDoc(doc(fs, "plans", todayStr()), { peeks:increment(1), updatedAt:nowISO() }, { merge:true }).catch((err) => console.error("peek", err));
+      setDoc(bookDoc("plans", todayStr()), { peeks:increment(1), updatedAt:nowISO() }, { merge:true }).catch((err) => console.error("peek", err));
       render();
     }
     refreshAllPrices();
@@ -6504,7 +6610,7 @@ function initForms(){
       setMsg("st-msg", "err", "Áp dụng sớm nhất từ " + fmtDateVN(earliest) + " · cách lần đổi trước ít nhất " + STRATEGY_MIN_SESSIONS + " phiên");
       return;
     }
-    addDoc(collection(fs, "strategies"),
+    addDoc(bookCol("strategies"),
       // buyDrop/buyDropPct chép từ bản đang chạy: app không còn dùng (đã bỏ mua khi giảm), bot cung cầu/điểm vẫn đọc.
       { buyDrop:activeStrategy(effectiveFrom).buyDrop, buyDropPct:activeStrategy(effectiveFrom).buyDropPct, stopLossPct, sellRise, sellRisePct, nearRange, watchNearRange, lotSize,
         minCashRatio, maxCashRatio, maLength, maDays, maMaxDays, maxBuys, effectiveFrom, reason, createdAt: nowISO() })
@@ -6802,8 +6908,8 @@ function initTcbs(){
     tcbsBusy = true; $("tcbs-apply").disabled = true;
     try{
       const batch = writeBatch(fs);
-      picked.forEach((t) => batch.set(doc(collection(fs, "transactions")), t));
-      if(Math.abs(cashDiff) >= 1) batch.set(doc(collection(fs, "cashflows")),
+      picked.forEach((t) => batch.set(doc(bookCol("transactions")), t));
+      if(Math.abs(cashDiff) >= 1) batch.set(doc(bookCol("cashflows")),
         { type:"adjust", amount:Math.round(cashDiff), date:todayStr(), note:"Đối chiếu TCBS", createdAt:nowISO() });
       await batch.commit();
       $("tcbs-dialog").close();
@@ -6822,7 +6928,7 @@ function setSync(ok, text){
 }
 
 function watch(name, apply){
-  watchRef(collection(fs, name), name, apply);
+  watchRef(BOOK_COLLECTIONS.has(name) ? bookCol(name) : collection(fs, name), name, apply);
 }
 
 const loadedCollections = new Set();   // collection đã về lần đầu — maybeAutoFreeze chờ đủ mới chốt
@@ -6861,9 +6967,11 @@ function startData(){
   watch('decision_control', (rows) => { decisionState.control=rows.find((r) => r.id==='runtime') || null; });
   watchRef(query(collection(fs,'decision_runs'),orderBy('date','desc'),limit(100)), 'decision_runs', (rows) => { decisionState.runs=rows; });
   watch('decision_events', (rows) => { decisionState.events=rows; });
-  watch('orderflow_latest', (rows) => { orderflowState.latest=Object.fromEntries(rows.map((r) => [r.id,r])); });
-  watch('orderflow_events', (rows) => { orderflowState.events=rows; });
-  watch('orderflow_control', (rows) => { orderflowState.control=rows.find((r) => r.id==='runtime') || null; });
+  if(me.owner){
+    watch('orderflow_latest', (rows) => { orderflowState.latest=Object.fromEntries(rows.map((r) => [r.id,r])); });
+    watch('orderflow_events', (rows) => { orderflowState.events=rows; });
+    watch('orderflow_control', (rows) => { orderflowState.control=rows.find((r) => r.id==='runtime') || null; });
+  } else loadedCollections.add('orderflow_latest');   // cung cầu đợt 1 còn bám giá vốn owner → thành viên không có, đừng chờ khi tự chốt kế hoạch
   watch("signals",         (rows) => { state.signals = rows; });
   watch("watch_prices",    (rows) => { state.watchPrices = rows; });
   watch("orders",          (rows) => { state.orders = rows; });
@@ -6877,6 +6985,92 @@ function startData(){
   watchRef(query(collection(fs, "screening_runs"), orderBy("date", "desc"), limit(40)), "screening_runs", (rows) => { state.screeningRuns = rows; });
   watchRef(query(collection(fs, "screening_results"), orderBy("date", "desc"), limit(250)), "screening_results", (rows) => { state.screeningResults = rows; });
   watchRef(query(collection(fs, "screening_results"), where("totalScore", ">", 90)), "screening_results_90", (rows) => { state.fiveSessionResults = rows; });
+}
+
+/* ================= tài khoản + hướng dẫn lần đầu ================= */
+/* "Đã xem" của tour/khung thiết lập: members/{email}.guideSeen (owner thấy ai chưa xem ở màn Tài khoản). */
+function markGuideSeen(id){
+  me.guideSeen = { ...me.guideSeen, [id]:nowISO() };
+  render();
+  updateDoc(doc(fs, "members", me.email), { ["guideSeen." + id]:nowISO() }).catch((e) => console.error("guide seen", e));
+}
+/* Mục thêm vào menu ? (guide.js vẽ). */
+function guideMenu(){
+  return [
+    { label:"Thiết lập sổ", sep:true, run(){ setupForced = true; $("tab-danh-muc").click(); render(); $("setup-card").scrollIntoView({ block:"nearest" }); } },
+    ...(me.owner ? [{ label:"Tài khoản", run:openMembers }] : []),
+    { label:"Đăng xuất", run(){ signOut(auth).then(() => location.reload()); } },
+  ];
+}
+
+/* Khung "Thiết lập sổ" đầu tab Danh mục: tự đánh dấu theo dữ liệu, ẩn khi xong hết hoặc bấm Ẩn (mở lại ở menu ?). */
+let setupForced = false;
+function renderSetup(){
+  const card = $("setup-card");
+  if(!me.uid || !loadedCollections.has("transactions") || !loadedCollections.has("cashflows") || !loadedCollections.has("strategies")){ card.hidden = true; return; }
+  const rows = [
+    { name:"Nạp tiền ban đầu", done:state.cashflows.some((c) => c.type === "deposit"), btn:"Nạp", act:"cash" },
+    { name:"Ghi các mã đang giữ", done:state.transactions.length > 0, btn:"Ghi", act:"trade" },
+    { name:"Xem lại chiến lược", done:state.strategies.length > 0 || !!me.guideSeen["setup-strategy"], btn:"Xem", act:"strategy" },
+  ];
+  card.hidden = !setupForced && (!!me.guideSeen["setup-hidden"] || rows.every((r) => r.done));
+  if(card.hidden) return;
+  $("setup-list").innerHTML = rows.map((r) =>
+    '<div class="setup-row' + (r.done ? ' done' : '') + '"><span class="mark"' + (r.done ? ' role="img" aria-label="Xong"' : ' aria-hidden="true"') + '>✓</span><span class="name">' + esc(r.name) + '</span><button class="btn" type="button" data-setup="' + r.act + '">' + r.btn + '</button></div>').join("") +
+    '<div class="setup-row"><span class="mark" aria-hidden="true"></span><span class="name">Nhận tin Telegram</span><span class="chip">Sắp có</span></div>';
+}
+function initSetup(){
+  $("setup-list").addEventListener("click", (e) => {
+    const act = e.target.closest("[data-setup]")?.dataset.setup;
+    if(act === "cash" || act === "trade") openCompactForm(act);
+    if(act === "strategy"){ markGuideSeen("setup-strategy"); $("tab-chien-luoc").click(); }
+  });
+  $("setup-hide").addEventListener("click", () => { setupForced = false; markGuideSeen("setup-hidden"); });
+}
+
+/* Màn Tài khoản (chỉ owner): thêm email Google, khoá/mở. Khoá thì giữ nguyên sổ, mở lại là dùng tiếp. */
+let membersUnsub = null;
+function openMembers(){
+  const dialog = $("members-dialog");
+  setMsg("members-msg", "", "");
+  membersUnsub = onSnapshot(collection(fs, "members"), (snap) => {
+    const rows = snap.docs.map((d) => ({ id:d.id, ...d.data() }))
+      .sort((a, b) => (b.role === "owner") - (a.role === "owner") || String(a.addedAt || "").localeCompare(String(b.addedAt || "")));
+    $("members-list").innerHTML = rows.map((m) => {
+      const locked = m.status !== "active", toured = !!m.guideSeen?.["fin2-start"];
+      const meta = [m.id, m.lastSeenAt ? "vào " + fmtDateVN(datePart(m.lastSeenAt)) : "chưa vào lần nào", toured ? "đã xem HD" : "chưa xem HD"];
+      return '<div class="member-row"><div class="who"><div>' + esc(m.name || m.id) + (locked ? ' <span class="chip stop">Đã khoá</span>' : '') + '</div>' +
+        '<div class="meta">' + esc(meta.join(" · ")) + '</div></div>' +
+        (m.role === "owner" ? '' : '<button class="btn" type="button" data-member="' + esc(m.id) + '" data-lock="' + (locked ? "0" : "1") + '">' + (locked ? "Mở" : "Khoá") + '</button>') + '</div>';
+    }).join("");
+  }, (e) => { console.error("members", e); setMsg("members-msg", "err", "Lỗi tải danh sách"); });
+  dialog.showModal();
+}
+function initMembers(){
+  const dialog = $("members-dialog");
+  dialog.addEventListener("close", () => { membersUnsub?.(); membersUnsub = null; });
+  dialog.querySelector("[data-members-close]").addEventListener("click", () => dialog.close());
+  $("members-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("members-email").value.trim().toLowerCase(), name = $("members-name").value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ setMsg("members-msg", "err", "Email chưa đúng"); return; }
+    $("members-add").disabled = true;
+    try {
+      const ref = doc(fs, "members", email);
+      if((await getDoc(ref)).exists()){ setMsg("members-msg", "err", "Email đã có trong danh sách"); return; }
+      await setDoc(ref, { role:"member", status:"active", name, addedAt:nowISO(), guideSeen:{} });
+      $("members-form").reset();
+      setMsg("members-msg", "ok", "Đã thêm · gửi " + location.origin + " cho bạn đăng nhập bằng Google");
+    } catch(err){ console.error("member add", err); setMsg("members-msg", "err", "Lỗi lưu · Thử lại"); }
+    finally { $("members-add").disabled = false; }
+  });
+  $("members-list").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-member]");
+    if(!b) return;
+    b.disabled = true;
+    updateDoc(doc(fs, "members", b.dataset.member), { status:b.dataset.lock === "1" ? "locked" : "active", updatedAt:nowISO() })
+      .catch((err) => { console.error("member lock", err); toast("Lỗi lưu · Thử lại"); b.disabled = false; });
+  });
 }
 
 /* ================= cổng đăng nhập ================= */
@@ -6910,20 +7104,35 @@ function initGate(){
     }
   }, 8000);
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     clearTimeout(timer);
     if(!user){
       showGate("Đăng nhập", true);
       return;
     }
-    if(user.email !== OWNER_EMAIL){
-      // KHÔNG tự signOut ở nhánh chặn quyền — chỉ hiện màn chặn, để owner tự đổi tài khoản.
-      showGate("Sai tài khoản · Đăng nhập lại", true);
+    // Danh sách được vào: members/{email} (owner thêm/khoá ở menu ? → Tài khoản). Owner luôn được vào.
+    // KHÔNG tự signOut ở nhánh chặn quyền — chỉ hiện màn chặn, để người dùng tự đổi tài khoản.
+    const owner = user.email === OWNER_EMAIL && user.emailVerified;
+    let member = null;
+    try { member = (await getDoc(doc(fs, "members", user.email))).data() || null; }
+    catch(e){ if(e.code !== "permission-denied"){ console.error("member", e); showGate("Lỗi kết nối · Tải lại trang", true); return; } }
+    if(!owner && member?.status !== "active"){
+      showGate(member ? "Tài khoản đang bị khoá · Liên hệ người mời" : "Email này chưa được cấp quyền · Đăng nhập tài khoản khác", true);
       return;
     }
+    if(owner && !member?.migratedAt){
+      // Một lần: chép sổ cũ ở cấp ngoài cùng sang users/{uid} (bản cũ giữ làm dự phòng). Chạy lại an toàn.
+      showGate("Đang chuyển sổ sang tài khoản…", false);
+      try { await migrateBookApi(); member = (await getDoc(doc(fs, "members", user.email))).data() || {}; }
+      catch(e){ console.error("migrate", e); showGate("Chưa chuyển được sổ · Tải lại trang", true); return; }
+    }
+    Object.assign(me, { uid:user.uid, email:user.email, owner, name:member?.name || user.displayName || "", guideSeen:member?.guideSeen || {} });
+    document.body.classList.toggle("is-owner", owner);
+    updateDoc(doc(fs, "members", user.email), { uid:user.uid, lastSeenAt:nowISO() }).catch((e) => console.error("member seen", e));
     $("gate").hidden = true;
     $("app").hidden = false;
     startData();
+    initGuide({ me, markSeen:markGuideSeen, menu:guideMenu, ready:() => loadedCollections.has("transactions") && loadedCollections.has("cashflows") });
   });
 }
 
@@ -7034,6 +7243,8 @@ initDecisionTools();
 initScreening();
 initSorting();
 initCompact();
+initSetup();
+initMembers();
 initStockChart();
 render();
 initGate();

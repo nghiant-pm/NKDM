@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fin2 — Hướng dẫn</title>
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<script>
+  try { var t = localStorage.getItem('fin2-theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap">
+<!--
+  Trang hướng dẫn — KHÔNG cần đăng nhập, không đọc dữ liệu (cách dựng theo guide.html của YMLC).
+  Số trong trang là MẶC ĐỊNH của chiến lược (RULE_* ở index.html) — đổi mặc định thì sửa chữ ở đây.
+  Tour trên màn hình: guide-tours.js.
+-->
+<style>
+  :root{
+    --bg:#F5F7FB; --surface:#FFFFFF; --surface-2:#EFF2F8; --border:#DFE4EE; --text:#131A2B; --text-muted:#5B6472;
+    --brand:#0248C4; --brand-soft:#E4ECFB; --pos:#12813F; --neg:#C8322A; --r-input:10px; --r-card:14px; --r-pill:999px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0B1120; --surface:#131C31; --surface-2:#1B2742; --border:#2B3958; --text:#E8ECF8; --text-muted:#A2AECA;
+      --brand:#8AA8F0; --brand-soft:#1E2B4C; --pos:#4ADE87; --neg:#FF8A7E;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B1120; --surface:#131C31; --surface-2:#1B2742; --border:#2B3958; --text:#E8ECF8; --text-muted:#A2AECA;
+    --brand:#8AA8F0; --brand-soft:#1E2B4C; --pos:#4ADE87; --neg:#FF8A7E;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; font-weight:400; }
+  b{ font-weight:500; }
+  .top{ position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:12px 20px;
+    background:var(--surface); border-bottom:1px solid var(--border); }
+  .top .name{ font-size:16px; font-weight:500; }
+  .top .meta{ color:var(--text-muted); font-size:13px; }
+  .top .spacer{ flex:1; }
+  .btn{ display:inline-flex; align-items:center; min-height:40px; padding:0 16px; border-radius:var(--r-input);
+    background:var(--brand); color:#fff; text-decoration:none; font-size:14px; font-weight:500; }
+  .wrap{ display:grid; grid-template-columns:200px minmax(0,1fr); gap:40px; max-width:1040px; margin:0 auto; padding:32px 20px 80px; }
+  .toc{ position:sticky; top:84px; align-self:start; display:grid; gap:2px; }
+  .toc a{ padding:6px 10px; border-radius:var(--r-input); color:var(--text-muted); text-decoration:none; font-size:14px; }
+  .toc a:hover{ background:var(--surface-2); color:var(--text); }
+  article{ display:grid; gap:56px; min-width:0; }
+  section{ display:grid; gap:14px; scroll-margin-top:84px; }
+  h2{ margin:0; font-size:20px; font-weight:500; }
+  h3{ margin:8px 0 0; font-size:16px; font-weight:500; }
+  p, li{ margin:0; font-size:15px; line-height:1.65; }
+  .muted{ color:var(--text-muted); }
+  ol.steps{ list-style:none; counter-reset:s; margin:0; padding:0; display:grid; gap:12px; }
+  ol.steps > li{ counter-increment:s; position:relative; padding-left:36px; }
+  ol.steps > li::before{ content:counter(s); position:absolute; left:0; top:1px; width:24px; height:24px; border-radius:50%;
+    display:grid; place-items:center; background:var(--brand-soft); color:var(--brand); font-size:13px; font-weight:500; }
+  ul{ margin:0; padding-left:20px; display:grid; gap:6px; }
+  .box{ border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface); padding:14px 16px; display:grid; gap:8px; }
+  .num{ font-variant-numeric:tabular-nums; }
+  .pos{ color:var(--pos); } .neg{ color:var(--neg); }
+  .chip{ display:inline-flex; padding:2px 10px; border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-muted); font-size:12px; }
+  .qa{ display:grid; gap:10px; }
+  .qa details{ border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface); padding:12px 16px; }
+  .qa summary{ cursor:pointer; font-weight:500; font-size:15px; }
+  .qa details p{ margin-top:8px; }
+  @media (max-width:768px){
+    .top{ padding:10px 16px; }
+    .wrap{ grid-template-columns:minmax(0,1fr); gap:16px; padding:16px 16px 64px; }
+    .toc{ position:static; display:flex; overflow-x:auto; gap:6px; scrollbar-width:none; margin:0 -16px; padding:0 16px; }
+    .toc a{ white-space:nowrap; border:1px solid var(--border); border-radius:var(--r-pill); font-size:13px; }
+    article{ gap:44px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="name">Fin2</span><span class="meta">Hướng dẫn</span>
+  <span class="spacer"></span>
+  <a class="btn" href="/">Vào app</a>
+</header>
+<div class="wrap">
+  <nav class="toc" aria-label="Mục lục" id="toc"></nav>
+  <article>
+    <section id="bat-dau">
+      <h2>Bắt đầu dùng</h2>
+      <ol class="steps">
+        <li>Người mời thêm email Google của bạn vào danh sách. Mở app, bấm <b>Đăng nhập Google</b> bằng đúng email đó.</li>
+        <li>Lần đầu vào, app chạy một vòng giới thiệu ngắn. Xem lại bất cứ lúc nào ở nút <b>?</b> góc trên.</li>
+        <li>Làm 3 việc trong khung <b>Thiết lập sổ</b>: nạp số tiền ban đầu, ghi các mã đang giữ (mỗi lần mua là một dòng, đúng giá và ngày khớp),
+          xem lại chiến lược.</li>
+        <li>Mỗi lần khớp lệnh ở công ty chứng khoán, ghi vào app. Sổ đúng thì khuyến nghị mới đúng.</li>
+      </ol>
+      <p class="muted">Sổ của bạn chỉ mình bạn xem được. Phần dữ liệu thị trường (Cơ hội, điểm, xu hướng MA) là dùng chung cho mọi người.</p>
+    </section>
+
+    <section id="man-hinh">
+      <h2>Màn hình chính</h2>
+      <ul>
+        <li><b>Tiền và lãi/lỗ</b> — dòng đầu tab Danh mục. Bấm để xem lãi đã chốt theo tuần, tháng, quý.</li>
+        <li><b>Khuyến nghị</b> — kế hoạch cho phiên tới, gồm các lệnh giới hạn đặt sẵn tại mốc giá. Bấm <b>Đặt</b> để ghi lệnh chờ, khớp rồi bấm <b>Khớp</b>.</li>
+        <li><b>Bảng mã</b> — mỗi dòng một mã đang giữ, kèm mốc giá theo chiến lược. Bấm để mở, bấm tiếp để xem chi tiết và biểu đồ.</li>
+        <li><b>Nút lấy giá</b> (mũi tên vòng) — cập nhật giá mọi mã.</li>
+        <li><b>Theo dõi</b> — mã chưa mua, kèm giá bạn muốn mua.</li>
+        <li><b>Cơ hội</b> — mã HOSE điểm cao do bot sàng lọc sau mỗi phiên.</li>
+        <li><b>Chiến lược</b> — các con số của luật bên dưới. Mỗi lần đổi lưu thành một phiên bản mới có ngày hiệu lực, tín hiệu cũ vẫn giữ số cũ.</li>
+      </ul>
+    </section>
+
+    <section id="chien-thuat">
+      <h2>Chiến thuật</h2>
+      <p>App gợi ý theo một bộ luật cố định để bớt quyết định theo cảm xúc. Các con số dưới đây là <b>mặc định</b>; bạn chỉnh được ở tab Chiến lược.
+        "Điểm" là giá tuyệt đối tính bằng nghìn đồng, không phải %.</p>
+
+      <h3>Mua bán T+ quanh giá vốn</h3>
+      <div class="box">
+        <p>Mã đang lãi chạm <b class="num">giá vốn + 3 điểm</b> → tới mốc bán. Mã trong danh sách theo dõi chạm <b>giá bạn muốn mua</b> → tới mốc mua.</p>
+        <p class="muted num">Ví dụ: giá vốn 50,0 → mốc bán 53,0.</p>
+      </div>
+
+      <h3>Cắt lỗ</h3>
+      <div class="box">
+        <p>Mã đang lỗ mà lỗ từ <b class="num neg">5%</b> trở lên, <b>hoặc</b> giá đóng cửa dưới đường MA50 → bán bớt về 1/2 khối lượng lớn nhất đã giữ.
+          Chạm cả hai → bán hết. Còn cách mức cắt dưới 0,5 điểm → app báo "Sắp cắt lỗ".</p>
+        <p>Mã đang lỗ <b>không bao giờ</b> được gợi ý mua thêm (không bình quân giá xuống).</p>
+      </div>
+
+      <h3>Vùng mua theo MA10</h3>
+      <div class="box">
+        <p>Mã đã đóng cửa trên đường MA10 liền <b class="num">5 tới 15 phiên</b> và MA10 đang đi lên = trong vùng. Phiên gần nhất đóng cửa tăng → gợi ý
+          <b>Mua · theo MA</b>. Trên MA quá 15 phiên thì bỏ (đã chạy xa).</p>
+        <p>Với mã đang giữ, đây là đường mua thêm duy nhất — và chỉ khi giá đang trên giá vốn.</p>
+      </div>
+
+      <h3>Bán từng phần và gồng lãi</h3>
+      <div class="box">
+        <p>Tới mốc bán, app đếm các dấu hiệu nên giữ: giá trên MA10 và MA đi lên (bắt buộc), VN-Index không yếu, khối ngoại mua ròng, lực mua còn mạnh.
+          Càng nhiều dấu hiệu thì bán càng ít, phần còn lại gồng tới khi đóng cửa dưới MA10 hoặc chạm sàn (mốc lúc bán đợt đầu).</p>
+        <p>Lệnh bán được chia nhỏ từng lô 100 cổ phiếu, mỗi bậc giá cao hơn 0,5% để khớp giá tốt hơn.</p>
+      </div>
+
+      <h3>Kế hoạch chốt trước phiên</h3>
+      <div class="box">
+        <p>Mọi gợi ý gom thành <b>kế hoạch ngày</b>, chốt trước 9:00. Trong giờ phiên app không đưa gợi ý mới và giấu biến động giá — để lệnh theo kế hoạch,
+          không theo bảng giá nhảy.</p>
+        <p>Cửa lọc lệnh mua: VN-Index đang yếu thì dừng mua T+ · tối đa <b class="num">3</b> lệnh mua một ngày ·
+          tiền mặt sau lệnh phải còn từ <b class="num">20%</b> tổng tài sản.</p>
+      </div>
+    </section>
+
+    <section id="ket-noi">
+      <h2>Telegram và TCBS <span class="chip">Sắp có</span></h2>
+      <p>Nhận tin Telegram theo danh mục của riêng bạn (cắt lỗ, kế hoạch trưa, vùng MA) và đối chiếu sổ với tài khoản TCBS sẽ có ở đợt sau.
+        Khi có, mục này sẽ hướng dẫn lấy mã chat Telegram và khoá API TCBS.</p>
+    </section>
+
+    <section id="hoi-dap">
+      <h2>Hỏi đáp</h2>
+      <div class="qa">
+        <details><summary>App có đặt lệnh thật ở công ty chứng khoán không?</summary>
+          <p>Không. App chỉ ghi sổ và gợi ý. Bạn tự đặt lệnh ở app chứng khoán, khớp rồi ghi lại vào Fin2.</p></details>
+        <details><summary>Ghi sai một giao dịch thì sửa thế nào?</summary>
+          <p>Mở Nhật ký, xoá dòng sai rồi ghi lại dòng đúng.</p></details>
+        <details><summary>Người khác có xem được danh mục của tôi không?</summary>
+          <p>Không. Mỗi tài khoản một sổ riêng, chặn ở máy chủ chứ không chỉ ẩn trên màn hình.</p></details>
+        <details><summary>Đây có phải lời khuyên đầu tư không?</summary>
+          <p>Không. Gợi ý chỉ là kết quả của bộ luật bạn đặt ở tab Chiến lược. Quyết định và rủi ro là của bạn.</p></details>
+      </div>
+    </section>
+  </article>
+</div>
+<script>
+  // Mục lục tự dựng từ các <section>.
+  document.getElementById('toc').innerHTML = [...document.querySelectorAll('article > section')]
+    .map((s) => '<a href="#' + s.id + '">' + s.querySelector('h2').firstChild.textContent.trim() + '</a>').join('');
+</script>
+</body>
+</html>

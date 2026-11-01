@@ -1,8 +1,10 @@
 # Fin2 — Nhật Ký Danh Mục
 
 ## Tổng quan
-Trang theo dõi danh mục cổ phiếu cá nhân. **1 người dùng duy nhất** (owner), chạy trên nhiều thiết bị.
-Không realtime nhiều người cùng sửa → **không cần merge 3 chiều, không cần phân quyền nhiều lớp**.
+Trang theo dõi danh mục cổ phiếu cá nhân, chạy trên nhiều thiết bị. Từ 01/11/2026 (**nhiều tài khoản — đợt 1**) owner mở cho dưới 10
+người bạn: **mỗi người một sổ riêng** (`users/{uid}/…`), owner gõ email để cấp/khoá (`members/{email}`). Không ai sửa sổ người khác →
+**vẫn không cần merge 3 chiều, chỉ 2 vai owner / thành viên**. Đợt 2 (chưa làm): bot + Telegram theo từng người, mọi tuỳ chọn trong
+setting của người đó, "giống anh". Đợt 3: TCBS cho thành viên (key riêng). Đợt 1 bot vẫn chỉ phục vụ owner (`functions/members.js ownerBook`).
 
 **Owner:** Trung Nghĩa — Project Manager, không lập trình.
 **Yêu cầu khi sửa code:** giải thích ngắn gọn thay đổi là gì, không giải thích kỹ thuật sâu. Tiếng Việt.
@@ -12,7 +14,7 @@ Không realtime nhiều người cùng sửa → **không cần merge 3 chiều,
 ## Tech Stack
 - **Frontend:** 1 file HTML tĩnh, JS thuần, không bundler, không framework
 - **Database:** Firestore (project `fin2-danh-muc`, location `asia-southeast1`)
-- **Auth:** Google Sign-In, rules chỉ cho **đúng 1 email**
+- **Auth:** Google Sign-In, rules cho owner (gõ cứng email) + email có trong `members` với `status:"active"`
 - **Hosting:** Firebase Hosting
 - **Font / Brand:** Inter · brand `#0248C4` · tăng `#16a34a` · giảm `#dc2626`
 
@@ -21,6 +23,10 @@ Không realtime nhiều người cùng sửa → **không cần merge 3 chiều,
 ## Cấu trúc thư mục
 ```
 public/index.html    Toàn bộ app: markup + style + logic. Nguồn sự thật duy nhất.
+public/guide.js      Phần chạy tour hướng dẫn + nút ? (chép từ YMLC Documents\[1] Project\LC Vaccine\public\shared\guide.js).
+public/guide-tours.js  Chữ tour (owner duyệt). id tour đã deploy KHÔNG đổi — "đã xem" nhớ theo id.
+public/guide.html    Trang giải thích chiến thuật, không cần đăng nhập. Số trong trang = mặc định RULE_* — đổi mặc định thì sửa chữ.
+functions/members.js Nhiều tài khoản phía server: ownerBook, memberTickers, isActiveMember, migrateOwnerBook.
 firestore.rules      Hàng rào bảo mật THẬT (server-side).
 firebase.json        Cấu hình hosting + rules.
 deploy.bat           Deploy 1 chạm trên Windows: lấy nhánh từ GitHub → smoke → hỏi xác nhận → deploy.
@@ -95,7 +101,7 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   cố định theo version — đổi là nâng `SELL_VERSION`; làm tròn lô, không chia được thì gồng cả). Phần gồng thoát khi đóng cửa dưới MA hoặc
   chạm **sàn = mốc T+ lúc bán đợt đầu** (lệnh điều kiện owner tự đặt ở TCBS; sàn KHÔNG đổi khi mua thêm theo MA). Lãi mỏng (vốn +1% →
   mốc) chỉ bán khi đóng cửa dưới MA — **sell-v1.1.0 (owner chốt 20/10/2026): VN-Index yếu KHÔNG còn tự bán lãi mỏng** (vụ TCB lãi 2%,
-  mã khỏe hơn thị trường bị khuyên bán hết). Đừng dựng lại. Đang gồng **suy ra** (`rideState`: kế hoạch đã chốt có mục `tier` `keepQty>0` + có lệnh bán
+  mã khỏe hơn thị trường bị khuyên bán hết). Đừng dựng lại. **Bán chia bậc** (sell-v1.2.0, owner chốt 30/10/2026): mọi lệnh bán giới hạn của kế hoạch (cắt lỗ, tier, exit, thin — không gồm lệnh điều kiện `ride`) tách lệnh 1 lô, bậc sau +`SELL_LADDER_STEP_PCT` (0,5%), không vượt trần (`sellLadder`, mục kế hoạch `ladder`); nút Đặt ghi đủ các lệnh chờ một lượt. Đang gồng **suy ra** (`rideState`: kế hoạch đã chốt có mục `tier` `keepQty>0` + có lệnh bán
   ngày đó), không lưu cờ. Đang gồng vẫn được mua theo MA. Chỉ ở app (`sellPlanFor` trong `buildPlan`); `signals` + nhãn tầng mở chưa đổi.
 - **KẾ HOẠCH CHIỀU** (owner chốt 23/10/2026, `pm-v1.0.0`, **CHẠY BÓNG**): giờ nghỉ trưa 11:30–13:00 dựng thêm kế hoạch cho phiên chiều
   (`buildPlan(s, ngày, noon=true)` → `plans/{ngày}.pm`). Giá so mốc = giá 11:30 của bot (`maTrendNoon.close`, `noonQuote`), MA tạm =
@@ -125,6 +131,12 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
 
 ## Mô hình dữ liệu
 ```
+members/{email}             role "owner"|"member", status "active"|"locked", name, uid?, addedAt, lastSeenAt?, guideSeen { <tourId>|setup-*: lúc xem },
+                            owner thêm: migratedAt, migratedCounts. Owner ghi; thành viên chỉ tự ghi uid/lastSeenAt/guideSeen của doc mình.
+users/{uid}/…               ⚠️ TỪ 01/11/2026 mọi collection SỔ RIÊNG dưới đây nằm ở users/{uid}/ (BOOK_COLLECTIONS): transactions,
+                            cashflows, tickers, daily_snapshots, watchlist, strategies, signals, watch_prices, orders, theses, plans.
+                            Bản ở cấp ngoài cùng = sổ owner CŨ, giữ dự phòng (client không đọc được), xoá tay sau 2 tuần (~15/11/2026).
+                            Phần còn lại (settings, screening_*, decision_*, orderflow_*) vẫn ở cấp ngoài cùng, dùng chung.
 transactions/{autoId}       ticker, side "buy"|"sell", qty, price (nghìn đ), date, note, createdAt
                             từ 16/10/2026 refPrice? = giá tham chiếu hôm đó (chép lúc ghi, chỉ khi app đã lấy giá ngày đó) → "mua lúc giá xanh"
                             từ 14/10/2026 lệnh bán có lots [{ id (= id lệnh mua của lô), qty }] — bán bao nhiêu CP từ lô nào.
@@ -212,13 +224,21 @@ mất cũng không sao. **Dữ liệu thật luôn nằm ở Firestore** — đ�
 ---
 
 ## Phân quyền
-Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OWNER_EMAIL`**. Client chỉ hiện màn đăng nhập; mọi chặn thật nằm ở rules.
+Rules Firestore (01/11/2026): `isOwner()` gõ cứng email owner (không bao giờ tự khoá mình) · `isMember()` = owner hoặc `members/{email}`
+`status == "active"`, email đã xác minh. Sổ `users/{uid}/…` chỉ chính chủ · dữ liệu bot `screening_*`/`decision_*`/`settings` thành viên đọc ·
+`orderflow_*` + `screening_slots` + ghi `settings` chỉ owner (cung cầu đợt 1 bám giá vốn owner). Client chỉ chặn hiển thị
+(`data-owner-only`); mọi chặn thật nằm ở rules. ⚠️ `decision_latest` còn chứa mốc T+ legacy tính từ giá vốn OWNER → thành viên
+đọc được mốc đó (owner biết, đợt 2 tách theo người). Đã thử 31 ca trên emulator — đổi rules thì thử lại.
 
 ⚠️ **Gate phía client KHÔNG phải hàng rào bảo mật.** Thêm collection mới → thêm nhánh rules NGAY, không để sau.
 
 ---
 
 ## ⚠️ Những chỗ NHÂN BẢN CÓ CHỦ Ý — sửa 1 chỗ phải sửa mấy chỗ
+- **Danh sách collection sổ riêng** `BOOK_COLLECTIONS` (`public/index.html`) ↔ `BOOK_COLLECTIONS` (`functions/members.js`) ↔ chú thích
+  nhánh `users/{uid}` trong `firestore.rules`. Thêm collection sổ mới → thêm cả ba; app đọc/ghi sổ CHỈ qua `bookCol`/`bookDoc`/`watch`.
+- **Tour hướng dẫn chỉ vào id thật** của `index.html` (`#setup-card`, `#compact-summary-toggle`, `#advice-section`, `#compact-positions-slot`,
+  `#compact-trade`, `#global-price-refresh`, `#tab-*`, `#tb-help`) — đổi id thì sửa `guide-tours.js`.
 - **Ngưỡng mua/bán có 3 tầng:** hằng số mặc định `RULE_BUY_DROP`/`RULE_SELL_RISE`/`RULE_LOT`
   → phiên bản trong `strategies` → nơi dùng gọi `activeStrategy(ngày)`. Ba nơi dùng phải
   ra cùng một số cho cùng một ngày: `renderCompact` (cột Mua / Bán + tầng mở của bảng mã), `buildSignals` (phần T+ ghi log

@@ -1,52 +1,65 @@
 rules_version = '2';
 
 // Fin2 — Nhật Ký Danh Mục.
-// App một người dùng: chỉ đúng một email được đọc/ghi. Mọi thứ khác đóng.
+// Nhiều tài khoản (đợt 1, 01/11/2026): owner + các email owner thêm vào members/{email}.
+// Sổ mỗi người ở users/{uid}/… — chỉ chính chủ đọc/ghi. Dữ liệu thị trường do bot tính: thành viên đọc được.
 // ⚠️ Thêm collection mới thì thêm nhánh Ở ĐÂY NGAY, không để sau.
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
     function isOwner() {
-      return request.auth != null
-        && request.auth.token.email == 'nghiant@youmed.vn'
-        && request.auth.token.email_verified == true;
+      return verified() && request.auth.token.email == 'nghiant@youmed.vn';
+    }
+    function memberDoc() {
+      return /databases/$(database)/documents/members/$(request.auth.token.email);
+    }
+    // Owner luôn qua (kể cả khi chưa có doc members) — không bao giờ tự khoá mình ngoài.
+    function isMember() {
+      return isOwner() || (verified() && exists(memberDoc()) && get(memberDoc()).data.status == 'active');
     }
 
-    match /transactions/{id}    { allow read, write: if isOwner(); }
-    match /cashflows/{id}       { allow read, write: if isOwner(); }
-    match /tickers/{id}         { allow read, write: if isOwner(); }
-    match /daily_snapshots/{id} { allow read, write: if isOwner(); }
-    match /watchlist/{id}       { allow read, write: if isOwner(); }
-    match /strategies/{id}      { allow read, write: if isOwner(); }
-    match /signals/{id}         { allow read, write: if isOwner(); }
-    match /watch_prices/{id}    { allow read, write: if isOwner(); }
-    match /orders/{id}          { allow read, write: if isOwner(); }
-    match /theses/{id}          { allow read, write: if isOwner(); }
-    // Kế hoạch ngày (chốt trước phiên) + số lần mở xem giá trong phiên — owner ghi từ app.
-    match /plans/{id}           { allow read, write: if isOwner(); }
+    // Danh sách được vào. Owner thêm/khoá; thành viên chỉ đọc doc của mình và tự ghi uid/lần vào/đã xem hướng dẫn.
+    match /members/{email} {
+      allow read: if isOwner() || (verified() && request.auth.token.email == email);
+      allow create, delete: if isOwner();
+      allow update: if isOwner() || (isMember() && request.auth.token.email == email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'lastSeenAt', 'guideSeen'])
+        && (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid));
+    }
+
+    // Sổ riêng: transactions, cashflows, tickers, daily_snapshots, watchlist, strategies, signals, watch_prices,
+    // orders, theses, plans (↔ BOOK_COLLECTIONS ở app + functions/members.js). Chỉ chính chủ.
+    match /users/{uid}/{col}/{id} {
+      allow read, write: if isMember() && request.auth.uid == uid;
+    }
+
     // Kết quả bot do Cloud Function (Admin SDK) ghi; trình duyệt chỉ được đọc.
-    match /screening_runs/{id}    { allow read: if isOwner(); allow write: if false; }
-    match /screening_results/{id} { allow read: if isOwner(); allow write: if false; }
+    match /screening_runs/{id}    { allow read: if isMember(); allow write: if false; }
+    match /screening_results/{id} { allow read: if isMember(); allow write: if false; }
     // Khoá theo khung giờ gửi Telegram — chỉ Cloud Function ghi.
     match /screening_slots/{id}   { allow read: if isOwner(); allow write: if false; }
-    // Điểm quyết định chạy bóng: chỉ server chấm/lưu, owner đọc.
-    match /decision_latest/{id}   { allow read: if isOwner(); allow write: if false; }
-    match /decision_snapshots/{id} { allow read: if isOwner(); allow write: if false; }
-    match /decision_runs/{id}     { allow read: if isOwner(); allow write: if false; }
-    match /decision_events/{id}   { allow read: if isOwner(); allow write: if false; }
-    match /decision_versions/{id} { allow read: if isOwner(); allow write: if false; }
-    match /decision_news/{id}     { allow read: if isOwner(); allow write: if false; }
-    match /decision_control/{id}  { allow read: if isOwner(); allow write: if false; }
-    // Cung-cầu: Cloud Function là bộ thu duy nhất; trình duyệt owner chỉ đọc kết quả chuẩn hóa.
+    // Điểm quyết định chạy bóng: chỉ server chấm/lưu.
+    match /decision_latest/{id}   { allow read: if isMember(); allow write: if false; }
+    match /decision_snapshots/{id} { allow read: if isMember(); allow write: if false; }
+    match /decision_runs/{id}     { allow read: if isMember(); allow write: if false; }
+    match /decision_events/{id}   { allow read: if isMember(); allow write: if false; }
+    match /decision_versions/{id} { allow read: if isMember(); allow write: if false; }
+    match /decision_news/{id}     { allow read: if isMember(); allow write: if false; }
+    match /decision_control/{id}  { allow read: if isMember(); allow write: if false; }
+    // Cung-cầu đợt 1 còn bám giá vốn owner → chỉ owner đọc (đợt 2 tách theo người).
     match /orderflow_daily/{id}    { allow read: if isOwner(); allow write: if false; }
     match /orderflow_latest/{id}   { allow read: if isOwner(); allow write: if false; }
     match /orderflow_events/{id}   { allow read: if isOwner(); allow write: if false; }
     match /orderflow_versions/{id} { allow read: if isOwner(); allow write: if false; }
     match /orderflow_control/{id}  { allow read: if isOwner(); allow write: if false; }
-    // Cấu hình owner chỉnh trong app (khung giờ nhận tin sàng lọc).
-    match /settings/{id}          { allow read, write: if isOwner(); }
+    // Cấu hình bot (khung giờ Telegram + thông số sàng lọc): owner chỉnh, thành viên đọc để Quét ngay ra cùng số với bot.
+    match /settings/{id}          { allow read: if isMember(); allow write: if isOwner(); }
 
-    // Chốt chặn cuối: không collection nào khác được chạm tới.
+    // Chốt chặn cuối: không collection nào khác được chạm tới — kể cả sổ owner cũ ở cấp ngoài cùng
+    // (giữ làm dự phòng sau khi chuyển sang users/{uid}, chỉ Cloud Function đọc).
     match /{document=**} { allow read, write: if false; }
   }
 }

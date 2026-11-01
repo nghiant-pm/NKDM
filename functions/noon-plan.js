@@ -1,6 +1,7 @@
 "use strict";
 
 const { activeStrategy, tplusLevels, holdings, maInZone } = require("./decision-service");
+const { ownerBook, sourceFor } = require("./members");
 
 /* Kế hoạch chiều (owner chốt 23/10/2026, pm-v1.0.0). Kế hoạch thật dựng ở APP (buildPlan(…, noon)) — bot KHÔNG chép luật kế hoạch,
    chỉ làm hai việc:
@@ -66,7 +67,8 @@ async function sendNoonPlan(db, date, send) {
   if (!claimed) return { status: "already-sent" };
   try {
     const names = ["decision_latest", "transactions", "watchlist", "tickers", "strategies", "plans"];
-    const reads = await Promise.all(names.map((n) => db.collection(n).get()));
+    const col = sourceFor(db, await ownerBook(db));
+    const reads = await Promise.all(names.map((n) => col(n).get()));
     const docs = (i) => reads[i].docs.map((d) => ({ ...d.data(), id: d.id }));
     const summary = noonSummary({ rows: docs(0).map((r) => ({ ...r, ticker: r.ticker || r.id })), positions: holdings(docs(1)),
       watch: Object.fromEntries(docs(2).map((r) => [r.id, r])), hold: new Set(docs(3).filter((r) => r.hold === true).map((r) => r.id)),
@@ -102,7 +104,7 @@ function evaluateNoonItem(item, samples, bars, date, morningItems) {
 }
 
 async function evaluateNoonPlans(db, fetchHistory) {
-  const snap = await db.collection("plans").get();
+  const snap = await (await ownerBook(db)).collection("plans").get();
   const pending = snap.docs.filter((d) => d.data().pm?.frozenAt && !d.data().pmEvaluation?.complete);
   const histories = new Map();
   const history = async (tk) => {

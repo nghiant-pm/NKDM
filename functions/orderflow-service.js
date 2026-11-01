@@ -3,6 +3,7 @@
 const { randomUUID } = require("node:crypto");
 const { holdings, activeStrategy, tplusLevels } = require("./decision-service");
 const O = require("./orderflow");
+const { ownerBook, sourceFor } = require("./members");
 
 const VPS_API = "https://bgapidatafeed.vps.com.vn/getliststockdata/";
 const NQS_API = "https://dulieu.nguoiquansat.vn/Company/OrderHistory";
@@ -184,7 +185,8 @@ async function runOrderflow(db, { now = new Date(), scheduled = false, fetchHist
   if (!acquired) return { status: "busy" };
   try {
     const names = ["transactions", "watchlist", "tickers", "strategies", "decision_latest", "orderflow_latest", "orderflow_events", "orderflow_control"];
-    const reads = await Promise.all(names.map((name) => db.collection(name).get()));
+    const col = sourceFor(db, await ownerBook(db));
+    const reads = await Promise.all(names.map((name) => col(name).get()));
     const rows = (index) => reads[index].docs.map((doc) => ({ ...doc.data(), id: doc.id }));
     const positions = holdings(rows(0)), watch = Object.fromEntries(rows(1).map((row) => [row.id, row]));
     const meta = Object.fromEntries(rows(2).map((row) => [row.id, row])), decisions = Object.fromEntries(rows(4).map((row) => [row.id, row]));

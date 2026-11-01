@@ -12,6 +12,7 @@ const { scoreTicker, evaluateCandidate, evaluateFiveSession, fiveSessionPending,
 const tickerAnalysis = require("./ticker-analysis");
 const orderflow = require("./orderflow-service");
 const { activeStrategy, maStreak, maInZone } = require("./decision-service");
+const members = require("./members");
 
 initializeApp();
 setGlobalOptions({ region: "asia-southeast1", maxInstances: 1 });
@@ -456,11 +457,12 @@ async function runSlot(db, slot, date, token, chatId, settings) {
   if (lock.skip) { logger.info(`Bỏ qua ${date} ${slot.time}: ${lock.reason}`); return; }
   const runRef = slot.phase === "post" ? db.collection("screening_runs").doc(date) : null;
   try {
+    const book = await members.ownerBook(db);
     const [transactionsSnap, watchlistSnap, oldResultsSnap, strategiesSnap] = await Promise.all([
-      db.collection("transactions").get(),
-      db.collection("watchlist").get(),
+      book.collection("transactions").get(),
+      book.collection("watchlist").get(),
       db.collection("screening_results").get(),
-      db.collection("strategies").get()
+      book.collection("strategies").get()
     ]);
     const pendingTickers = oldResultsSnap.docs.filter((item) => {
       const data = item.data();
@@ -535,14 +537,14 @@ exports._private = {
 const { runDecision } = require("./decision-service");
 const decisionHelpers = { fetchHistory, fetchForeign, mapWithConcurrency };
 exports.refreshDecisionScores = onCall({ timeoutSeconds: 540, memory: "512MiB", cors: true }, async (request) => {
-  if (request.auth?.token?.email !== "nghiant@youmed.vn" || request.auth.token.email_verified !== true) {
+  if (!(await members.isActiveMember(getFirestore(), request.auth))) {
     throw new HttpsError("permission-denied", "Không có quyền truy cập");
   }
   try { return await runDecision(getFirestore(), decisionHelpers); }
   catch (error) { logger.error("decision scores", error); throw new HttpsError("unavailable", "Chưa cập nhật được điểm quyết định"); }
 });
 exports.analyzeTicker = onCall({ timeoutSeconds: 120, memory: "256MiB", cors: true }, async (request) => {
-  if (request.auth?.token?.email !== "nghiant@youmed.vn" || request.auth.token.email_verified !== true) {
+  if (!(await members.isActiveMember(getFirestore(), request.auth))) {
     throw new HttpsError("permission-denied", "Không có quyền truy cập");
   }
   const ticker = String(request.data?.ticker || "").trim().toUpperCase();
@@ -554,6 +556,12 @@ exports.analyzeTicker = onCall({ timeoutSeconds: 120, memory: "256MiB", cors: tr
     logger.error("ticker analysis", { ticker, error });
     throw new HttpsError("unavailable", "Chưa phân tích được mã này");
   }
+});
+// Nhiều tài khoản (đợt 1, 01/11/2026): chép sổ owner sang users/{uid} một lần — app tự gọi lúc owner đăng nhập.
+exports.migrateOwnerBook = onCall({ timeoutSeconds: 300, memory: "256MiB", cors: true }, async (request) => {
+  if (!members.isOwnerAuth(request.auth)) throw new HttpsError("permission-denied", "Không có quyền truy cập");
+  try { return await members.migrateOwnerBook(getFirestore(), request.auth.uid); }
+  catch (error) { logger.error("migrate owner book", error); throw new HttpsError("unavailable", "Chưa chuyển được sổ"); }
 });
 // Kế hoạch chiều (owner chốt 23/10/2026): lượt 11:30 (thử lại 12:30) nhắn Telegram tóm tắt sơ bộ; lượt 15:30 đo kế hoạch chiều đã chốt.
 const noonPlan = require("./noon-plan");

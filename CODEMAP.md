@@ -1,4 +1,4 @@
-# CODEMAP — Fin2
+| ✅ thành viên đọc || ✅ thành viên đọc |# CODEMAP — Fin2
 
 ## 1. Sơ đồ phụ thuộc
 
@@ -104,6 +104,18 @@ Nút `#compact-save-day` (chấm vàng khi hôm nay chưa có `daily_snapshots`)
 vào `#compact-dialog` qua `openCompactForm("day"|"cash")`; `restoreCompactForm()` trả form về chỗ (gọi cả khi đóng lẫn khi mở popup mới).
 Tầng 3 của mã: nút "Chi tiết" (`detailButton`) hoặc dòng điểm ở tầng 2 → `openTickerDetail()` → `#ticker-dialog`.
 
+### Nhiều tài khoản + hướng dẫn lần đầu (đợt 1, 01/11/2026)
+```
+members/{email}  ──(initGate: getDoc → chặn nếu không có/locked)──> me { uid, email, name, owner, guideSeen }
+users/{uid}/<BOOK_COLLECTIONS>  <── bookCol(name) / bookDoc(name,id) / watch(name)   (11 collection sổ riêng)
+owner chưa migratedAt → callable migrateOwnerBook (chép sổ cấp ngoài → users/{uid}, bản cũ giữ nguyên)
+public/guide.js (phần chạy tour, chép từ YMLC) ← public/guide-tours.js (chữ tour) · public/guide.html (trang giải thích, không cần đăng nhập)
+functions/members.js: ownerBook(db) (bot đọc sổ owner; chưa chuyển → gốc db) · sourceFor · memberTickers (mã của thành viên khác
+  để chấm điểm/MA) · isActiveMember (callable analyzeTicker, refreshDecisionScores) · migrateOwnerBook
+```
+Thành viên (không phải owner): `body:not(.is-owner) [data-owner-only]` ẩn nút TCBS, khung giờ Telegram, thông số sàng lọc; không mở listener
+`orderflow_*` (đánh dấu `orderflow_latest` đã tải để `maybeAutoFreeze` không chờ); `renderDecisionPilot` ẩn phần "Quy tắc giá vốn" (mốc owner).
+
 ---
 
 ## 2. `public/index.html` — các hàm quan trọng
@@ -124,7 +136,7 @@ Tầng 3 của mã: nút "Chi tiết" (`detailButton`) hoặc dòng điểm ở 
 | | `activeStrategy(dateStr)` | **nguồn duy nhất của ngưỡng.** Trả phiên bản trong `strategies` có `effectiveFrom` lớn nhất mà ≤ ngày đưa vào, gồm ngưỡng điểm, ngưỡng % tuỳ chọn, `nearRange`, `watchNearRange`, mục tiêu tiền mặt và `maLength`/`maDays`/`maMaxDays` (vùng mua MA, thiếu = 10 · 5 · 15). Bản cũ thiếu % thì trả `null`, tức chỉ dùng điểm |
 | | `maRuleText(st)` `maInZone(streak,rise,st)` `maTrendFor(ticker,st)` `maTag(ticker,st)` `signalMaAbove(signal)` `maBoughtInRun(ticker,since)` `maCandidates(s,st,buyingTickers)` `signalMaCompare()` `adviceInsight(signal)` | vùng mua MA (13/10/2026): `maTrendFor` đọc `decision_latest.maTrend` (bỏ khi `stale`, bot đếm theo đường MA khác hoặc thiếu `rise`), `maInZone` = `maDays`..`maMaxDays` phiên trên MA + MA đi lên ≥`maDays` (bản sao của bot) → nhãn "MA10↑" ở ô mã bảng Nắm giữ + Theo dõi, tín hiệu `trend` ở `buildSignals`. `buyNow` = trong vùng + phiên cuối tăng (`up`), `waiting` = trong vùng + phiên cuối giảm/đứng (nhãn vàng "MA10 chờ"); thiếu `up` (bot cũ) = chưa biết. `maCandidates` là nơi duy nhất lọc mã vùng MA cho Khuyến nghị (bỏ mã có tín hiệu mua T+ cùng ngày, chờ hàng, đã mua trong đợt): `buildSignals` lấy `buyNow`, `renderAdvice` lấy `waiting` thành nhóm "Chờ bật lên" (không nút Đặt, không ghi signals). `maBoughtInRun`: đã khớp mua / lệnh mua chờ từ `since` thì không ra lại trong đợt. `signalMaAbove` đọc mức chép trong doc tín hiệu (chip "Ưu tiên" trên dòng T+, xếp lên đầu). `signalMaCompare` ở Chất lượng tín hiệu so "Mua theo MA" với "Mua T+". `adviceInsight` = dòng chi tiết Khuyến nghị: điểm quyết định · phiên n/max trên MA (cách MA %) · khối ngoại 5 phiên · so VN-Index 20 phiên + dòng đỏ cảnh báo rủi ro (chiều mua, `DECISION_RISK_TEXT`); đã bỏ "sau lệnh còn x% tiền mặt" |
 | **Kỷ luật** (16/10/2026) | `inSession` `sessionLocked` `planDateStr` `nextOpenDateStr` `addSessionsStr` `strategyEarliestFrom` | giờ phiên 9:00–15:00 T2–T6 (không xét lễ); khoá trong phiên trừ khi đang "Vẫn xem" (`peekUntil`, 15'); kế hoạch hướng tới phiên nào (trước 15:00 = hôm nay); phiên chưa mở; giãn nhịp chiến lược ≥5 phiên |
-| | `holdSignals(ticker,st,market,date)` `rideState(ticker,heldSince,date)` `sellPlanFor(h,ctx)` `sellPlanText(x)` `rideTag(h)` | luật bán/gồng 19/10/2026 (`SELL_VERSION`, `SELL_TIER_SHARE`): dấu hiệu giữ (MA bắt buộc + VN-Index/khối ngoại/cầu phiên trước), đang gồng suy từ kế hoạch đã chốt có mục `tier` giữ lại CP + lệnh bán cùng ngày (sàn = `floor` lần đầu), mục bán `tier`/`ride`/`exit`/`thin`; dòng chữ ở Khuyến nghị; nhãn "Gồng" ở ô mã |
+| | `holdSignals(ticker,st,market,date)` `rideState(ticker,heldSince,date)` `sellPlanFor(h,ctx)` `sellPlanText(x)` `sellLadder(qty,price,lot,ref)` `planLadder(x)` `orderLadder()` `createOrders(list)` `rideTag(h)` | luật bán/gồng 19/10/2026 (`SELL_VERSION`, `SELL_TIER_SHARE`): dấu hiệu giữ (MA bắt buộc + VN-Index/khối ngoại/cầu phiên trước), đang gồng suy từ kế hoạch đã chốt có mục `tier` giữ lại CP + lệnh bán cùng ngày (sàn = `floor` lần đầu), mục bán `tier`/`ride`/`exit`/`thin`; dòng chữ ở Khuyến nghị; nhãn "Gồng" ở ô mã; bán chia bậc 1 lô +0,5% (sell-v1.2.0, `ladder` trên mục kế hoạch, popup Đặt ghi nhiều lệnh một lượt) |
 | | `marketState()` `roundTick(price,up)` `planRefPrice(ticker,date)` `buildPlan(s,date)` | thị trường yếu = cờ `MARKET_WEAK_FLAG` của lượt Điểm quyết định mới nhất (thiếu dữ liệu = chặn); bước giá HOSE; giá biên độ (tham chiếu ngày đó → giá app/đóng cửa bot mới hơn); dựng kế hoạch: mục bán/mua T+/theo dõi/MA thành lệnh giới hạn + cửa lọc mua (thị trường yếu → `maxBuys` → tiền mặt sau lệnh), mục bị lọc giữ `gate` |
 | | `frozenPlan(date)` `firstPlanDate()` `freezePlan(by)` `maybeAutoFreeze()` | kế hoạch đã chốt; ngày có kế hoạch đầu tiên; ghi `plans/{ngày}` (`merge`, giữ `peeks`); vào phiên chưa chốt thì tự chốt khi đủ `PLAN_INPUTS` (`loadedCollections`) |
 | | `inLunch()` `noonQuote(ticker,date)` `boughtTickersOn(date)` `pmPlanOf(date)` `pmNoonReady(date)` `pmSessionNo(date)` `freezePmPlan(by)` `maybeAutoFreezePm()` `pmPlanHtml(s,date,row)` | **kế hoạch chiều** (23/10/2026, chạy bóng `PM_LIVE=false`): giờ nghỉ trưa; giá 11:30 (`maTrendNoon.close`) + giá tham chiếu; mã đã mua/đặt mua trong ngày (trừ `maxBuys`); `buildPlan(s,date,true)` → `plans/{ngày}.pm`; mở app giờ trưa tự chốt khi bot đã có bản trưa; khối "Kế hoạch chiều" cuối Khuyến nghị (`data-freeze-pm`), không nút Đặt. `maTrendFor`/`maCandidates`/`holdSignals`/`sellPlanFor`/`rideState` nhận cờ `noon` |
@@ -201,7 +213,7 @@ Tầng 3 của mã: nút "Chi tiết" (`detailButton`) hoặc dòng điểm ở 
 |---|---|---|
 | `index.js` | `screenShortTermOpportunities` | chạy mỗi 30 phút T2–T6; `slotAt` ra khung giờ, `slotEnabled` đọc `settings/screening` (thiếu doc = chỉ 16:00). Khung tắt thì thoát ngay |
 | | `collectOrderflow` `refreshOrderflow` `getMarketQuotes` | thu cung-cầu mỗi phút trong hai phiên; callable owner chạy tay/đọc quote chuẩn hóa. Độc lập Telegram |
-| | `analyzeTicker` | callable chỉ email owner đã xác minh; nhận mã 3 chữ, đọc `settings/screening.analysis`, chuẩn hoá rồi gọi `ticker-analysis.analyzeTicker`. Chỉ trả kết quả, không ghi Firestore hay tạo tín hiệu |
+| | `analyzeTicker` | callable thành viên đang active (`members.isActiveMember`); nhận mã 3 chữ, đọc `settings/screening.analysis`, chuẩn hoá rồi gọi `ticker-analysis.analyzeTicker`. Chỉ trả kết quả, không ghi Firestore hay tạo tín hiệu |
 | | `runSlot(db,slot,date,…)` `acquireSlot(db,date,slot)` | khoá `screening_slots/{ngày}_{khung}` — mỗi khung gửi Telegram đúng một lần; ngày nghỉ ghi `holiday`, không nhắn |
 | | `scanMarket({phase,date,held,watchlist,extraTickers,config})` `marketDateFor(phase,date,bars)` | tải + chấm, KHÔNG ghi gì. `pre` chấm theo phiên gần nhất đã đóng; `intraday`/`post` cần nến hôm nay (nến trong phiên chưa đóng → tin ghi “tạm tính”). `watchlist` là Map mã → giá kỳ vọng; dòng theo dõi mang theo `targetBuy` |
 | | `selectResults(rows,config)` `rank(rows,group,minScore)` | mỗi nhóm xếp hạng riêng: mã mới tối đa `maxNew`, mã theo dõi đạt `minScore` lấy hết |
@@ -240,6 +252,8 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 
 | Collection | Đọc ở | Ghi ở | Nhánh rules |
 |---|---|---|---|
+| `members` | `initGate` (`getDoc` doc mình), `openMembers` (owner, `onSnapshot` cả danh sách) | `#members-form` thêm, nút Khoá/Mở (owner); `initGate` (`uid`, `lastSeenAt`), `markGuideSeen` (`guideSeen.<id>`); `migrateOwnerBook` (server) | ✅ owner đủ quyền; thành viên đọc/ghi 3 trường của doc mình |
+| `users/{uid}/…` | 11 collection sổ bên dưới (từ 01/11/2026 nằm dưới uid, cấp ngoài cùng chỉ còn bản dự phòng của owner) | | ✅ chính chủ, thành viên đang active |
 | `transactions` | `watch("transactions")` → `computeHoldings`, `computeCashVND`, `renderLog`, `renderTickerList`, `buildExport` (đối chiếu `daLamTheo`) | `tx-form` submit (`addDoc`); `fillOrder` (`batch.set`); `removeTransaction` (`deleteDoc`); `initTcbs` nút Đồng bộ (`batch.set`, note "Đồng bộ TCBS"); `#lot-form` (`updateDoc` chỉ trường `lots`) | ✅ |
 | `cashflows` | `watch("cashflows")` → `computeCashVND`, `renderLog`, `buildExport` | `cf-form` submit (`addDoc`); `initTcbs` nút Đồng bộ (`batch.set`, `adjust`, note "Đối chiếu TCBS"); `removeCashflow` (`deleteDoc`) | ✅ |
 | `tickers` | `watch("tickers")` → `currentPriceFor`, `renderCompact`, `renderPriceInputs`, `buildSignals` | `toggleHold`, `saveTodaySnapshot`, `refreshAllPrices`, `addWatch`, `tx-form` submit, `fillOrder` | ✅ |
@@ -290,4 +304,4 @@ và chạy theo khung giờ owner bật trong app, không còn lịch cố đị
 
 ---
 
-_Cập nhật lần cuối: 2026-10-09 — cung cầu `orderflow-v2.1.0`: nền 5 phiên làm mới mỗi ngày (ưu tiên tự thu), khung 30 phút nối qua nghỉ trưa, nhận xét sơ bộ từ phút 15._
+_Cập nhật lần cuối: 2026-11-01 — nhiều tài khoản đợt 1 (members, users/{uid}, hướng dẫn lần đầu)._

@@ -19,6 +19,10 @@
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
       {
+        "source": "/guide*.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
         "//": "Phải phủ CẢ '/' lẫn '/index.html' — trình duyệt xin '/', pattern chỉ khớp /index.html thì header không áp, và bản cũ sống thêm 1 tiếng.",
         "source": "/",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]

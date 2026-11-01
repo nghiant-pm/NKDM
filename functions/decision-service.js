@@ -4,6 +4,7 @@ const { randomUUID } = require("node:crypto");
 const D = require("./decision-scoring");
 const { collectNews } = require("./decision-news");
 const { decisionInputs: I } = require("./scoring");
+const { ownerBook, sourceFor, memberTickers } = require("./members");
 
 /* Bản sao có chủ ý (ghi ở CLAUDE.md): DEFAULT_STRATEGY ↔ RULE_* · activeStrategy() ↔ activeStrategy() ·
    holdings() ↔ computeLedger() · buyAt/sellAt legacy ↔ strategyLevels() trong public/index.html.
@@ -131,12 +132,14 @@ async function runDecision(db, helpers, { now = new Date(), scheduled = false } 
   if (!acquired) return { status: "busy" };
   try {
     const names = ["transactions", "watchlist", "tickers", "strategies", "decision_latest", "decision_events"];
-    const reads = await Promise.all(names.map((n) => db.collection(n).get()));
+    const col = sourceFor(db, await ownerBook(db));
+    const [reads, others] = await Promise.all([Promise.all(names.map((n) => col(n).get())), memberTickers(db)]);
     const docs = (i) => reads[i].docs.map((d) => ({ ...d.data(), id: d.id }));
     const positions = holdings(docs(0)), watch = Object.fromEntries(docs(1).map((r) => [r.id, r]));
     const prices = Object.fromEntries(docs(2).map((r) => [r.id, r]));
     const prior = Object.fromEntries(docs(4).map((r) => [r.id, r]));
-    const targets = [...new Set([...Object.keys(positions).filter((tk) => positions[tk].qty > 0), ...Object.keys(watch)])].sort();
+    // Mã của thành viên khác cũng được chấm điểm/đếm MA; mốc T+ legacy vẫn chỉ theo sổ owner (đợt 2 mới tách theo người).
+    const targets = [...new Set([...Object.keys(positions).filter((tk) => positions[tk].qty > 0), ...Object.keys(watch), ...others])].sort();
     if (targets.length > 150) throw new Error("Quá 150 mã trong danh mục và theo dõi");
     if (!targets.length) {
       await lock.set({ status: "empty", completedAt: new Date().toISOString() }, { merge: true });
