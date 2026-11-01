@@ -657,6 +657,7 @@
   .ticker-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
   .ticker-actions .btn{ flex:1 1 auto; min-width:0; padding:0 10px; white-space:nowrap; }
   .ticker-detail .value.pos{ color:var(--pos); } .ticker-detail .value.neg{ color:var(--neg); }
+  .valuation b{ font-weight:500; } .valuation .pos{ color:var(--pos); } .valuation .neg{ color:var(--neg); }
   .ticker-detail h4{ font-weight:500; margin:16px 0 4px; font-size:var(--fs-body); }
   .ticker-detail .decision-detail{ font-size:var(--fs-body); }
   .ticker-detail .decision-detail > p:first-child{ color:var(--text-muted); font-size:var(--fs-label); }
@@ -1409,6 +1410,50 @@
   </section>
 
   <section>
+    <div class="card">
+      <div class="sec-head" data-sec="st-dinh-gia">
+        <h2>Định giá</h2>
+        <span class="meta" id="vl-since"></span>
+      </div>
+      <form id="vl-form" novalidate>
+        <div class="row">
+          <div>
+            <label for="vl-return">Lợi suất đòi hỏi (%)</label>
+            <input id="vl-return" type="number" min="5" max="30" step="0.5" inputmode="decimal" required>
+          </div>
+          <div>
+            <label for="vl-savings">Lãi tiết kiệm 12 tháng (%)</label>
+            <input id="vl-savings" type="number" min="1" max="20" step="0.1" inputmode="decimal" required>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="vl-growth-cap">Trần tăng trưởng 5 năm (%)</label>
+            <input id="vl-growth-cap" type="number" min="0" max="30" step="0.5" inputmode="decimal" required>
+          </div>
+          <div>
+            <label for="vl-growth-long">Tăng trưởng dài hạn (%)</label>
+            <input id="vl-growth-long" type="number" min="0" max="8" step="0.5" inputmode="decimal" required>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="vl-margin">Biên an toàn (%)</label>
+            <input id="vl-margin" type="number" min="0" max="60" step="1" inputmode="decimal" required>
+          </div>
+          <div>
+            <label for="vl-spread">Các cách lệch tối đa (%)</label>
+            <input id="vl-spread" type="number" min="5" max="200" step="5" inputmode="decimal" required>
+          </div>
+        </div>
+        <button class="btn primary wide" type="submit">Lưu</button>
+        <button class="btn wide" id="vl-reset" type="button" style="margin-top:8px;">Về mặc định</button>
+        <div class="form-msg" id="vl-msg"></div>
+      </form>
+    </div>
+  </section>
+
+  <section>
     <div class="sec-head" data-sec="st-lich-su">
       <h2>Lịch sử chiến lược</h2>
       <span class="meta" id="st-count"></span>
@@ -1647,7 +1692,7 @@ const OWNER_EMAIL = "nghiant@youmed.vn";
    ↔ BOOK_COLLECTIONS ở functions/members.js. Dữ liệu bot (screening_*, decision_*, orderflow_*, settings) vẫn ở cấp ngoài cùng.
    Mọi chỗ đọc/ghi sổ đi qua bookCol()/bookDoc() — đừng gọi thẳng collection(fs, "transactions"). */
 const BOOK_COLLECTIONS = new Set(["transactions", "cashflows", "tickers", "daily_snapshots", "watchlist", "strategies",
-  "signals", "watch_prices", "orders", "theses", "plans"]);
+  "signals", "watch_prices", "orders", "theses", "plans", "prefs"]);
 const me = { uid:"", email:"", name:"", owner:false, guideSeen:{} };   // người đang đăng nhập, điền ở initGate
 const bookCol = (name) => collection(fs, "users", me.uid, name);
 const bookDoc = (name, id) => doc(fs, "users", me.uid, name, id);
@@ -1713,6 +1758,32 @@ const SCREENING_UNIVERSE = [
   "VPI", "VRE", "VSC", "YEG"
 ];
 
+/* Định giá nội tại (owner chốt 01/11/2026) — CHỈ để xem ở chi tiết mã, không vào tín hiệu/kế hoạch/điểm.
+   Số liệu tài chính lấy thẳng VNDirect finfo từ trình duyệt (cho gọi cross-origin, đo 01/11/2026), không lưu Firestore.
+   Giả định mỗi người chỉnh ở tab Chiến lược (users/{uid}/prefs/valuation, đơn vị %); thiếu = mặc định. */
+const VALUATION_RATIOS_API = "https://api-finfo.vndirect.com.vn/v4/ratios";
+const VALUATION_STATEMENTS_API = "https://api-finfo.vndirect.com.vn/v4/financial_statements";
+const VALUATION_DEFAULTS = Object.freeze({
+  requiredReturn:13, savingsRate:5, growthCap:10, longGrowth:3, margin:25, maxSpread:30
+});
+// [nhỏ nhất, lớn nhất]
+const VALUATION_LIMITS = {
+  requiredReturn:[5, 30], savingsRate:[1, 20], growthCap:[0, 30], longGrowth:[0, 8], margin:[0, 60], maxSpread:[5, 200]
+};
+// Ngành tài chính: không dùng DCF/Graham 2 (cấu trúc nợ khác) → P/B theo ROE + Graham 3.
+const VALUATION_FINANCIAL_SECTORS = ["Ngân hàng", "Chứng khoán"];
+function valuationConfig(raw = state.valuationPrefs){
+  const out = { ...VALUATION_DEFAULTS };
+  if(raw && typeof raw === "object"){
+    Object.keys(VALUATION_LIMITS).forEach((key) => {
+      const [min, max] = VALUATION_LIMITS[key], value = Number(raw[key]);
+      if(Number.isFinite(value) && value >= min && value <= max) out[key] = value;
+    });
+  }
+  if(out.longGrowth >= out.requiredReturn){ out.requiredReturn = VALUATION_DEFAULTS.requiredReturn; out.longGrowth = VALUATION_DEFAULTS.longGrowth; }
+  return out;
+}
+
 /* Ngưỡng chiến thuật MẶC ĐỊNH — đơn vị: nghìn đồng, KHÔNG phải %.
    Từ khi có collection `strategies`, đây chỉ là bản rơi về khi chưa tạo
    phiên bản nào. Mọi chỗ cần ngưỡng phải gọi activeStrategy(), đừng gõ số. */
@@ -1748,6 +1819,7 @@ const migrateBookApi = httpsCallable(getFunctions(app, "asia-southeast1"), "migr
 const decisionState = { latest:{}, runs:[], events:[], control:null, busy:false, error:"" };
 const orderflowState = { latest:{}, events:[], control:null };
 const tickerAnalysisState = new Map();
+const valuationState = new Map();   // { MÃ: { status, input } } — số liệu thô VNDirect, nhớ trong phiên; giá trị tính lại mỗi lần vẽ
 
 let ready = false;
 const state = {
@@ -1759,6 +1831,7 @@ const state = {
   orders: [],       // lệnh đã đặt; chỉ phần khớp mới sinh transactions
   plans: {},        // { YYYY-MM-DD: kế hoạch ngày đã chốt } — plans/{ngày}
   theses: {},       // { MÃ: { thesis, invalidation, reviewDate } }
+  valuationPrefs: null,  // prefs/valuation — giả định định giá của người đang đăng nhập
   screeningRuns: [],
   screeningResults: [],
   fiveSessionResults: [], // mọi đề cử >90 điểm, không bị giới hạn 250 kết quả gần nhất
@@ -3212,6 +3285,45 @@ async function saveScreeningSettings(values){
     setMsg("sc-msg", "err", "Lỗi lưu · Thử lại");
   }
 }
+/* Ô nhập ↔ khoá trong users/{uid}/prefs/valuation (giả định định giá, mỗi người một bộ). */
+const VALUATION_FIELDS = [
+  ["vl-return", "requiredReturn"], ["vl-savings", "savingsRate"], ["vl-growth-cap", "growthCap"],
+  ["vl-growth-long", "longGrowth"], ["vl-margin", "margin"], ["vl-spread", "maxSpread"]
+];
+function renderValuationSettings(){
+  const saved = state.valuationPrefs;
+  $("vl-since").textContent = saved ? (saved.updatedAt ? "Sửa " + fmtDateVN(datePart(saved.updatedAt)) : "") : "Mặc định";
+  const config = valuationConfig();
+  // điền sẵn bằng bộ đang dùng, nhưng không giẫm lên chữ đang gõ
+  VALUATION_FIELDS.forEach(([id, key]) => {
+    const el = $(id);
+    if(el.value === "" && document.activeElement !== el) el.value = config[key];
+  });
+}
+async function saveValuationSettings(values){
+  if(!ready){ setMsg("vl-msg", "err", "Chưa kết nối"); return; }
+  const prefs = {};
+  for(const [id, key] of VALUATION_FIELDS){
+    const [min, max] = VALUATION_LIMITS[key], value = Number(values[key]);
+    if(values[key] === "" || !Number.isFinite(value) || value < min || value > max){
+      $(id).focus();
+      setMsg("vl-msg", "err", "Kiểm tra “" + document.querySelector('label[for="' + id + '"]').textContent + "”: từ " +
+        min.toLocaleString("vi-VN") + " đến " + max.toLocaleString("vi-VN"));
+      return;
+    }
+    prefs[key] = value;
+  }
+  if(prefs.longGrowth >= prefs.requiredReturn){ setMsg("vl-msg", "err", "Tăng trưởng dài hạn phải nhỏ hơn lợi suất đòi hỏi"); return; }
+  try{
+    await setDoc(bookDoc("prefs", "valuation"), { ...prefs, updatedAt:nowISO() });
+    VALUATION_FIELDS.forEach(([id, key]) => { $(id).value = prefs[key]; });
+    setMsg("vl-msg", "ok", "Đã lưu");
+    setTimeout(() => setMsg("vl-msg", "", ""), 2500);
+  }catch(err){
+    console.error(err);
+    setMsg("vl-msg", "err", "Lỗi lưu · Thử lại");
+  }
+}
 
 function renderScreeningHub(){
   renderScreeningSlots();
@@ -3637,10 +3749,138 @@ async function requestTickerAnalysis(ticker){
   }
   if($('ticker-dialog').open && $('ticker-dialog').dataset.ticker === ticker) renderTickerDetail();
 }
+/* Số liệu tài chính thô cho Định giá (VNDirect finfo). Đơn vị trả về: VND → đổi sang nghìn đ cho khớp `price`.
+   EPS_TR = EPS 4 quý gần nhất; tăng trưởng = EPS hôm nay so với 12 quý trước (thiếu thì số năm tròn có được);
+   dòng tiền tự do năm = lưu chuyển tiền kinh doanh (32000) + mua sắm TSCĐ (32100, số âm). */
+async function fetchValuationInputs(ticker){
+  const get = async (url) => {
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
+    try{
+      const response = await fetch(url, { signal:controller.signal });
+      if(!response.ok) throw new Error("HTTP " + response.status);
+      const data = await response.json();
+      return Array.isArray(data?.data) ? data.data : [];
+    }finally{ clearTimeout(timer); }
+  };
+  const [latest, epsRows, cashRows] = await Promise.all([
+    get(VALUATION_RATIOS_API + "/latest?filter=ratioCode:EPS_TR,BVPS_CR,ROAE_TR_AVG5Q,MARKETCAP,PRICE_TO_EARNINGS,PRICE_TO_BOOK&where=code:" + ticker +
+      "&order=reportDate&fields=ratioCode,value,reportDate"),
+    get(VALUATION_RATIOS_API + "?q=code:" + ticker + "~ratioCode:EPS_TR&sort=reportDate:desc&size=13&fields=reportDate,value"),
+    get(VALUATION_STATEMENTS_API + "?q=code:" + ticker + "~reportType:ANNUAL~modelType:3~itemCode:32000,32100&sort=fiscalDate:desc&size=12")
+  ]);
+  const ratio = {}, dates = {};
+  latest.forEach((r) => { ratio[r.ratioCode] = Number(r.value); dates[r.ratioCode] = String(r.reportDate || "").slice(0, 10); });
+  if(!Number.isFinite(ratio.EPS_TR) || !(ratio.BVPS_CR > 0)) throw new Error("Chưa có số liệu tài chính cho mã này");
+  // EPS_TR chậm điều chỉnh sau chia thưởng cổ phiếu (TCB 29/10/2026: sổ sách đã chia, EPS chưa) → lấy giá ngày đó = P/B × sổ sách
+  // rồi EPS = giá ÷ P/E; hai tỷ số này VNDirect tính cùng giá cùng ngày nên luôn khớp nhau.
+  const reportPrice = ratio.PRICE_TO_BOOK > 0 ? ratio.PRICE_TO_BOOK * ratio.BVPS_CR : NaN;   // VND
+  const eps = reportPrice > 0 && ratio.PRICE_TO_EARNINGS ? reportPrice / ratio.PRICE_TO_EARNINGS : ratio.EPS_TR;
+  const back = epsRows.length > 12 ? 12 : Math.floor((epsRows.length - 1) / 4) * 4;
+  const epsNow = Number(epsRows[0]?.value), epsThen = back ? Number(epsRows[back]?.value) : NaN;
+  const years = {};
+  cashRows.forEach((r) => {
+    const y = String(r.fiscalDate || "").slice(0, 4);
+    (years[y] = years[y] || {})[Number(r.itemCode) === 32000 ? "cfo" : "capex"] = Number(r.numericValue);
+  });
+  return {
+    eps:eps / 1000, bvps:ratio.BVPS_CR / 1000, epsDate:dates.EPS_TR,
+    roe:Number.isFinite(ratio.ROAE_TR_AVG5Q) ? ratio.ROAE_TR_AVG5Q * 100 : null,
+    shares:ratio.MARKETCAP > 0 && reportPrice > 0 ? ratio.MARKETCAP / reportPrice : null,
+    reportPrice:reportPrice > 0 ? reportPrice / 1000 : null,
+    growth:epsNow > 0 && epsThen > 0 ? (Math.pow(epsNow / epsThen, 4 / back) - 1) * 100 : null, growthYears:back / 4,
+    fcf:Object.keys(years).sort().reverse().filter((y) => Number.isFinite(years[y].cfo) && Number.isFinite(years[y].capex)).slice(0, 3)
+      .map((y) => ({ year:y, value:years[y].cfo + years[y].capex }))
+  };
+}
+/* Định giá từ số liệu thô + giả định đang dùng. Giá trị (nghìn đ/CP) không dương = cách đó không dùng được.
+   Giá trị nội tại = TRUNG VỊ các cách dùng được (không lấy trung bình — một cách thổi cao kéo cả kết quả). */
+function valuationOf(ticker, input, price, config = valuationConfig()){
+  const r = config.requiredReturn / 100, gl = config.longGrowth / 100;
+  const g = Math.min(Math.max(input.growth ?? 0, 0), config.growthCap);
+  const financial = VALUATION_FINANCIAL_SECTORS.includes(sectorOf(ticker));
+  const methods = [];
+  const add = (name, value, note) => methods.push({ name, value:Number.isFinite(value) && value > 0 ? value : null, note });
+  const n = (x, digits = 1) => Number(x).toLocaleString("vi-VN", { maximumFractionDigits:digits });
+  if(financial){
+    const pb = input.roe === null ? NaN : (input.roe / 100 - gl) / (r - gl);
+    add("P/B theo ROE", pb * input.bvps, input.roe === null ? "Chưa có ROE"
+      : "P/B hợp lý (" + n(input.roe) + "% − " + n(config.longGrowth) + "%) ÷ (" + n(config.requiredReturn) + "% − " + n(config.longGrowth) + "%) = " +
+        n(pb, 2) + " × sổ sách " + fmtPrice(input.bvps));
+  }else{
+    const fcf = input.fcf.length ? input.fcf.reduce((sum, x) => sum + x.value, 0) / input.fcf.length : NaN;
+    let dcf = NaN;
+    if(fcf > 0 && input.shares > 0){
+      let cash = fcf / input.shares / 1000, pv = 0;
+      for(let t = 1; t <= 5; t++){ cash *= 1 + g / 100; pv += cash / Math.pow(1 + r, t); }
+      dcf = pv + cash * (1 + gl) / (r - gl) / Math.pow(1 + r, 5);
+    }
+    add("DCF", dcf, !input.fcf.length ? "Chưa có báo cáo dòng tiền" : !(fcf > 0) ? "Dòng tiền tự do " + input.fcf.length + " năm gần nhất âm"
+      : "Dòng tiền tự do bình quân " + input.fcf.length + " năm " + n(fcf / 1e9, 0) + " tỷ đ · tăng " + n(g) + "%/năm trong 5 năm rồi " + n(config.longGrowth) + "%");
+    // Bản thận trọng 7 + 1g (owner chọn 01/11/2026): bản gốc 8,5 + 2g ngầm cho P/E tới ~25, thổi giá trị mã tăng trưởng ở VN.
+    add("Graham 2", input.eps * (7 + g) * 4.4 / config.savingsRate,
+      "EPS " + fmtPrice(input.eps) + " × (7 + " + n(g) + ") × 4,4 ÷ " + n(config.savingsRate));
+  }
+  add("Graham 3", input.eps > 0 && input.bvps > 0 ? Math.sqrt(22.5 * input.eps * input.bvps) : NaN,
+    "√(22,5 × EPS " + fmtPrice(input.eps) + " × sổ sách " + fmtPrice(input.bvps) + ")");
+  const values = methods.map((m) => m.value).filter((v) => v !== null).sort((a, b) => a - b);
+  if(!values.length) return { financial, g, methods, median:null };
+  const half = values.length / 2;
+  const median = values.length % 2 ? values[Math.floor(half)] : (values[half - 1] + values[half]) / 2;
+  const low = values[0], high = values[values.length - 1], spread = values.length > 1 ? (high - low) / median * 100 : null;
+  const gap = price > 0 ? (price / median - 1) * 100 : null;
+  return { financial, g, methods, median, low, high, spread, unreliable:spread !== null && spread > config.maxSpread, gap,
+    verdict:gap === null ? null : gap <= -config.margin ? "cheap" : gap <= 0 ? "fair" : "dear" };
+}
+function valuationHtml(ticker){
+  const row = valuationState.get(ticker);
+  if(!row) return '';
+  if(row.status === 'loading') return '<h4>Định giá</h4><p class="muted">Đang lấy dữ liệu…</p>';
+  if(row.status === 'error') return '<h4>Định giá</h4><p class="muted">' + esc(row.error) + '</p>';
+  const input = row.input, config = valuationConfig();
+  const live = Number(state.tickers[ticker]?.lastPrice), price = live > 0 ? live : input.reportPrice;
+  const v = valuationOf(ticker, input, price, config);
+  const n = (x, digits = 1) => Number(x).toLocaleString('vi-VN', { maximumFractionDigits:digits });
+  const metric = (name, value) => '<div class="metric-row"><div class="name">' + name + '</div><div class="value num">' + value + '</div></div>';
+  let plain;
+  if(v.median === null) plain = '<p class="muted">Không cách nào dùng được với số liệu hiện có</p>';
+  else{
+    const gap = v.gap === null ? '' : ' khoảng ' + n(Math.abs(v.gap), 0) + '%';
+    plain = '<p>' + (v.verdict === 'cheap' ? '<b class="pos">Rẻ</b> · giá ' + fmtPrice(price) + ' thấp hơn giá trị nội tại ' + fmtPrice(v.median) + gap +
+        ', đủ biên an toàn ' + n(config.margin, 0) + '%'
+      : v.verdict === 'fair' ? '<b>Hợp lý</b> · giá ' + fmtPrice(price) + (v.gap > -1 ? ' ngang giá trị nội tại ' + fmtPrice(v.median)
+        : ' thấp hơn giá trị nội tại ' + fmtPrice(v.median) + gap) + ', chưa đủ biên an toàn ' + n(config.margin, 0) + '%'
+      : v.verdict === 'dear' ? '<b class="neg">Đắt</b> · giá ' + fmtPrice(price) + ' cao hơn giá trị nội tại ' + fmtPrice(v.median) + gap
+      : 'Giá trị nội tại ' + fmtPrice(v.median)) + '</p>' +
+      '<p class="muted">Khoảng ' + fmtPrice(v.low) + ' – ' + fmtPrice(v.high) + ' theo ' + v.methods.filter((m) => m.value !== null).length + ' cách' +
+        (v.unreliable ? ' · <span class="neg">các cách lệch nhau ' + n(v.spread, 0) + '%, kém tin cậy</span>' : '') + '</p>';
+  }
+  return '<h4>Định giá</h4><div class="valuation">' + plain +
+    '<details class="plain-raw"><summary>Xem số liệu</summary><div class="metric-list">' +
+      v.methods.map((m) => '<div class="metric-row"><div class="name">' + m.name + '<span>' + esc(m.note) + '</span></div>' +
+        '<div class="value num">' + (m.value === null ? '—' : fmtPrice(m.value)) + '</div></div>').join('') +
+      metric('EPS 4 quý' + (input.epsDate ? ' tới ' + fmtDateVN(input.epsDate) : ''), fmtPrice(input.eps)) +
+      metric('Giá trị sổ sách/CP', fmtPrice(input.bvps)) +
+      metric('ROE', input.roe === null ? '—' : n(input.roe) + '%') +
+      metric('Tăng trưởng EPS' + (input.growthYears ? ' ' + input.growthYears + ' năm' : ''),input.growth === null ? '—' : n(input.growth) + '%/năm · dùng ' + n(v.g) + '%') +
+      metric('Lợi suất đòi hỏi · dài hạn', n(config.requiredReturn) + '% · ' + n(config.longGrowth) + '%') +
+      (live > 0 ? '' : metric('Giá so sánh', fmtPrice(price) + ' (giá VNDirect)')) +
+    '</div><p class="muted">' + (v.financial ? 'Ngành tài chính: P/B theo ROE + Graham 3' : 'DCF + Graham 2 + Graham 3') + ' · số liệu VNDirect</p></details></div>';
+}
+async function requestValuation(ticker){
+  valuationState.set(ticker, { status:'loading' });
+  try{ valuationState.set(ticker, { status:'complete', input:await fetchValuationInputs(ticker) }); }
+  catch(error){
+    console.error('valuation', error);
+    valuationState.set(ticker, { status:'error', error:error?.message === 'Chưa có số liệu tài chính cho mã này' ? error.message : 'Chưa lấy được số liệu định giá · mở lại để thử' });
+  }
+  if($('ticker-dialog').open && $('ticker-dialog').dataset.ticker === ticker) renderTickerDetail();
+}
 /* Tầng 3 của một mã: gom mọi thứ về mã đó vào một popup, không phải rời bảng giá.
-   Chỉ đọc lại số sẵn có (computeSummary, decision_latest, theses, transactions, orders) — không tính gì mới. */
+   Chỉ đọc lại số sẵn có (computeSummary, decision_latest, theses, transactions, orders) — không tính gì mới;
+   riêng Định giá tự lấy số liệu VNDirect lần đầu mở mã (lỗi thì lần mở sau thử lại). */
 function openTickerDetail(ticker){
   $("ticker-dialog").dataset.ticker = ticker;
+  if(valuationState.get(ticker)?.status !== 'complete' && valuationState.get(ticker)?.status !== 'loading') requestValuation(ticker);
   renderTickerDetail();
   if(!$("ticker-dialog").open) $("ticker-dialog").showModal();
 }
@@ -3693,6 +3933,7 @@ function renderTickerDetail(){
     (facts ? '<div class="metric-list">' + facts + '</div>' : '') +
     (lots.length ? '<h4>Lô</h4>' + lotRowsHtml(lots, h?.hasPrice ? h.price : null) : '') +
     tickerOpportunityHtml(ticker) +
+    valuationHtml(ticker) +
     (thesis ? '<h4>Luận điểm</h4><p>' + esc(thesis.thesis || '') + '</p>' +
       (thesis.invalidation ? '<p class="muted">Sai khi: ' + esc(thesis.invalidation) + '</p>' : '') +
       (thesis.reviewDate ? '<p class="muted">Xem lại ' + fmtDateVN(thesis.reviewDate) + '</p>' : '') : '') +
@@ -3781,6 +4022,7 @@ function render(){
   renderTickerList(s.held);
   renderStrategy();
   renderScreeningSettings();
+  renderValuationSettings();
   renderLog();
   renderCompact(s);
   renderAnalysis(s);
@@ -6452,6 +6694,16 @@ function initForms(){
     if(!window.confirm("Đưa thông số sàng lọc về mặc định?")) return;
     saveScreeningSettings({ ...SCREENING_DEFAULTS });
   });
+  $("vl-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const values = {};
+    VALUATION_FIELDS.forEach(([id, key]) => { values[key] = $(id).value.trim(); });
+    saveValuationSettings(values);
+  });
+  $("vl-reset").addEventListener("click", () => {
+    if(!window.confirm("Đưa giả định định giá về mặc định?")) return;
+    saveValuationSettings({ ...VALUATION_DEFAULTS });
+  });
 
   $("ex-btn").addEventListener("click", downloadExport);
 
@@ -6785,6 +7037,7 @@ function startData(){
   watch("watch_prices",    (rows) => { state.watchPrices = rows; });
   watch("orders",          (rows) => { state.orders = rows; });
   watch("plans",           (rows) => { state.plans = Object.fromEntries(rows.map((p) => [p.id, p])); });
+  watch("prefs",           (rows) => { state.valuationPrefs = rows.find((r) => r.id === "valuation") || null; });
   watch("theses",          (rows) => {
     const map = {};
     rows.forEach((t) => { map[t.id] = t; });

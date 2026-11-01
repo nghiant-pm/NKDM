@@ -117,6 +117,11 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   **Chạy bóng 20 phiên**: chỉ ghi kết luận, lệnh vẫn theo máy T+/MA — chưa có quyền chặn. Tin tức 3 mức, tin "ý định/tin đồn" KHÔNG cộng điểm
   (owner lo tin do đội lái tung). **Hộp giá 1–3 tháng chỉ tinh chỉnh giá trong 3% quanh mốc, không tự ra lệnh** — nói bằng số mẫu, không "đọc đội lái".
   Giai đoạn 2 (chưa làm): xuất file → nút "Nhập review" trong app (owner chọn, KHÔNG cất khoá quản trị trên máy) + chip trên mục kế hoạch + đo độ đúng.
+- **ĐỊNH GIÁ NỘI TẠI** (owner chốt 01/11/2026): mục "Định giá" trong popup chi tiết mã, **CHỈ ĐỂ XEM** — không vào tín hiệu/kế hoạch/điểm.
+  Doanh nghiệp thường DCF + Graham 2 + Graham 3; ngân hàng/chứng khoán P/B theo ROE + Graham 3. **Graham 2 dùng bản thận trọng 7 + 1g**
+  (owner chọn, bản gốc 8,5 + 2g thổi giá mã tăng trưởng) — đừng đổi lại. Giá trị nội tại = **trung vị**, không trung bình. Số liệu VNDirect
+  finfo lấy từ trình duyệt, không lưu; giả định mỗi người ở `prefs/valuation` (tab Chiến lược). EPS = (P/B × sổ sách) ÷ P/E, không dùng
+  thẳng `EPS_TR` (chậm chỉnh sau chia thưởng). Số liệu VNDirect đôi khi lệch sau chia cổ phiếu → kết quả chỉ tham khảo.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán.
   **Không ẩn cắt lỗ** (30/10/2026).
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.
@@ -134,7 +139,7 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
 members/{email}             role "owner"|"member", status "active"|"locked", name, uid?, addedAt, lastSeenAt?, guideSeen { <tourId>|setup-*: lúc xem },
                             owner thêm: migratedAt, migratedCounts. Owner ghi; thành viên chỉ tự ghi uid/lastSeenAt/guideSeen của doc mình.
 users/{uid}/…               ⚠️ TỪ 01/11/2026 mọi collection SỔ RIÊNG dưới đây nằm ở users/{uid}/ (BOOK_COLLECTIONS): transactions,
-                            cashflows, tickers, daily_snapshots, watchlist, strategies, signals, watch_prices, orders, theses, plans.
+                            cashflows, tickers, daily_snapshots, watchlist, strategies, signals, watch_prices, orders, theses, plans, prefs.
                             Bản ở cấp ngoài cùng = sổ owner CŨ, giữ dự phòng (client không đọc được), xoá tay sau 2 tuần (~15/11/2026).
                             Phần còn lại (settings, screening_*, decision_*, orderflow_*) vẫn ở cấp ngoài cùng, dùng chung.
 transactions/{autoId}       ticker, side "buy"|"sell", qty, price (nghìn đ), date, note, createdAt
@@ -171,6 +176,8 @@ signals/{YYYY-MM-DD_MÃ_loại}  date, ticker, kind "buy"|"sell"|"watch", price,
                             flowPrice (giá nút Đặt điền), flowZoneLow/flowZoneHigh, flowReason
                             từ 13/10/2026: kind "trend" + engine "ma" (mua theo vùng MA, id ngày_MÃ_trend); mọi tín hiệu chép
                             maLength, maDays, maMaxDays, maStreak, maRise, maSince, maUp (trạng thái MA lúc lưu; null = không rõ / lưu ngày cũ)
+prefs/valuation             (sổ riêng, từ 01/11/2026) giả định định giá: requiredReturn, savingsRate, growthCap, longGrowth, margin,
+                            maxSpread (%, thiếu = 13 · 5 · 10 · 3 · 25 · 30), updatedAt. Chỉ ảnh hưởng mục Định giá ở chi tiết mã
 settings/screening          slots { "0830"|"1030"|"1330"|"1530"|"1600"|"2000": bool }, updatedAt
                             (không có doc = chỉ bật 16:00). Owner bật/tắt khung giờ nhận tin Telegram
                             analysis { minScore, maxNew, minLiquidityBn (tỷ đ), fitMin, fitMax (nghìn đ),

@@ -9,7 +9,7 @@ const { getAuth } = require("firebase-admin/auth");
 
 const OWNER_EMAIL = "nghiant@youmed.vn";
 const BOOK_COLLECTIONS = ["transactions", "cashflows", "tickers", "daily_snapshots", "watchlist", "strategies",
-  "signals", "watch_prices", "orders", "theses", "plans"];
+  "signals", "watch_prices", "orders", "theses", "plans", "prefs"];
 const BOOK = new Set(BOOK_COLLECTIONS);
 
 let ownerUid = null;

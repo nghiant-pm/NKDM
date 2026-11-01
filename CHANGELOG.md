@@ -4,6 +4,26 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-01 (Định giá nội tại trong chi tiết mã)
+
+Owner chốt 01/11: thêm định giá DCF + Graham vào popup chi tiết mã, **chỉ để xem** — không vào tín hiệu, kế hoạch hay điểm.
+- Mục **Định giá** (sau Điểm Cơ hội): Tóm lại "Rẻ / Hợp lý / Đắt" so giá hiện tại với giá trị nội tại (trung vị các cách), khoảng thấp–cao,
+  cảnh báo "kém tin cậy" khi các cách lệch nhau quá ngưỡng; "Xem số liệu" ghi từng cách + EPS, sổ sách, ROE, tăng trưởng, giả định.
+- Doanh nghiệp thường: **DCF** (dòng tiền tự do bình quân 3 năm, 5 năm tăng theo EPS rồi tăng dài hạn) + **Graham 2** bản thận trọng
+  EPS × (7 + g) × 4,4 ÷ lãi tiết kiệm (owner chọn thay 8,5 + 2g vì bản gốc thổi giá mã tăng trưởng: VNM 137 so giá 57) + **Graham 3**
+  √(22,5 × EPS × sổ sách). Ngân hàng, chứng khoán: **P/B theo ROE** + Graham 3.
+- Số liệu lấy thẳng **VNDirect finfo** từ trình duyệt khi mở chi tiết mã (đo 01/11: cho gọi cross-origin, có EPS 4 quý, sổ sách, ROE, BCTC năm
+  2020–2025), nhớ trong phiên, không lưu Firestore. EPS tính từ P/E và P/B vì EPS_TR chậm điều chỉnh sau chia thưởng (TCB 29/10).
+- **Giả định chỉnh ở tab Chiến lược** (khu Định giá, mỗi người một bộ): lợi suất đòi hỏi 13% · lãi tiết kiệm 5% · trần tăng trưởng 10% ·
+  tăng trưởng dài hạn 3% · biên an toàn 25% · lệch tối đa 30%. Lưu ở collection sổ mới `users/{uid}/prefs/valuation`
+  (`BOOK_COLLECTIONS` app + functions; rules đã có nhánh chung).
+- Đã kiểm: chạy công thức với số thật 9 mã (FPT, TCB, HPG, MWG, SSI, VNM, MBB, PNJ, GAS); bản chạy máy, dữ liệu thật: popup FPT + VCB,
+  khổ điện thoại, form Chiến lược điền mặc định + báo lỗi ô sai, không lỗi console. Chưa bấm Lưu giả định thật (tránh ghi trước khi deploy).
+
+· `public/index.html` · `functions/members.js` (danh sách sổ) · `firestore.rules` (chỉ chú thích)
+
+---
+
 ## 2026-11-01 (Gỡ view Đầy đủ)
 
 Owner chốt: view Đầy đủ lâu nay không dùng → gỡ hẳn (bước 2 của việc gom view từ 02/10/2026).

@@ -31,7 +31,7 @@ service cloud.firestore {
     }
 
     // Sổ riêng: transactions, cashflows, tickers, daily_snapshots, watchlist, strategies, signals, watch_prices,
-    // orders, theses, plans (↔ BOOK_COLLECTIONS ở app + functions/members.js). Chỉ chính chủ.
+    // orders, theses, plans, prefs (↔ BOOK_COLLECTIONS ở app + functions/members.js). Chỉ chính chủ.
     match /users/{uid}/{col}/{id} {
       allow read, write: if isMember() && request.auth.uid == uid;
     }
