@@ -121,7 +121,9 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   Doanh nghiệp thường DCF + Graham 2 + Graham 3; ngân hàng/chứng khoán P/B theo ROE + Graham 3. **Graham 2 dùng bản thận trọng 7 + 1g**
   (owner chọn, bản gốc 8,5 + 2g thổi giá mã tăng trưởng) — đừng đổi lại. Giá trị nội tại = **trung vị**, không trung bình. Số liệu VNDirect
   finfo lấy từ trình duyệt, không lưu; giả định mỗi người ở `prefs/valuation` (tab Chiến lược). EPS = (P/B × sổ sách) ÷ P/E, không dùng
-  thẳng `EPS_TR` (chậm chỉnh sau chia thưởng). Số liệu VNDirect đôi khi lệch sau chia cổ phiếu → kết quả chỉ tham khảo.
+  thẳng `EPS_TR` (chậm chỉnh sau chia thưởng). **Tăng trưởng theo lợi nhuận công ty mẹ 3 năm, KHÔNG theo lịch sử EPS** (VNDirect không chỉnh
+  lùi sau chia thưởng → tăng trưởng âm giả). **DCF tính từ lợi nhuận** EPS × (1 − g ÷ ROE), không dùng dòng tiền tự do thực tế (owner chọn).
+  Nhãn **đối xứng**: Rẻ ≤ −biên an toàn, Đắt ≥ +biên an toàn, giữa Hợp lý. Ngành tài chính nhận theo loại BCTC (≠ 2). Kết quả chỉ tham khảo.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán.
   **Không ẩn cắt lỗ** (30/10/2026).
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.

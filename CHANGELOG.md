@@ -4,6 +4,24 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-01 (Định giá: sửa tăng trưởng, DCF từ lợi nhuận, nhãn đối xứng)
+
+Owner báo giá trị nội tại thấp bất thường so với giá thị trường. Đo lại 33 mã đang giữ/theo dõi:
+- **Lỗi:** tăng trưởng tính từ lịch sử EPS của VNDirect, mà lịch sử này **không chỉnh lùi sau chia thưởng** (VCB 2025: EPS 6.053 → 4.063
+  dù lãi tăng; GMD 2024 chia 100%) → tăng trưởng âm/≈0 → Graham 2 + DCF bị kéo thấp hàng loạt. Sửa: tăng trưởng = lợi nhuận sau thuế
+  công ty mẹ năm gần nhất so với 3 năm trước (FPT 4% → 21%, GMD −7% → 21%).
+- Nhận ngành tài chính theo **loại BCTC** của VNDirect (ngân hàng/chứng khoán/bảo hiểm), danh sách ngành chỉ còn dự phòng — trước đó BVH
+  (bảo hiểm) bị tính như doanh nghiệp thường.
+- **DCF tính từ lợi nhuận** (owner chọn): dòng tiền = EPS × (1 − tăng trưởng ÷ ROE), thay dòng tiền tự do thực tế 3 năm vốn rơi rất thấp ở
+  năm đầu tư lớn (DGW 3,7 → 36,3 khi giá 40,9). Bỏ hẳn phần lấy báo cáo dòng tiền.
+- **Nhãn đối xứng** (owner chọn): Rẻ khi giá thấp hơn ≥ biên an toàn, Đắt khi cao hơn ≥ biên an toàn, giữa là Hợp lý (trước: cao hơn 2% đã "Đắt").
+- 33 mã sau sửa: 9 Rẻ · 11 Hợp lý · 13 Đắt — còn Đắt chủ yếu là mã P/E rất cao (VPI, VJC, FRT, VTP, PET, GEX) hoặc lợi nhuận đang giảm (GAS, MSR, VGC).
+- Đã kiểm: công thức với số thật 33 mã; bản chạy máy dữ liệu thật FPT/GAS/VCB, không lỗi console.
+
+· `public/index.html`
+
+---
+
 ## 2026-11-01 (Định giá nội tại trong chi tiết mã)
 
 Owner chốt 01/11: thêm định giá DCF + Graham vào popup chi tiết mã, **chỉ để xem** — không vào tín hiệu, kế hoạch hay điểm.

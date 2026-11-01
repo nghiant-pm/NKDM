@@ -1770,8 +1770,9 @@ const VALUATION_DEFAULTS = Object.freeze({
 const VALUATION_LIMITS = {
   requiredReturn:[5, 30], savingsRate:[1, 20], growthCap:[0, 30], longGrowth:[0, 8], margin:[0, 60], maxSpread:[5, 200]
 };
-// Ngành tài chính: không dùng DCF/Graham 2 (cấu trúc nợ khác) → P/B theo ROE + Graham 3.
-const VALUATION_FINANCIAL_SECTORS = ["Ngân hàng", "Chứng khoán"];
+// Ngành tài chính: không dùng DCF/Graham 2 (cấu trúc nợ khác) → P/B theo ROE + Graham 3. Nhận theo loại BCTC (fetchValuationInputs);
+// danh sách ngành này chỉ dùng khi VNDirect không có báo cáo lợi nhuận.
+const VALUATION_FINANCIAL_SECTORS = ["Ngân hàng", "Chứng khoán", "Bảo hiểm"];
 function valuationConfig(raw = state.valuationPrefs){
   const out = { ...VALUATION_DEFAULTS };
   if(raw && typeof raw === "object"){
@@ -3750,8 +3751,9 @@ async function requestTickerAnalysis(ticker){
   if($('ticker-dialog').open && $('ticker-dialog').dataset.ticker === ticker) renderTickerDetail();
 }
 /* Số liệu tài chính thô cho Định giá (VNDirect finfo). Đơn vị trả về: VND → đổi sang nghìn đ cho khớp `price`.
-   EPS_TR = EPS 4 quý gần nhất; tăng trưởng = EPS hôm nay so với 12 quý trước (thiếu thì số năm tròn có được);
-   dòng tiền tự do năm = lưu chuyển tiền kinh doanh (32000) + mua sắm TSCĐ (32100, số âm). */
+   EPS_TR = EPS 4 quý gần nhất; tăng trưởng = lợi nhuận sau thuế công ty mẹ (23000) năm gần nhất so với 3 năm trước — KHÔNG dùng lịch sử
+   EPS_TR vì VNDirect không chỉnh lùi sau chia thưởng (VCB 2025: EPS 6.053 → 4.063 dù lãi tăng; đo 01/11/2026). Loại báo cáo của dòng
+   lợi nhuận cho biết ngành: 2 = doanh nghiệp thường, khác (102 ngân hàng, 90 chứng khoán, 412 bảo hiểm) = tài chính. */
 async function fetchValuationInputs(ticker){
   const get = async (url) => {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 15000);
@@ -3762,11 +3764,10 @@ async function fetchValuationInputs(ticker){
       return Array.isArray(data?.data) ? data.data : [];
     }finally{ clearTimeout(timer); }
   };
-  const [latest, epsRows, cashRows] = await Promise.all([
-    get(VALUATION_RATIOS_API + "/latest?filter=ratioCode:EPS_TR,BVPS_CR,ROAE_TR_AVG5Q,MARKETCAP,PRICE_TO_EARNINGS,PRICE_TO_BOOK&where=code:" + ticker +
+  const [latest, profitRows] = await Promise.all([
+    get(VALUATION_RATIOS_API + "/latest?filter=ratioCode:EPS_TR,BVPS_CR,ROAE_TR_AVG5Q,PRICE_TO_EARNINGS,PRICE_TO_BOOK&where=code:" + ticker +
       "&order=reportDate&fields=ratioCode,value,reportDate"),
-    get(VALUATION_RATIOS_API + "?q=code:" + ticker + "~ratioCode:EPS_TR&sort=reportDate:desc&size=13&fields=reportDate,value"),
-    get(VALUATION_STATEMENTS_API + "?q=code:" + ticker + "~reportType:ANNUAL~modelType:3~itemCode:32000,32100&sort=fiscalDate:desc&size=12")
+    get(VALUATION_STATEMENTS_API + "?q=code:" + ticker + "~reportType:ANNUAL~itemCode:23000&sort=fiscalDate:desc&size=8")
   ]);
   const ratio = {}, dates = {};
   latest.forEach((r) => { ratio[r.ratioCode] = Number(r.value); dates[r.ratioCode] = String(r.reportDate || "").slice(0, 10); });
@@ -3775,21 +3776,17 @@ async function fetchValuationInputs(ticker){
   // rồi EPS = giá ÷ P/E; hai tỷ số này VNDirect tính cùng giá cùng ngày nên luôn khớp nhau.
   const reportPrice = ratio.PRICE_TO_BOOK > 0 ? ratio.PRICE_TO_BOOK * ratio.BVPS_CR : NaN;   // VND
   const eps = reportPrice > 0 && ratio.PRICE_TO_EARNINGS ? reportPrice / ratio.PRICE_TO_EARNINGS : ratio.EPS_TR;
-  const back = epsRows.length > 12 ? 12 : Math.floor((epsRows.length - 1) / 4) * 4;
-  const epsNow = Number(epsRows[0]?.value), epsThen = back ? Number(epsRows[back]?.value) : NaN;
-  const years = {};
-  cashRows.forEach((r) => {
-    const y = String(r.fiscalDate || "").slice(0, 4);
-    (years[y] = years[y] || {})[Number(r.itemCode) === 32000 ? "cfo" : "capex"] = Number(r.numericValue);
-  });
+  const profit = {};
+  profitRows.forEach((r) => { profit[String(r.fiscalDate || "").slice(0, 4)] = Number(r.numericValue); });
+  const profitYears = Object.keys(profit).sort().reverse(), back = Math.min(3, profitYears.length - 1);
+  const profitNow = profit[profitYears[0]], profitThen = back > 0 ? profit[profitYears[back]] : NaN;
+  const model = Number(profitRows[0]?.modelType);
   return {
     eps:eps / 1000, bvps:ratio.BVPS_CR / 1000, epsDate:dates.EPS_TR,
     roe:Number.isFinite(ratio.ROAE_TR_AVG5Q) ? ratio.ROAE_TR_AVG5Q * 100 : null,
-    shares:ratio.MARKETCAP > 0 && reportPrice > 0 ? ratio.MARKETCAP / reportPrice : null,
     reportPrice:reportPrice > 0 ? reportPrice / 1000 : null,
-    growth:epsNow > 0 && epsThen > 0 ? (Math.pow(epsNow / epsThen, 4 / back) - 1) * 100 : null, growthYears:back / 4,
-    fcf:Object.keys(years).sort().reverse().filter((y) => Number.isFinite(years[y].cfo) && Number.isFinite(years[y].capex)).slice(0, 3)
-      .map((y) => ({ year:y, value:years[y].cfo + years[y].capex }))
+    growth:profitNow > 0 && profitThen > 0 ? (Math.pow(profitNow / profitThen, 1 / back) - 1) * 100 : null, growthYears:back,
+    financial:Number.isFinite(model) ? model !== 2 : null
   };
 }
 /* Định giá từ số liệu thô + giả định đang dùng. Giá trị (nghìn đ/CP) không dương = cách đó không dùng được.
@@ -3797,7 +3794,7 @@ async function fetchValuationInputs(ticker){
 function valuationOf(ticker, input, price, config = valuationConfig()){
   const r = config.requiredReturn / 100, gl = config.longGrowth / 100;
   const g = Math.min(Math.max(input.growth ?? 0, 0), config.growthCap);
-  const financial = VALUATION_FINANCIAL_SECTORS.includes(sectorOf(ticker));
+  const financial = input.financial ?? VALUATION_FINANCIAL_SECTORS.includes(sectorOf(ticker));
   const methods = [];
   const add = (name, value, note) => methods.push({ name, value:Number.isFinite(value) && value > 0 ? value : null, note });
   const n = (x, digits = 1) => Number(x).toLocaleString("vi-VN", { maximumFractionDigits:digits });
@@ -3807,15 +3804,18 @@ function valuationOf(ticker, input, price, config = valuationConfig()){
       : "P/B hợp lý (" + n(input.roe) + "% − " + n(config.longGrowth) + "%) ÷ (" + n(config.requiredReturn) + "% − " + n(config.longGrowth) + "%) = " +
         n(pb, 2) + " × sổ sách " + fmtPrice(input.bvps));
   }else{
-    const fcf = input.fcf.length ? input.fcf.reduce((sum, x) => sum + x.value, 0) / input.fcf.length : NaN;
+    // DCF từ lợi nhuận (owner chọn 01/11/2026, thay dòng tiền tự do thực tế — năm đầu tư lớn kéo tụt, DGW 3,7 khi giá 40,9):
+    // dòng tiền mỗi năm = EPS × (1 − tăng trưởng ÷ ROE) — phần lợi nhuận không phải giữ lại để tăng trưởng.
+    const payout = (growth) => Math.min(Math.max(1 - growth / input.roe, 0), 1);
     let dcf = NaN;
-    if(fcf > 0 && input.shares > 0){
-      let cash = fcf / input.shares / 1000, pv = 0;
-      for(let t = 1; t <= 5; t++){ cash *= 1 + g / 100; pv += cash / Math.pow(1 + r, t); }
-      dcf = pv + cash * (1 + gl) / (r - gl) / Math.pow(1 + r, 5);
+    if(input.eps > 0 && input.roe > 0){
+      let eps = input.eps, pv = 0;
+      for(let t = 1; t <= 5; t++){ eps *= 1 + g / 100; pv += eps * payout(g) / Math.pow(1 + r, t); }
+      dcf = pv + eps * (1 + gl) * payout(config.longGrowth) / (r - gl) / Math.pow(1 + r, 5);
     }
-    add("DCF", dcf, !input.fcf.length ? "Chưa có báo cáo dòng tiền" : !(fcf > 0) ? "Dòng tiền tự do " + input.fcf.length + " năm gần nhất âm"
-      : "Dòng tiền tự do bình quân " + input.fcf.length + " năm " + n(fcf / 1e9, 0) + " tỷ đ · tăng " + n(g) + "%/năm trong 5 năm rồi " + n(config.longGrowth) + "%");
+    add("DCF", dcf, !(input.eps > 0) ? "Lợi nhuận âm" : !(input.roe > 0) ? "Chưa có ROE"
+      : "EPS " + fmtPrice(input.eps) + " tăng " + n(g) + "%/năm trong 5 năm rồi " + n(config.longGrowth) + "% · trả về cổ đông " +
+        n(payout(g) * 100, 0) + "% lợi nhuận");
     // Bản thận trọng 7 + 1g (owner chọn 01/11/2026): bản gốc 8,5 + 2g ngầm cho P/E tới ~25, thổi giá trị mã tăng trưởng ở VN.
     add("Graham 2", input.eps * (7 + g) * 4.4 / config.savingsRate,
       "EPS " + fmtPrice(input.eps) + " × (7 + " + n(g) + ") × 4,4 ÷ " + n(config.savingsRate));
@@ -3829,7 +3829,8 @@ function valuationOf(ticker, input, price, config = valuationConfig()){
   const low = values[0], high = values[values.length - 1], spread = values.length > 1 ? (high - low) / median * 100 : null;
   const gap = price > 0 ? (price / median - 1) * 100 : null;
   return { financial, g, methods, median, low, high, spread, unreliable:spread !== null && spread > config.maxSpread, gap,
-    verdict:gap === null ? null : gap <= -config.margin ? "cheap" : gap <= 0 ? "fair" : "dear" };
+    // Nhãn đối xứng (owner chốt 01/11/2026): lệch dưới biên an toàn hai phía đều là Hợp lý.
+    verdict:gap === null ? null : gap <= -config.margin ? "cheap" : gap >= config.margin ? "dear" : "fair" };
 }
 function valuationHtml(ticker){
   const row = valuationState.get(ticker);
@@ -3847,8 +3848,8 @@ function valuationHtml(ticker){
     const gap = v.gap === null ? '' : ' khoảng ' + n(Math.abs(v.gap), 0) + '%';
     plain = '<p>' + (v.verdict === 'cheap' ? '<b class="pos">Rẻ</b> · giá ' + fmtPrice(price) + ' thấp hơn giá trị nội tại ' + fmtPrice(v.median) + gap +
         ', đủ biên an toàn ' + n(config.margin, 0) + '%'
-      : v.verdict === 'fair' ? '<b>Hợp lý</b> · giá ' + fmtPrice(price) + (v.gap > -1 ? ' ngang giá trị nội tại ' + fmtPrice(v.median)
-        : ' thấp hơn giá trị nội tại ' + fmtPrice(v.median) + gap) + ', chưa đủ biên an toàn ' + n(config.margin, 0) + '%'
+      : v.verdict === 'fair' ? '<b>Hợp lý</b> · giá ' + fmtPrice(price) + (Math.abs(v.gap) < 1 ? ' ngang' : v.gap < 0 ? ' thấp hơn' : ' cao hơn') +
+        ' giá trị nội tại ' + fmtPrice(v.median) + (Math.abs(v.gap) < 1 ? '' : gap) + (v.gap <= -1 ? ', chưa đủ biên an toàn ' + n(config.margin, 0) + '%' : '')
       : v.verdict === 'dear' ? '<b class="neg">Đắt</b> · giá ' + fmtPrice(price) + ' cao hơn giá trị nội tại ' + fmtPrice(v.median) + gap
       : 'Giá trị nội tại ' + fmtPrice(v.median)) + '</p>' +
       '<p class="muted">Khoảng ' + fmtPrice(v.low) + ' – ' + fmtPrice(v.high) + ' theo ' + v.methods.filter((m) => m.value !== null).length + ' cách' +
@@ -3861,7 +3862,7 @@ function valuationHtml(ticker){
       metric('EPS 4 quý' + (input.epsDate ? ' tới ' + fmtDateVN(input.epsDate) : ''), fmtPrice(input.eps)) +
       metric('Giá trị sổ sách/CP', fmtPrice(input.bvps)) +
       metric('ROE', input.roe === null ? '—' : n(input.roe) + '%') +
-      metric('Tăng trưởng EPS' + (input.growthYears ? ' ' + input.growthYears + ' năm' : ''),input.growth === null ? '—' : n(input.growth) + '%/năm · dùng ' + n(v.g) + '%') +
+      metric('Tăng trưởng lợi nhuận' + (input.growthYears ? ' ' + input.growthYears + ' năm' : ''),input.growth === null ? '—' : n(input.growth) + '%/năm · dùng ' + n(v.g) + '%') +
       metric('Lợi suất đòi hỏi · dài hạn', n(config.requiredReturn) + '% · ' + n(config.longGrowth) + '%') +
       (live > 0 ? '' : metric('Giá so sánh', fmtPrice(price) + ' (giá VNDirect)')) +
     '</div><p class="muted">' + (v.financial ? 'Ngành tài chính: P/B theo ROE + Graham 3' : 'DCF + Graham 2 + Graham 3') + ' · số liệu VNDirect</p></details></div>';
