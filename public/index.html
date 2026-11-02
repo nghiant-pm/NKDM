@@ -2670,8 +2670,11 @@ function dashboardData(summary){
   const strategy = activeStrategy(todayStr());
   const events = realizedEventsInRange(summary.realizedEvents, pnlRange);
   const realizedVND = events.reduce((sum, x) => sum + x.pnl * 1000, 0);
+  // Tách theo từng lệnh bán: lệnh ra lãi = chốt lời, lệnh ra lỗ = cắt lỗ.
+  const gainVND = events.reduce((sum, x) => sum + Math.max(x.pnl, 0) * 1000, 0);
+  const lossVND = events.reduce((sum, x) => sum + Math.min(x.pnl, 0) * 1000, 0);
   const cashRatio = cashRatioFor(summary);
-  return { strategy, events, realizedVND, cashRatio, cashStatus:cashRatioStatus(cashRatio, strategy) };
+  return { strategy, events, realizedVND, gainVND, lossVND, cashRatio, cashStatus:cashRatioStatus(cashRatio, strategy) };
 }
 
 function sellForecast(summary){
@@ -2718,22 +2721,30 @@ function renderDashboardDetails(summary, data){
     '</div>';
   }).join("");
 
-  const byTicker = {};
-  data.events.forEach((x) => {
-    const row = byTicker[x.ticker] || { ticker:x.ticker, pnl:0, count:0 };
-    row.pnl += x.pnl * 1000;
-    row.count += 1;
-    byTicker[x.ticker] = row;
-  });
-  const rows = Object.values(byTicker).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl) || a.ticker.localeCompare(b.ticker));
+  // Hai nhóm: lệnh bán ra lãi (chốt lời) và lệnh bán ra lỗ (cắt lỗ); một mã có thể nằm ở cả hai.
+  const sides = [
+    { name:"Lãi chốt", total:data.gainVND, events:data.events.filter((x) => x.pnl >= 0) },
+    { name:"Cắt lỗ", total:data.lossVND, events:data.events.filter((x) => x.pnl < 0) }
+  ];
   $("realized-breakdown-title").textContent = "Đã chốt theo mã · " + pnlRangeLabel(pnlRange);
-  $("realized-breakdown").innerHTML = rows.length ? rows.map((row) => {
-    const cls = pnlClass(row.pnl);
+  $("realized-breakdown").innerHTML = data.events.length ? sides.filter((side) => side.events.length).map((side) => {
+    const byTicker = {};
+    side.events.forEach((x) => {
+      const row = byTicker[x.ticker] || { ticker:x.ticker, pnl:0, count:0 };
+      row.pnl += x.pnl * 1000;
+      row.count += 1;
+      byTicker[x.ticker] = row;
+    });
+    const rows = Object.values(byTicker).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl) || a.ticker.localeCompare(b.ticker));
     return '<div class="metric-row">' +
-      '<div class="name">' + esc(row.ticker) + '<span>' + row.count + ' lệnh bán</span></div>' +
-      '<div class="value num' + cls + '">' + pnlMoney(row.pnl) + '</div>' +
-      '<div class="share"></div>' +
-    '</div>';
+        '<div class="name">' + side.name + '<span>' + side.events.length + ' lệnh bán</span></div>' +
+        '<div class="value num' + pnlClass(side.total) + '">' + pnlMoney(side.total) + '</div>' +
+        '<div class="share"></div>' +
+      '</div>' + rows.map((row) => '<div class="metric-row">' +
+        '<div class="name">· ' + esc(row.ticker) + '<span>' + row.count + ' lệnh bán</span></div>' +
+        '<div class="value num' + pnlClass(row.pnl) + '">' + pnlMoney(row.pnl) + '</div>' +
+        '<div class="share"></div>' +
+      '</div>').join("");
   }).join("") : '<div class="dashboard-empty">Chưa có lệnh bán trong kỳ</div>';
 }
 
@@ -4446,7 +4457,9 @@ function renderCompact(s){
   const dashboardPnlText = (value, cost) => pnlMoney(value) + (cost > 0 ? '<span class="compact-note">' + pnlPercent(value / cost * 100) + '</span>' : '');
   const compactPnlClass = (n) => n > 0 ? "pos" : n < 0 ? "neg" : "";
   $("c-realized-label").textContent = "Đã chốt · " + rangeLabel;
-  $("c-realized").textContent = pnlMoney(dashboard.realizedVND);
+  $("c-realized").innerHTML = pnlMoney(dashboard.realizedVND) + (dashboard.events.length ?
+    '<span class="compact-note">Lãi chốt <span class="' + dashboardPnlClass(dashboard.gainVND) + '">' + pnlMoney(dashboard.gainVND) + '</span>' +
+    ' · Cắt lỗ <span class="' + dashboardPnlClass(dashboard.lossVND) + '">' + pnlMoney(dashboard.lossVND) + '</span></span>' : '');
   $("c-realized").className = "v num " + dashboardPnlClass(dashboard.realizedVND);
   $("c-unrealized").className = "v num " + dashboardPnlClass(pnlScope.unrealizedPnl);
   $("c-unrealized").innerHTML = (pnlScope.rows.length ? dashboardPnlText(pnlScope.unrealizedPnl, pnlScope.investedCost) : "—") +

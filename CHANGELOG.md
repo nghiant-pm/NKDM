@@ -4,6 +4,18 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-02 (Tách lãi chốt lời và lỗ cắt lỗ)
+
+Owner muốn thấy riêng tiền lỗ do cắt lỗ với tiền lãi khi bán có lời.
+- Ô **Đã chốt** ở tổng quan: vẫn là tổng, thêm dòng nhỏ "Lãi chốt +X · Cắt lỗ −Y" trong kỳ đang chọn (Tuần/Tháng/Quý/Tất cả).
+- Khung **Đã chốt theo mã**: chia hai nhóm Lãi chốt / Cắt lỗ, mỗi nhóm có tổng và từng mã. Một mã có thể nằm ở cả hai nhóm.
+- Cách chia: theo **từng lệnh bán** — lệnh ra lỗ (theo giá mua của lô, đã trừ thuế) tính là cắt lỗ, kể cả lệnh trước khi có luật cắt lỗ 30/10.
+- Đã kiểm: công thức với dữ liệu mẫu (tổng = lãi + lỗ, lệnh ngoài kỳ bị loại), cú pháp toàn script.
+
+· `public/index.html`
+
+---
+
 ## 2026-11-01 (Định giá: sửa tăng trưởng, DCF từ lợi nhuận, nhãn đối xứng)
 
 Owner báo giá trị nội tại thấp bất thường so với giá thị trường. Đo lại 33 mã đang giữ/theo dõi:
