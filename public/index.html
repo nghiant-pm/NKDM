@@ -1671,7 +1671,7 @@ import {
   getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
-  getFirestore, collection, doc, addDoc, setDoc, updateDoc, writeBatch, deleteDoc, onSnapshot,
+  getFirestore, collection, doc, addDoc, setDoc, updateDoc, writeBatch, deleteDoc, deleteField, onSnapshot,
   query, orderBy, limit, where, increment, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { initGuide } from "/guide.js";
@@ -2008,7 +2008,8 @@ function computeLedger(transactions){
         pnl, taxAmount:transactionTaxVND(t), lots, autoLots:alloc.auto
       });
       h.qty -= t.qty;
-      if(h.qty <= 0.0001){ h.qty = 0; h.avgCost = 0; h.heldSince = null; h.cycleRealizedPnl = 0; h.lots.forEach((l) => { l.remaining = 0; }); }
+      // Chu kỳ vừa bán hết: lãi/lỗ cả chu kỳ (nghìn đ) — mục "Đã cắt lỗ" ở Theo dõi đọc từ đây.
+      if(h.qty <= 0.0001){ h.closedCycle = { date:t.date || "", pnl:h.cycleRealizedPnl }; h.qty = 0; h.avgCost = 0; h.heldSince = null; h.cycleRealizedPnl = 0; h.lots.forEach((l) => { l.remaining = 0; }); }
     }
     h.lotCost = h.lots.reduce((sum, l) => sum + l.remaining * l.price, 0);
     holdings[t.ticker] = h;
@@ -4012,6 +4013,7 @@ function render(){
   renderPrivacyControl();
   renderPnlScopeControls();
   renderSetup();
+  syncStopLossWatch(s);
 
   $("s-total").textContent = fmtVND(s.total);
   $("s-mkt").textContent = fmtVND(s.marketValue);
@@ -4548,9 +4550,12 @@ function renderCompact(s){
     const gap = price !== null && target !== null ? price - target : null;
     return { ticker:tk, price, target, gap, proximity:watchProximity(tk, w, meta, st) };
   }), "watchlist");
-  $("compact-watchlist").innerHTML = sectorGroups("watchlist", watched, (row) => {
+  // Mã đã cắt lỗ (syncStopLossWatch) nằm cuối bảng, nhóm riêng, không chia ngành.
+  const stopKey = "watchlist:Đã cắt lỗ", stopOpen = !sectorCollapsedSet().has(stopKey);
+  const stopped = watched.filter((r) => state.watchlist[r.ticker].stopLoss);
+  const watchRow = (row) => {
     const tk = row.ticker, gap = row.gap;
-    const meta = state.tickers[tk] || {};
+    const meta = state.tickers[tk] || {}, stop = state.watchlist[tk].stopLoss;
     const trend = watchTrend(tk);
     const near = row.proximity;
     const gapCls = gap === null ? '' : gap <= 0 ? 'pos' : 'neg';
@@ -4562,11 +4567,16 @@ function renderCompact(s){
       '<td class="a-px ' + gapCls + '">' + (row.price === null ? '—' : compactPriceCell(tk, row.price)) + '</td>' +
       '<td class="a-tgt"><button class="compact-link" type="button" data-compact-watch="' + esc(tk) + '" aria-label="Sửa giá kỳ vọng ' + esc(tk) + '">' + (row.target === null ? '—' : fmtPrice(row.target)) + '</button></td>' +
       '<td class="a-gap ' + gapCls + '">' + (gap === null ? '—' : (gap > 0 ? '+' : '') + gap.toFixed(2)) + '</td>' +
-      '<td class="a-more"><span class="compact-facts">Theo dõi ' + ageLabel(trend.addedDate) +
+      '<td class="a-more"><span class="compact-facts">' + (stop ? 'Cắt lỗ ' + fmtDateVN(stop.date) + ' · <span class="neg">' + pnlMoney(stop.pnl) + '</span> · ' : '') +
+        'Theo dõi ' + ageLabel(trend.addedDate) +
         (dropPct === null ? '' : ' · Cần giảm ' + dropPct.toLocaleString("vi-VN", { minimumFractionDigits:2, maximumFractionDigits:2 }) + '%') +
         ' · Cập nhật ' + (meta.lastPriceDate ? fmtDateVN(meta.lastPriceDate) : '—') + '</span>' +
         decisionScoreLine(tk,s) + alert + orderflowLine(tk, gap !== null && gap <= 0 ? "buy" : null) + thesisBadge(tk) + detailButton(tk) + compactRowMenu(tk, true) + '</td></tr>';
-  }) || '<tr><td class="compact-empty">' + (keys.length ? 'Không có mã phù hợp' : 'Chưa có mã') + '</td></tr>';
+  };
+  $("compact-watchlist").innerHTML = ((sectorGroups("watchlist", watched.filter((r) => !state.watchlist[r.ticker].stopLoss), watchRow) +
+    (stopped.length ? '<tr class="sector-row"><td><button class="sector-toggle" type="button" data-sector-toggle="' + esc(stopKey) + '" aria-expanded="' + stopOpen + '">' +
+      CHEVRON + '<span>Đã cắt lỗ <b>' + stopped.length + '</b></span></button></td></tr>' + (stopOpen ? stopped.map(watchRow).join("") : '') : '')) ||
+    '<tr><td class="compact-empty">' + (keys.length ? 'Không có mã phù hợp' : 'Chưa có mã') + '</td></tr>');
   // Hàng tiêu đề: bấm tên cột để sắp xếp (lần 2 đảo chiều, lần 3 bỏ). Đang sắp theo cột thì ẩn tay nắm kéo thả.
   const counts = { positions:s.held.length, watchlist:keys.length };
   const areas = { ticker:"a-tk", qty:"a-qty", value:"a-val c-wide", edgeGap:"a-edge", pnl:"a-pnl", target:"a-tgt", gap:"a-gap" };
@@ -5533,6 +5543,35 @@ function removeWatch(ticker){
   deleteDoc(bookDoc("watchlist", ticker))
     .then(() => toast("Đã bỏ " + ticker))
     .catch((e) => { console.error(e); toast("Lỗi xoá · Thử lại"); });
+}
+/* Mục "Đã cắt lỗ" ở Theo dõi (owner chốt 02/11/2026): mã bán hết mà cả chu kỳ lỗ (từ 30/10/2026) tự vào watchlist kèm
+   `stopLoss`, không giá kỳ vọng → chỉ mua lại theo vùng MA (maCandidates). `tickers.stopWatchedOn` = ngày bán hết đã xử lý,
+   owner Bỏ theo dõi thì không tự thêm lại cho tới lần cắt lỗ sau. Mua lại → rời mục (giá kỳ vọng owner tự đặt thì chỉ bỏ nhãn).
+   Suy từ sổ mỗi lần render, nên mọi đường ghi lệnh (form, Khớp, Đồng bộ TCBS) đều được bắt. */
+const STOP_WATCH_FROM = "2026-10-30";
+let stopWatchBusy = false;
+function syncStopLossWatch(s){
+  if(stopWatchBusy || !["transactions", "tickers", "watchlist"].every((n) => loadedCollections.has(n))) return;
+  const batch = writeBatch(fs), now = nowISO();
+  let n = 0;
+  Object.entries(s.holdings).forEach(([tk, h]) => {
+    const w = state.watchlist[tk], c = h.closedCycle;
+    if(h.qty > 0){
+      if(!w?.stopLoss) return;
+      if(Number(w.targetBuy) > 0) batch.update(bookDoc("watchlist", tk), { stopLoss:deleteField(), updatedAt:now });
+      else batch.delete(bookDoc("watchlist", tk));
+      n++;
+      return;
+    }
+    if(!c || !(c.pnl < 0) || c.date < STOP_WATCH_FROM || state.tickers[tk]?.stopWatchedOn === c.date) return;
+    batch.set(bookDoc("watchlist", tk), { ...(w ? {} : { targetBuy:null, addedAt:now }),
+      stopLoss:{ date:c.date, pnl:Math.round(c.pnl * 1000) }, updatedAt:now }, { merge:true });
+    batch.set(bookDoc("tickers", tk), { stopWatchedOn:c.date, updatedAt:now }, { merge:true });
+    n++;
+  });
+  if(!n) return;
+  stopWatchBusy = true;
+  batch.commit().catch((e) => console.error("stop watch", e)).finally(() => { stopWatchBusy = false; });
 }
 
 function removeTransaction(id, btn){

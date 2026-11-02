@@ -63,6 +63,8 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   `engine:"stop"`, `mode:"stop"` tại giá so mốc, không qua cửa lọc, đứng trước luật bán/gồng. Mã đang giữ **không còn mốc mua T+**
   (giá vốn −2), cung cầu không nhận xét chiều mua cho mã đang giữ, vùng MA10 bỏ mã đang lỗ/hoà. **Mã đang lỗ không bao giờ có gợi ý
   mua thêm — đừng dựng lại.** Mã đang lãi vẫn theo sell-v1.1.0 (owner chọn giữ, KHÔNG lấy chốt lời đuổi MA20/8% của phiên cloud).
+  **Mục "Đã cắt lỗ"** (owner chốt 02/11/2026): mã bán hết mà cả chu kỳ lỗ tự vào Theo dõi, nhóm riêng cuối bảng, không giá kỳ
+  vọng → chỉ mua lại theo vùng MA (đã hồi thật), mua lại thì tự rời. Suy từ sổ mỗi lần render (`syncStopLossWatch`), không gắn vào từng đường ghi lệnh.
   Chưa làm (owner để sau): vốn chết + mã thay thế, mục "Danh mục cần xử lý" ở Telegram sàng lọc. Tin Telegram trưa có dòng "Cắt lỗ".
   Giá bán cung cầu vẫn ≥ giá vốn +1% (`POLICY.minProfitPct`) — chỉ áp cho mục bán T+, mục cắt lỗ không kèm cung cầu.
 - ⚠️ **+3 / 5% / 100 CP chỉ là MẶC ĐỊNH.** Owner sửa được ở tab Chiến lược, mỗi lần
@@ -153,8 +155,11 @@ cashflows/{autoId}          type "deposit"|"withdraw"|"adjust", amount (VND nguy
 tickers/{TICKER}            lastPrice (nghìn đ), lastPriceDate, refPrice? (giá tham chiếu, nghìn đ), refPriceDate?, hold?, sector?, updatedAt
                             (sector = ngành owner gán đè; thiếu/null = theo rổ `TICKER_SECTORS`, ngoài rổ → "Khác")
                             (refPrice chỉ ghi ở nút lấy giá chung; % trong ngày chỉ tính khi refPriceDate = lastPriceDate)
+                            stopWatchedOn? = ngày bán hết cắt lỗ đã đưa vào "Đã cắt lỗ" — owner Bỏ theo dõi thì không tự thêm lại tới lần cắt lỗ sau
 daily_snapshots/{YYYY-MM-DD}  date, cash, investedCost, marketValue, totalAssets, prices{}, createdAt, updatedAt
 watchlist/{TICKER}          targetBuy (nghìn đ), addedAt, updatedAt
+                            từ 02/11/2026: stopLoss? { date, pnl (VND) } = mục "Đã cắt lỗ" (app tự ghi, `syncStopLossWatch`): mã bán hết mà
+                            cả chu kỳ lỗ, từ 30/10/2026. targetBuy null → chỉ mua lại theo vùng MA. Mua lại → app xoá doc (có giá kỳ vọng tự đặt thì chỉ bỏ nhãn)
 strategies/{autoId}         buyDrop, sellRise, lotSize, effectiveFrom (YYYY-MM-DD), reason, createdAt
                             từ 13/10/2026: maLength, maDays, maMaxDays (vùng mua MA; thiếu = 10 · 5 · 15)
                             từ 16/10/2026: maxBuys (lệnh mua tối đa mỗi kế hoạch ngày; thiếu = 3)

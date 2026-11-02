@@ -4,6 +4,20 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-02 (Mã đã cắt lỗ tự vào Theo dõi)
+
+Owner chốt 02/11: mã bán hết để cắt lỗ tự sang Theo dõi, nằm mục riêng **Đã cắt lỗ** để mua lại khi mã hồi.
+- Mã bán hết mà **cả chu kỳ** (từ lúc mua tới lúc bán hết) lỗ → tự thêm vào Theo dõi, nhóm "Đã cắt lỗ" cuối bảng (gập được), dòng ghi
+  ngày cắt lỗ + số tiền lỗ. Quét lại từ 30/10/2026 (ngày có luật cắt lỗ).
+- **Không đặt giá kỳ vọng** → chỉ khuyến nghị mua lại theo vùng MA (mã cắt lên MA10, MA đi lên, phiên tăng), không bắt dao rơi.
+- Mua lại → tự rời mục. Anh bấm Bỏ theo dõi thì không tự thêm lại, tới lần cắt lỗ sau của mã đó.
+- Tự bắt mọi đường ghi lệnh (form, Khớp lệnh chờ, Đồng bộ TCBS). Thêm field `watchlist.stopLoss`, `tickers.stopWatchedOn`, không thêm collection.
+- Đã kiểm: 6 tình huống mẫu (thêm, trước 30/10, chu kỳ lãi, mua lại, đã bỏ theo dõi, mã có sẵn giá kỳ vọng), cú pháp toàn script.
+
+· `public/index.html`
+
+---
+
 ## 2026-11-02 (Tách lãi chốt lời và lỗ cắt lỗ)
 
 Owner muốn thấy riêng tiền lỗ do cắt lỗ với tiền lãi khi bán có lời.
