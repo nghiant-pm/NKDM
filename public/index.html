@@ -923,7 +923,9 @@
   .pidx-line{ fill:none; stroke-width:2; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
   .pidx-line.held{ stroke:var(--brand); stroke-width:2.5; }
   .pidx-line.watch{ stroke:var(--warn); stroke-width:2.5; }
-  .pidx-line.vni{ stroke:var(--text-muted); stroke-width:1.5; stroke-dasharray:5 4; }
+  .pidx-line.bench{ stroke:var(--text-muted); stroke-width:1.5; stroke-dasharray:5 4; }
+  .pidx-line.custom{ stroke:var(--brand); stroke-width:3; }
+  .pidx-line.tk.mid{ opacity:.6; stroke-width:1.5; }
   .pidx-line.tk{ stroke:var(--text-muted); stroke-width:1; opacity:.28; }
   .pidx-line.tk.on{ stroke-width:2.5; opacity:1; }
   .pidx-line.tk.on.pos{ stroke:var(--pos); } .pidx-line.tk.on.neg{ stroke:var(--neg); } .pidx-line.tk.on.flat{ stroke:var(--text); }
@@ -934,7 +936,8 @@
   .pidx-legend span{ display:inline-flex; align-items:center; gap:5px; }
   .pidx-legend i{ width:18px; height:0; border-top:2.5px solid; }
   .pidx-legend .held{ border-color:var(--brand); } .pidx-legend .watch{ border-color:var(--warn); }
-  .pidx-legend .vni{ border-color:var(--text-muted); border-top-style:dashed; border-top-width:1.5px; }
+  .pidx-legend .custom{ border-color:var(--brand); }
+  .pidx-legend .bench{ border-color:var(--text-muted); border-top-style:dashed; border-top-width:1.5px; }
   .pidx-list{ display:flex; flex-wrap:wrap; gap:6px; }
   .pidx-list button{
     min-height:36px; padding:4px 10px; border:1px solid var(--border); border-radius:var(--r-pill);
@@ -1600,6 +1603,11 @@
       <div class="range-switch" role="group" aria-label="Nhóm mã">
         <button type="button" data-pidx-set="held" aria-pressed="true">Đang nắm</button>
         <button type="button" data-pidx-set="watch" aria-pressed="false">Theo dõi</button>
+        <button type="button" data-pidx-set="custom" aria-pressed="false">Tự chọn</button>
+      </div>
+      <div class="range-switch" role="group" aria-label="So với">
+        <button type="button" data-pidx-bench="VNINDEX" aria-pressed="true">VN-Index</button>
+        <button type="button" data-pidx-bench="VN30" aria-pressed="false">VN30</button>
       </div>
       <div class="range-switch" role="group" aria-label="Khoảng thời gian">
         <button type="button" data-pidx-range="30" aria-pressed="true">1 tháng</button>
@@ -5159,16 +5167,19 @@ function initStockChart(){
    Gốc 0% tại đầu khung, như VN30. Đang nắm = theo tỷ trọng giá trị với SỐ CP HIỆN TẠI (danh mục hôm nay đi thế nào trong khung,
    không nhiễu nạp/rút/mua thêm) · Theo dõi = bình quân đều các mã theo dõi chưa nắm · VN-Index làm thước so.
    Chỉ để xem — không vào tín hiệu/kế hoạch. Lịch sử lấy VNDirect (cùng nguồn Quét ngay), nhớ trong bộ nhớ 15 phút, không lưu Firestore.
-   Trong phiên bỏ nến hôm nay như biểu đồ từng mã. */
-const PIDX_BENCH = "VNINDEX", PIDX_TTL = 15 * 60 * 1000, PIDX_STRIP_DAYS = 30;
-const PIDX_LABEL = { held:"Đang nắm", watch:"Theo dõi", vni:"VN-Index" };
+   Trong phiên bỏ nến hôm nay như biểu đồ từng mã.
+   Tự chọn (09/11/2026): owner tick mã nắm/theo dõi thành một nhóm, tính theo tỷ trọng đang nắm, so VN-Index hoặc VN30.
+   Nhóm KHÔNG lưu (owner chọn) — đóng popup là mất. Dải nhỏ đầu tab luôn so VN-Index. */
+const PIDX_BENCH = "VNINDEX", PIDX_BENCHES = ["VNINDEX", "VN30"], PIDX_TTL = 15 * 60 * 1000, PIDX_STRIP_DAYS = 30;
+const PIDX_LABEL = { held:"Đang nắm", watch:"Theo dõi", custom:"Nhóm chọn", VNINDEX:"VN-Index", VN30:"VN30" };
 const pidxCache = {}, pidxLoading = {};
 let pidxSet = "held", pidxRange = 30, pidxFocus = "", pidxPoints = [], pidxW = 640, pidxH = 300, pidxReturnFocus = null, pidxTimer = null;
+let pidxBench = PIDX_BENCH, pidxPick = new Set();
 
 function pidxTickers(s = computeSummary()){
   const held = s.held.filter((h) => h.qty > 0).map((h) => ({ ticker:h.ticker, qty:h.qty }));
   const heldSet = new Set(held.map((h) => h.ticker));
-  const watch = Object.keys(state.watchlist).filter((t) => !heldSet.has(t)).sort().map((t) => ({ ticker:t, qty:1 }));
+  const watch = Object.keys(state.watchlist).filter((t) => !heldSet.has(t)).sort().map((t) => ({ ticker:t, qty:0 }));
   return { held, watch };
 }
 function pidxFetch(ticker){
@@ -5184,7 +5195,7 @@ function pidxFetch(ticker){
   return pidxLoading[ticker];
 }
 function pidxLoadAll(tk){
-  const list = [PIDX_BENCH, ...tk.held.map((x) => x.ticker), ...tk.watch.map((x) => x.ticker)];
+  const list = [...PIDX_BENCHES, ...tk.held.map((x) => x.ticker), ...tk.watch.map((x) => x.ticker)];
   return screenMapWithConcurrency(list, 4, pidxFetch);
 }
 function pidxInvalidate(){
@@ -5192,9 +5203,9 @@ function pidxInvalidate(){
   schedulePidx();
 }
 function pidxBusy(){ return Object.keys(pidxLoading).length > 0; }
-/* Dãy % theo ngày của khung cho cả hai nhóm + VN-Index. Ngày lấy theo VN-Index (thiếu thì gộp ngày các mã);
+/* Dãy % theo ngày của khung cho các nhóm + chỉ số so. Ngày lấy theo VN-Index (thiếu thì gộp ngày các mã);
    ngày mã không có giá dùng giá gần nhất trước đó. Mã không có giá ở đầu khung bị bỏ khỏi khung đó (báo ở `missing`). */
-function pidxCompute(rangeDays, tk = pidxTickers()){
+function pidxCompute(rangeDays, tk = pidxTickers(), bench = PIDX_BENCH, pick = null){
   const locked = sessionLocked(), today = todayStr();
   const rowsOf = (t) => (pidxCache[t]?.rows || []).filter((r) => !(locked && r.date === today));
   let dates = rowsOf(PIDX_BENCH).map((r) => r.date);
@@ -5209,24 +5220,28 @@ function pidxCompute(rangeDays, tk = pidxTickers()){
     let i = 0, p = null;
     return win.map((d) => { while(i < rows.length && rows[i].date <= d){ p = rows[i].close; i++; } return p; });
   };
-  const group = (members, weighted) => {
-    const lines = [], missing = [];
-    members.forEach((m) => {
-      const vals = along(m.ticker);
-      if(!(vals[0] > 0)){ missing.push(m.ticker); return; }
-      lines.push({ ticker:m.ticker, qty:m.qty, vals, pct:vals.map((v) => (v / vals[0] - 1) * 100) });
-    });
-    const index = !lines.length ? null : win.map((_, i) => {
-      if(!weighted) return lines.reduce((sum, l) => sum + l.pct[i], 0) / lines.length;
-      let now = 0, base = 0;
-      lines.forEach((l) => { now += l.qty * l.vals[i]; base += l.qty * l.vals[0]; });
-      return (now / base - 1) * 100;
-    });
+  const members = tk.held.concat(tk.watch), lineOf = {}, noBase = new Set();
+  members.forEach((m) => {
+    const vals = along(m.ticker);
+    if(!(vals[0] > 0)){ noBase.add(m.ticker); return; }
+    lineOf[m.ticker] = { ticker:m.ticker, qty:m.qty, vals, pct:vals.map((v) => (v / vals[0] - 1) * 100) };
+  });
+  /* Tỷ trọng: mã đang nắm = số CP hiện tại × giá đầu khung; mã chưa nắm trong nhóm theo tỷ trọng = trung bình các mã nắm
+     của nhóm (nhóm toàn mã chưa nắm thì chia đều). Không theo tỷ trọng = chia đều. */
+  const group = (list, weighted) => {
+    const lines = list.map((m) => lineOf[m.ticker]).filter(Boolean);
+    const missing = list.filter((m) => noBase.has(m.ticker)).map((m) => m.ticker);
+    const heldW = lines.filter((l) => l.qty > 0).map((l) => l.qty * l.vals[0]);
+    const fill = heldW.length ? heldW.reduce((a, b) => a + b, 0) / heldW.length : 1;
+    const w = lines.map((l) => !weighted ? 1 : l.qty > 0 ? l.qty * l.vals[0] : fill);
+    const total = w.reduce((a, b) => a + b, 0);
+    const index = !lines.length ? null : win.map((_, i) => lines.reduce((sum, l, k) => sum + w[k] * l.pct[i], 0) / total);
     return { lines, missing, index };
   };
-  const bench = along(PIDX_BENCH);
+  const benchVals = along(bench);
   return { dates:win, held:group(tk.held, true), watch:group(tk.watch, false),
-    vni:bench[0] > 0 ? bench.map((v) => (v / bench[0] - 1) * 100) : null };
+    custom:pick ? group(members.filter((m) => pick.has(m.ticker)), true) : null, all:Object.values(lineOf),
+    bench:benchVals[0] > 0 ? benchVals.map((v) => (v / benchVals[0] - 1) * 100) : null };
 }
 function pidxPctHtml(n){
   return '<b class="' + (n > 0.05 ? "pos" : n < -0.05 ? "neg" : "") + '">' + fmtPct(n) + '</b>';
@@ -5246,7 +5261,7 @@ function renderPidxStrips(tk = pidxTickers()){
       el.setAttribute("aria-label", PIDX_LABEL[set]);
       return;
     }
-    const last = data.dates[data.dates.length - 1], idx = grp.index, vni = data.vni;
+    const last = data.dates[data.dates.length - 1], idx = grp.index, vni = data.bench;
     const all = idx.concat(vni || [], [0]);
     const min = Math.min(...all), max = Math.max(...all), span = (max - min) || 1;
     const W = 300, H = 44, pad = 3;
@@ -5257,7 +5272,7 @@ function renderPidxStrips(tk = pidxTickers()){
       (last !== todayStr() ? ' · tới ' + fmtDateVN(last).slice(0, 5) : '') + '</span>' +
       '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
       '<line class="pidx-zero" x1="0" x2="' + W + '" y1="' + yAt(0).toFixed(2) + '" y2="' + yAt(0).toFixed(2) + '"></line>' +
-      (vni ? '<path class="pidx-line vni" d="' + pidxPath(vni, xAt, yAt) + '"></path>' : '') +
+      (vni ? '<path class="pidx-line bench" d="' + pidxPath(vni, xAt, yAt) + '"></path>' : '') +
       '<path class="pidx-line ' + set + '" d="' + pidxPath(idx, xAt, yAt) + '"></path></svg>';
     el.setAttribute("aria-label", PIDX_LABEL[set] + " 1 tháng " + fmtPct(tail) + (vni ? ", VN-Index " + fmtPct(vni[vni.length - 1]) : "") + ". Mở biểu đồ từng mã");
   });
@@ -5279,10 +5294,12 @@ function renderPidxChart(){
   $("pidx-tooltip").hidden = true;
   document.querySelectorAll("[data-pidx-set]").forEach((b) => {
     b.setAttribute("aria-pressed", String(b.dataset.pidxSet === pidxSet));
-    b.disabled = !tk[b.dataset.pidxSet].length;
+    b.disabled = b.dataset.pidxSet === "custom" ? !tk.held.length && !tk.watch.length : !tk[b.dataset.pidxSet].length;
   });
   document.querySelectorAll("[data-pidx-range]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.pidxRange) === pidxRange)));
-  const data = pidxCompute(pidxRange, tk);
+  document.querySelectorAll("[data-pidx-bench]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pidxBench === pidxBench)));
+  const custom = pidxSet === "custom";
+  const data = pidxCompute(pidxRange, tk, pidxBench, custom ? pidxPick : null);
   if(!data || (!data.held.index && !data.watch.index)){
     pidxPoints = [];
     svg.setAttribute("hidden", "");
@@ -5297,17 +5314,20 @@ function renderPidxChart(){
   pidxH = window.matchMedia("(max-width:430px)").matches ? 260 : 300;
   const W = pidxW, H = pidxH, left = 16, right = 58, top = 18, bottom = 32, n = data.dates.length;
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-  const mains = ["vni", "watch", "held"].map((key) => ({ key, vals:key === "vni" ? data.vni : data[key].index })).filter((m) => m.vals);
+  // Tự chọn: chỉ đường nhóm + chỉ số so, các mã trong nhóm vẽ đủ (ít mã). Nhóm có sẵn: 3 đường chính, mã là nền mờ.
+  const mains = (custom ? ["bench", "custom"] : ["bench", "watch", "held"])
+    .map((key) => ({ key, label:key === "bench" ? PIDX_LABEL[pidxBench] : PIDX_LABEL[key], vals:key === "bench" ? data.bench : data[key].index }))
+    .filter((m) => m.vals);
   // Thang dọc: đường chính + mã đang chọn + 80% vùng giữa của các mã — mã quá đà (±100% năm) không làm dẹt các đường chính; phần vượt cắt ở mép.
-  const focus = grp.lines.find((l) => l.ticker === pidxFocus);
+  const focus = custom ? null : grp.lines.find((l) => l.ticker === pidxFocus);
   const spread = grp.lines.flatMap((l) => l.pct).sort((a, b) => a - b);
   const q = (p) => spread.length ? spread[Math.floor(p * (spread.length - 1))] : 0;
-  const all = [0, q(.1), q(.9)].concat(...mains.map((m) => m.vals), focus ? focus.pct : []);
+  const all = (custom ? spread : [q(.1), q(.9)]).concat(0, ...mains.map((m) => m.vals), focus ? focus.pct : []);
   const minRaw = Math.min(...all), maxRaw = Math.max(...all);
   const pad = Math.max((maxRaw - minRaw) * .08, .5), min = minRaw - pad, max = maxRaw + pad;
   const xAt = (i) => left + i / (n - 1) * (W - left - right), yAt = (v) => top + (max - v) / (max - min) * (H - top - bottom);
   const tone = (v) => v > 0.05 ? "pos" : v < -0.05 ? "neg" : "flat";
-  const lineSvg = (l) => '<path class="pidx-line tk' + (l.ticker === pidxFocus ? " on " + tone(l.pct[n - 1]) : "") + '" d="' + pidxPath(l.pct, xAt, yAt) + '"></path>';
+  const lineSvg = (l) => '<path class="pidx-line tk' + (custom ? " mid" : "") + (l.ticker === pidxFocus ? " on " + tone(l.pct[n - 1]) : "") + '" d="' + pidxPath(l.pct, xAt, yAt) + '"></path>';
   const grids = [maxRaw, 0, minRaw].filter((v, i, a) => a.indexOf(v) === i).map((v) => {
     const y = yAt(v).toFixed(2);
     return '<line class="' + (v === 0 ? "pidx-zero" : "chart-grid") + '" x1="' + left + '" y1="' + y + '" x2="' + (W - right) + '" y2="' + y + '"></line>' +
@@ -5321,14 +5341,20 @@ function renderPidxChart(){
     mains.map((m) => '<path class="pidx-line ' + m.key + '" d="' + pidxPath(m.vals, xAt, yAt) + '"></path>').join("") +
     (focus ? lineSvg(focus) : "") +
     '<line class="chart-guide" id="pidx-guide" y1="' + top + '" y2="' + (H - bottom) + '" hidden></line>';
+  const tipLines = custom ? grp.lines : focus ? [focus] : [];
   pidxPoints = data.dates.map((d, i) => ({ d, x:xAt(i),
-    rows:mains.slice().reverse().map((m) => PIDX_LABEL[m.key] + " " + fmtPct(m.vals[i])).concat(focus ? [focus.ticker + " " + fmtPct(focus.pct[i])] : []) }));
-  $("pidx-legend").innerHTML = mains.slice().reverse().map((m) => '<span><i class="' + m.key + '"></i>' + PIDX_LABEL[m.key] + ' ' + pidxPctHtml(m.vals[n - 1]) + '</span>').join("");
-  $("pidx-list").innerHTML = grp.lines.slice().sort((a, b) => b.pct[n - 1] - a.pct[n - 1]).map((l) =>
-    '<button type="button" data-pidx-focus="' + esc(l.ticker) + '" aria-pressed="' + (l.ticker === pidxFocus) + '">' + esc(l.ticker) + ' ' + pidxPctHtml(l.pct[n - 1]) + '</button>').join("");
-  $("pidx-note").textContent = grp.missing.length ? "Chưa có lịch sử giá đầu khung: " + grp.missing.join(", ") : "";
+    rows:mains.slice().reverse().map((m) => m.label + " " + fmtPct(m.vals[i])).concat(tipLines.map((l) => l.ticker + " " + fmtPct(l.pct[i]))) }));
+  $("pidx-legend").innerHTML = mains.slice().reverse().map((m) => '<span><i class="' + m.key + '"></i>' + m.label +
+    (m.key === "custom" ? ' (' + grp.lines.length + ' mã)' : '') + ' ' + pidxPctHtml(m.vals[n - 1]) + '</span>').join("");
+  // Tự chọn: chip là toàn bộ mã nắm + theo dõi, chạm để thêm/bớt khỏi nhóm. Nhóm có sẵn: chạm để tô sáng.
+  const chips = custom ? data.all : grp.lines;
+  $("pidx-list").innerHTML = chips.slice().sort((a, b) => b.pct[n - 1] - a.pct[n - 1]).map((l) =>
+    '<button type="button" ' + (custom ? 'data-pidx-pick' : 'data-pidx-focus') + '="' + esc(l.ticker) + '" aria-pressed="' +
+    (custom ? pidxPick.has(l.ticker) : l.ticker === pidxFocus) + '">' + esc(l.ticker) + ' ' + pidxPctHtml(l.pct[n - 1]) + '</button>').join("");
+  const missing = custom ? tk.held.concat(tk.watch).map((m) => m.ticker).filter((t) => !data.all.some((l) => l.ticker === t)) : grp.missing;
+  $("pidx-note").textContent = missing.length ? "Chưa có lịch sử giá đầu khung: " + missing.join(", ") : "";
   svg.setAttribute("aria-label", "Biến động từ " + fmtDateVN(data.dates[0]) + " đến " + fmtDateVN(data.dates[n - 1]) + ": " +
-    mains.map((m) => PIDX_LABEL[m.key] + " " + fmtPct(m.vals[n - 1])).join(", "));
+    mains.map((m) => m.label + " " + fmtPct(m.vals[n - 1])).join(", "));
   status.hidden = true;
   svg.removeAttribute("hidden");
 }
@@ -5358,6 +5384,7 @@ function initPortfolioIndex(){
   document.querySelectorAll("[data-pidx-open]").forEach((btn) => btn.addEventListener("click", () => {
     pidxSet = btn.dataset.pidxOpen;
     pidxFocus = "";
+    pidxPick = new Set();
     pidxReturnFocus = btn;
     dialog.showModal();
     $("pidx-close").focus();
@@ -5366,9 +5393,12 @@ function initPortfolioIndex(){
   }));
   dialog.addEventListener("click", (e) => {
     const set = e.target.closest("[data-pidx-set]"), range = e.target.closest("[data-pidx-range]"), focus = e.target.closest("[data-pidx-focus]");
+    const bench = e.target.closest("[data-pidx-bench]"), pick = e.target.closest("[data-pidx-pick]");
     if(set){ pidxSet = set.dataset.pidxSet; pidxFocus = ""; }
     else if(range) pidxRange = Number(range.dataset.pidxRange);
+    else if(bench) pidxBench = bench.dataset.pidxBench;
     else if(focus) pidxFocus = pidxFocus === focus.dataset.pidxFocus ? "" : focus.dataset.pidxFocus;
+    else if(pick){ const t = pick.dataset.pidxPick; pidxPick.has(t) ? pidxPick.delete(t) : pidxPick.add(t); }
     else return;
     renderPidxChart();
   });

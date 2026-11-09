@@ -129,6 +129,8 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
 - **CHỈ SỐ DANH MỤC** (owner chốt 09/11/2026): dải 1 tháng đầu tab Danh mục/Theo dõi + popup chung từng mã (`pidxCompute`), **CHỈ ĐỂ XEM**.
   Gốc 0% đầu khung. Đang nắm = **theo tỷ trọng với số CP hiện tại** (owner chọn, không dùng tổng tài sản vì nhiễu nạp/rút) · Theo dõi =
   bình quân đều mã chưa nắm · VN-Index so. Lịch sử VNDirect, nhớ 15 phút, không lưu Firestore. Trong phiên bỏ nến hôm nay.
+  **Tự chọn**: tick mã nắm/theo dõi thành nhóm, theo tỷ trọng đang nắm (mã chưa nắm = trung bình mã nắm của nhóm), so VN-Index/VN30;
+  nhóm KHÔNG lưu (owner chọn) — đừng tự thêm lưu nhóm.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán.
   **Không ẩn cắt lỗ** (30/10/2026).
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.

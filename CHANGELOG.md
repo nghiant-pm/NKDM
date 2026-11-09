@@ -4,6 +4,21 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-09 (Chỉ số danh mục: nhóm tự chọn + so VN30)
+
+Owner muốn gom riêng vài mã (vd 3 mã) thành một đường rồi so với VN-Index hoặc VN30.
+- Popup Biến động danh mục thêm nút **Tự chọn**: chạm chip mã (mọi mã đang nắm + theo dõi) để thêm/bớt khỏi nhóm; vẽ đường
+  "Nhóm chọn (n mã)" + đường từng mã trong nhóm, rê/chạm xem số từng mã theo ngày.
+- Nhóm tính **theo tỷ trọng đang nắm** (owner chọn): mã đang nắm theo giá trị số CP hiện tại; mã chỉ theo dõi lấy bằng trung bình
+  các mã đang nắm của nhóm; nhóm toàn mã theo dõi thì chia đều.
+- Nút **VN-Index / VN30** chọn thước so (áp cho cả Đang nắm/Theo dõi trong popup). Dải nhỏ đầu tab vẫn so VN-Index.
+- Nhóm **không lưu** (owner chọn): đóng popup là mất.
+- Đã kiểm: nhóm VCB·CTG·BVB, đổi VN30, đổi qua lại các nhóm, màn điện thoại 375px, không lỗi console, cú pháp toàn script.
+
+· `public/index.html`
+
+---
+
 ## 2026-11-09 (Đường chỉ số danh mục + biểu đồ chung từng mã)
 
 Owner muốn nhìn nhanh danh mục đang lên hay xuống như đường VN30, thay vì đọc từng ô xanh đỏ.
