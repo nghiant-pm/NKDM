@@ -4,6 +4,22 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-09 (Đường chỉ số danh mục + biểu đồ chung từng mã)
+
+Owner muốn nhìn nhanh danh mục đang lên hay xuống như đường VN30, thay vì đọc từng ô xanh đỏ.
+- **Dải nhỏ** ở đầu tab Danh mục (Đang nắm) và tab Theo dõi: đường 1 tháng gốc 0%, kèm % và VN-Index (nét đứt) để so.
+- **Đang nắm** tính theo tỷ trọng giá trị với **số CP đang giữ hôm nay** (giống VN30, không nhiễu nạp/rút/mua thêm).
+  **Theo dõi** = bình quân đều các mã theo dõi chưa nắm.
+- Bấm dải → popup **Biến động danh mục**: 3 đường đậm (Đang nắm · Theo dõi · VN-Index) + từng mã là đường mờ; danh sách mã xếp theo %,
+  chạm một mã để tô sáng đường của nó (xanh tăng / đỏ giảm). Đổi nhóm Đang nắm/Theo dõi, khung 1 tháng / 3 tháng / 1 năm. Rê/chạm để xem số từng ngày.
+- Thang dọc theo đường chính + 80% vùng giữa các mã: mã tăng/giảm quá mạnh (vd ±100%/năm) bị cắt ở mép, số đúng vẫn ở danh sách.
+- Lịch sử giá lấy VNDirect (cùng nguồn Quét ngay), nhớ 15 phút, bấm Lấy giá thì lấy lại. Trong phiên chỉ tính tới phiên đã đóng cửa. Chỉ để xem, không vào tín hiệu/kế hoạch, không ghi Firestore.
+- Đã kiểm: bấm thử trên sổ thật (máy tính + màn điện thoại 375px), không lỗi console, cú pháp toàn script.
+
+· `public/index.html`
+
+---
+
 ## 2026-11-02 (Mã đã cắt lỗ tự vào Theo dõi)
 
 Owner chốt 02/11: mã bán hết để cắt lỗ tự sang Theo dõi, nằm mục riêng **Đã cắt lỗ** để mua lại khi mã hồi.

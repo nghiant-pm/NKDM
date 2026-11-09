@@ -126,6 +126,9 @@ reviews/             Bản review từng mã (gitignore, dữ liệu cá nhân) 
   thẳng `EPS_TR` (chậm chỉnh sau chia thưởng). **Tăng trưởng theo lợi nhuận công ty mẹ 3 năm, KHÔNG theo lịch sử EPS** (VNDirect không chỉnh
   lùi sau chia thưởng → tăng trưởng âm giả). **DCF tính từ lợi nhuận** EPS × (1 − g ÷ ROE), không dùng dòng tiền tự do thực tế (owner chọn).
   Nhãn **đối xứng**: Rẻ ≤ −biên an toàn, Đắt ≥ +biên an toàn, giữa Hợp lý. Ngành tài chính nhận theo loại BCTC (≠ 2). Kết quả chỉ tham khảo.
+- **CHỈ SỐ DANH MỤC** (owner chốt 09/11/2026): dải 1 tháng đầu tab Danh mục/Theo dõi + popup chung từng mã (`pidxCompute`), **CHỈ ĐỂ XEM**.
+  Gốc 0% đầu khung. Đang nắm = **theo tỷ trọng với số CP hiện tại** (owner chọn, không dùng tổng tài sản vì nhiễu nạp/rút) · Theo dõi =
+  bình quân đều mã chưa nắm · VN-Index so. Lịch sử VNDirect, nhớ 15 phút, không lưu Firestore. Trong phiên bỏ nến hôm nay.
 - `tickers/{TICKER}.hold === true` → **ẩn gợi ý bán của CẢ HAI máy**, hiện badge "Giữ"; chi tiết mã vẫn cảnh báo áp lực bán.
   **Không ẩn cắt lỗ** (30/10/2026).
 - **"Điểm" = giá tuyệt đối (nghìn đ), KHÔNG phải %.** Owner đã biết đánh đổi và cố ý chọn. Đừng đề xuất đổi sang %.

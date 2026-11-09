@@ -908,6 +908,41 @@
   .chart-tooltip span{ display:block; color:var(--text-muted); white-space:pre-line; font-variant-numeric:tabular-nums; }
   .chart-status{ position:absolute; inset:0; display:grid; place-items:center; padding:20px; text-align:center; color:var(--text-muted); font-size:var(--fs-body); }
   .chart-status[hidden]{ display:none; }
+  /* Chỉ số danh mục (09/11/2026): dải nhỏ đầu tab + popup chung từng mã. */
+  .pidx-strip{
+    display:grid; gap:4px; width:100%; margin-bottom:12px; padding:8px 14px 6px;
+    border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface);
+    color:var(--text-muted); font-size:var(--fs-label); text-align:left; font-variant-numeric:tabular-nums; cursor:pointer;
+  }
+  .pidx-strip[hidden]{ display:none; }
+  .pidx-strip:focus-visible{ outline:2px solid var(--brand); outline-offset:2px; }
+  .pidx-strip b{ font-weight:500; color:var(--text); }
+  .pidx-strip .pos, .pidx-list .pos, .pidx-legend .pos{ color:var(--pos); }
+  .pidx-strip .neg, .pidx-list .neg, .pidx-legend .neg{ color:var(--neg); }
+  .pidx-strip svg{ width:100%; height:44px; display:block; }
+  .pidx-line{ fill:none; stroke-width:2; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+  .pidx-line.held{ stroke:var(--brand); stroke-width:2.5; }
+  .pidx-line.watch{ stroke:var(--warn); stroke-width:2.5; }
+  .pidx-line.vni{ stroke:var(--text-muted); stroke-width:1.5; stroke-dasharray:5 4; }
+  .pidx-line.tk{ stroke:var(--text-muted); stroke-width:1; opacity:.28; }
+  .pidx-line.tk.on{ stroke-width:2.5; opacity:1; }
+  .pidx-line.tk.on.pos{ stroke:var(--pos); } .pidx-line.tk.on.neg{ stroke:var(--neg); } .pidx-line.tk.on.flat{ stroke:var(--text); }
+  .pidx-zero{ stroke:var(--text-muted); stroke-width:1; opacity:.5; vector-effect:non-scaling-stroke; }
+  .pidx-controls{ display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; }
+  .pidx-controls .range-switch{ margin:0; }
+  .pidx-legend{ display:flex; flex-wrap:wrap; gap:6px 14px; color:var(--text-muted); font-size:var(--fs-label); font-variant-numeric:tabular-nums; }
+  .pidx-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .pidx-legend i{ width:18px; height:0; border-top:2.5px solid; }
+  .pidx-legend .held{ border-color:var(--brand); } .pidx-legend .watch{ border-color:var(--warn); }
+  .pidx-legend .vni{ border-color:var(--text-muted); border-top-style:dashed; border-top-width:1.5px; }
+  .pidx-list{ display:flex; flex-wrap:wrap; gap:6px; }
+  .pidx-list button{
+    min-height:36px; padding:4px 10px; border:1px solid var(--border); border-radius:var(--r-pill);
+    background:var(--surface); color:var(--text); font-size:var(--fs-label); font-variant-numeric:tabular-nums; cursor:pointer;
+  }
+  .pidx-list button[aria-pressed="true"]{ border-color:var(--brand); background:var(--brand-soft); }
+  .pidx-note{ margin:0; color:var(--text-muted); font-size:var(--fs-meta); }
+  .pidx-note:empty{ display:none; }
   @media(max-width:430px){
     .chart-body{ padding:12px; }
     .chart-range .btn{ flex:1; min-width:0; }
@@ -1061,6 +1096,7 @@
       <div class="compact-today-head sec-head" data-sec="khuyen-nghi"><h2 id="compact-today-title">Khuyến nghị</h2><span class="compact-today-count" id="compact-today-count"></span></div>
       <div class="compact-today-list" id="compact-today-list"></div>
     </section></div>
+    <button class="pidx-strip" id="pidx-strip-held" type="button" data-pidx-open="held" hidden></button>
     <section class="compact-panel">
       <div class="compact-head sec-head" data-sec="gon-nam-giu"><h2>Đang nắm giữ</h2><div class="compact-actions">
         <button class="icon-action" id="compact-save-day" type="button" aria-label="Lưu nhật ký hôm nay" title="Lưu nhật ký hôm nay">
@@ -1105,6 +1141,7 @@
     </div>
   </div>
   <div class="panel" id="panel-theo-doi" role="tabpanel" aria-labelledby="tab-theo-doi" hidden>
+    <button class="pidx-strip" id="pidx-strip-watch" type="button" data-pidx-open="watch" hidden></button>
     <section class="compact-panel">
       <div class="compact-head sec-head" data-sec="gon-theo-doi"><h2>Đang theo dõi</h2><button class="icon-action" id="compact-add-watch" type="button" aria-label="Thêm mã theo dõi" title="Thêm mã theo dõi">
         <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -1550,6 +1587,34 @@
       <div class="chart-tooltip" id="chart-tooltip" hidden><strong></strong><span></span></div>
     </div>
     <div class="chart-legend" id="chart-legend"></div>
+  </div>
+</dialog>
+
+<dialog class="edit-dialog chart-dialog" id="pidx-dialog" aria-labelledby="pidx-dialog-title">
+  <div class="compact-head chart-head">
+    <div class="chart-title"><h2 id="pidx-dialog-title">Biến động danh mục</h2></div>
+    <button class="icon-action" id="pidx-close" type="button" aria-label="Đóng" title="Đóng"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="chart-body">
+    <div class="pidx-controls">
+      <div class="range-switch" role="group" aria-label="Nhóm mã">
+        <button type="button" data-pidx-set="held" aria-pressed="true">Đang nắm</button>
+        <button type="button" data-pidx-set="watch" aria-pressed="false">Theo dõi</button>
+      </div>
+      <div class="range-switch" role="group" aria-label="Khoảng thời gian">
+        <button type="button" data-pidx-range="30" aria-pressed="true">1 tháng</button>
+        <button type="button" data-pidx-range="90" aria-pressed="false">3 tháng</button>
+        <button type="button" data-pidx-range="365" aria-pressed="false">1 năm</button>
+      </div>
+    </div>
+    <div class="pidx-legend" id="pidx-legend" aria-live="polite"></div>
+    <div class="chart-plot-wrap" id="pidx-plot-wrap">
+      <div class="chart-status" id="pidx-status" role="status">Đang tải…</div>
+      <svg class="chart-svg" id="pidx-svg" viewBox="0 0 640 300" preserveAspectRatio="none" role="img" hidden></svg>
+      <div class="chart-tooltip" id="pidx-tooltip" hidden><strong></strong><span></span></div>
+    </div>
+    <div class="pidx-list" id="pidx-list"></div>
+    <p class="pidx-note" id="pidx-note"></p>
   </div>
 </dialog>
 
@@ -3024,8 +3089,8 @@ function screenDateInVietnam(timestamp){
     .formatToParts(new Date(timestamp * 1000)).reduce((out, part) => { if(part.type !== "literal") out[part.type] = part.value; return out; }, {});
   return parts.year + "-" + parts.month + "-" + parts.day;
 }
-async function screenFetchHistory(ticker, maxAttempts = 2){
-  const to = Math.floor(Date.now() / 1000), from = to - 240 * 86400;
+async function screenFetchHistory(ticker, maxAttempts = 2, days = 240){
+  const to = Math.floor(Date.now() / 1000), from = to - days * 86400;
   const url = SCREENING_HISTORY_API + "?symbol=" + encodeURIComponent(ticker) + "&resolution=D&from=" + from + "&to=" + to;
   let lastError;
   for(let attempt = 1; attempt <= maxAttempts; attempt += 1){
@@ -4480,6 +4545,7 @@ function renderCompact(s){
   $("compact-save-day").classList.toggle("todo", !savedToday);
   $("compact-save-day").setAttribute("aria-label", "Lưu nhật ký hôm nay" + (savedToday ? " · đã lưu" : " · chưa lưu"));
   renderAdvice(s);
+  schedulePidx();
   $("global-price-refresh").disabled = priceRefreshBusy || (!s.held.length && !Object.keys(state.watchlist).length);
   // Đang kéo thả thì không dựng lại.
   if(dragSort) return;
@@ -5089,6 +5155,238 @@ function initStockChart(){
   });
 }
 
+/* ===== Chỉ số danh mục (owner chốt 09/11/2026) =====
+   Gốc 0% tại đầu khung, như VN30. Đang nắm = theo tỷ trọng giá trị với SỐ CP HIỆN TẠI (danh mục hôm nay đi thế nào trong khung,
+   không nhiễu nạp/rút/mua thêm) · Theo dõi = bình quân đều các mã theo dõi chưa nắm · VN-Index làm thước so.
+   Chỉ để xem — không vào tín hiệu/kế hoạch. Lịch sử lấy VNDirect (cùng nguồn Quét ngay), nhớ trong bộ nhớ 15 phút, không lưu Firestore.
+   Trong phiên bỏ nến hôm nay như biểu đồ từng mã. */
+const PIDX_BENCH = "VNINDEX", PIDX_TTL = 15 * 60 * 1000, PIDX_STRIP_DAYS = 30;
+const PIDX_LABEL = { held:"Đang nắm", watch:"Theo dõi", vni:"VN-Index" };
+const pidxCache = {}, pidxLoading = {};
+let pidxSet = "held", pidxRange = 30, pidxFocus = "", pidxPoints = [], pidxW = 640, pidxH = 300, pidxReturnFocus = null, pidxTimer = null;
+
+function pidxTickers(s = computeSummary()){
+  const held = s.held.filter((h) => h.qty > 0).map((h) => ({ ticker:h.ticker, qty:h.qty }));
+  const heldSet = new Set(held.map((h) => h.ticker));
+  const watch = Object.keys(state.watchlist).filter((t) => !heldSet.has(t)).sort().map((t) => ({ ticker:t, qty:1 }));
+  return { held, watch };
+}
+function pidxFetch(ticker){
+  const hit = pidxCache[ticker];
+  if(hit && Date.now() - hit.at < PIDX_TTL) return Promise.resolve(hit.rows);
+  if(!pidxLoading[ticker]){
+    pidxLoading[ticker] = screenFetchHistory(ticker, 2, 400)
+      .then((rows) => (pidxCache[ticker] = { at:Date.now(), rows:rows.map((r) => ({ date:r.date, close:r.close })) }).rows)
+      // Lỗi: giữ dữ liệu cũ (nếu có), 1 phút sau thử lại.
+      .catch((e) => { console.error(e); return (pidxCache[ticker] = { at:Date.now() - PIDX_TTL + 60000, rows:hit?.rows || [] }).rows; })
+      .finally(() => { delete pidxLoading[ticker]; });
+  }
+  return pidxLoading[ticker];
+}
+function pidxLoadAll(tk){
+  const list = [PIDX_BENCH, ...tk.held.map((x) => x.ticker), ...tk.watch.map((x) => x.ticker)];
+  return screenMapWithConcurrency(list, 4, pidxFetch);
+}
+function pidxInvalidate(){
+  Object.values(pidxCache).forEach((x) => { x.at = 0; });
+  schedulePidx();
+}
+function pidxBusy(){ return Object.keys(pidxLoading).length > 0; }
+/* Dãy % theo ngày của khung cho cả hai nhóm + VN-Index. Ngày lấy theo VN-Index (thiếu thì gộp ngày các mã);
+   ngày mã không có giá dùng giá gần nhất trước đó. Mã không có giá ở đầu khung bị bỏ khỏi khung đó (báo ở `missing`). */
+function pidxCompute(rangeDays, tk = pidxTickers()){
+  const locked = sessionLocked(), today = todayStr();
+  const rowsOf = (t) => (pidxCache[t]?.rows || []).filter((r) => !(locked && r.date === today));
+  let dates = rowsOf(PIDX_BENCH).map((r) => r.date);
+  if(dates.length < 2) dates = [...new Set(tk.held.concat(tk.watch).flatMap((m) => rowsOf(m.ticker).map((r) => r.date)))].sort();
+  if(dates.length < 2) return null;
+  const startDay = new Date(dates[dates.length - 1] + "T00:00:00");
+  startDay.setDate(startDay.getDate() - rangeDays);
+  const start = dateStrOf(startDay), win = dates.filter((d) => d >= start);
+  if(win.length < 2) return null;
+  const along = (t) => {
+    const rows = rowsOf(t);
+    let i = 0, p = null;
+    return win.map((d) => { while(i < rows.length && rows[i].date <= d){ p = rows[i].close; i++; } return p; });
+  };
+  const group = (members, weighted) => {
+    const lines = [], missing = [];
+    members.forEach((m) => {
+      const vals = along(m.ticker);
+      if(!(vals[0] > 0)){ missing.push(m.ticker); return; }
+      lines.push({ ticker:m.ticker, qty:m.qty, vals, pct:vals.map((v) => (v / vals[0] - 1) * 100) });
+    });
+    const index = !lines.length ? null : win.map((_, i) => {
+      if(!weighted) return lines.reduce((sum, l) => sum + l.pct[i], 0) / lines.length;
+      let now = 0, base = 0;
+      lines.forEach((l) => { now += l.qty * l.vals[i]; base += l.qty * l.vals[0]; });
+      return (now / base - 1) * 100;
+    });
+    return { lines, missing, index };
+  };
+  const bench = along(PIDX_BENCH);
+  return { dates:win, held:group(tk.held, true), watch:group(tk.watch, false),
+    vni:bench[0] > 0 ? bench.map((v) => (v / bench[0] - 1) * 100) : null };
+}
+function pidxPctHtml(n){
+  return '<b class="' + (n > 0.05 ? "pos" : n < -0.05 ? "neg" : "") + '">' + fmtPct(n) + '</b>';
+}
+function pidxPath(vals, xAt, yAt){
+  return vals.map((v, i) => (i ? "L" : "M") + xAt(i).toFixed(2) + " " + yAt(v).toFixed(2)).join(" ");
+}
+function renderPidxStrips(tk = pidxTickers()){
+  const data = pidxCompute(PIDX_STRIP_DAYS, tk);
+  ["held", "watch"].forEach((set) => {
+    const el = $("pidx-strip-" + set);
+    el.hidden = !tk[set].length;
+    if(!tk[set].length) return;
+    const grp = data?.[set];
+    if(!grp?.index){
+      el.innerHTML = '<span>' + PIDX_LABEL[set] + ' · ' + (pidxBusy() ? "đang tải…" : "chưa đủ dữ liệu") + '</span>';
+      el.setAttribute("aria-label", PIDX_LABEL[set]);
+      return;
+    }
+    const last = data.dates[data.dates.length - 1], idx = grp.index, vni = data.vni;
+    const all = idx.concat(vni || [], [0]);
+    const min = Math.min(...all), max = Math.max(...all), span = (max - min) || 1;
+    const W = 300, H = 44, pad = 3;
+    const xAt = (i) => i / (idx.length - 1) * W, yAt = (v) => pad + (max - v) / span * (H - pad * 2);
+    const tail = idx[idx.length - 1];
+    el.innerHTML = '<span>' + PIDX_LABEL[set] + ' · 1 tháng ' + pidxPctHtml(tail) +
+      (vni ? ' · VN-Index ' + pidxPctHtml(vni[vni.length - 1]) : '') +
+      (last !== todayStr() ? ' · tới ' + fmtDateVN(last).slice(0, 5) : '') + '</span>' +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+      '<line class="pidx-zero" x1="0" x2="' + W + '" y1="' + yAt(0).toFixed(2) + '" y2="' + yAt(0).toFixed(2) + '"></line>' +
+      (vni ? '<path class="pidx-line vni" d="' + pidxPath(vni, xAt, yAt) + '"></path>' : '') +
+      '<path class="pidx-line ' + set + '" d="' + pidxPath(idx, xAt, yAt) + '"></path></svg>';
+    el.setAttribute("aria-label", PIDX_LABEL[set] + " 1 tháng " + fmtPct(tail) + (vni ? ", VN-Index " + fmtPct(vni[vni.length - 1]) : "") + ". Mở biểu đồ từng mã");
+  });
+}
+function schedulePidx(){
+  clearTimeout(pidxTimer);
+  pidxTimer = setTimeout(() => {
+    const tk = pidxTickers();
+    renderPidxStrips(tk);
+    if(!tk.held.length && !tk.watch.length) return;
+    pidxLoadAll(tk).then(() => {
+      renderPidxStrips();
+      if($("pidx-dialog").open) renderPidxChart();
+    });
+  }, 300);
+}
+function renderPidxChart(){
+  const svg = $("pidx-svg"), status = $("pidx-status"), tk = pidxTickers();
+  $("pidx-tooltip").hidden = true;
+  document.querySelectorAll("[data-pidx-set]").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.pidxSet === pidxSet));
+    b.disabled = !tk[b.dataset.pidxSet].length;
+  });
+  document.querySelectorAll("[data-pidx-range]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.pidxRange) === pidxRange)));
+  const data = pidxCompute(pidxRange, tk);
+  if(!data || (!data.held.index && !data.watch.index)){
+    pidxPoints = [];
+    svg.setAttribute("hidden", "");
+    status.hidden = false;
+    status.textContent = pidxBusy() ? "Đang tải…" : "Chưa đủ dữ liệu trong khoảng này";
+    $("pidx-legend").innerHTML = $("pidx-list").innerHTML = $("pidx-note").textContent = "";
+    return;
+  }
+  const grp = data[pidxSet];
+  if(pidxFocus && !grp.lines.some((l) => l.ticker === pidxFocus)) pidxFocus = "";
+  pidxW = Math.max(300, Math.round($("pidx-plot-wrap").clientWidth));
+  pidxH = window.matchMedia("(max-width:430px)").matches ? 260 : 300;
+  const W = pidxW, H = pidxH, left = 16, right = 58, top = 18, bottom = 32, n = data.dates.length;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const mains = ["vni", "watch", "held"].map((key) => ({ key, vals:key === "vni" ? data.vni : data[key].index })).filter((m) => m.vals);
+  // Thang dọc: đường chính + mã đang chọn + 80% vùng giữa của các mã — mã quá đà (±100% năm) không làm dẹt các đường chính; phần vượt cắt ở mép.
+  const focus = grp.lines.find((l) => l.ticker === pidxFocus);
+  const spread = grp.lines.flatMap((l) => l.pct).sort((a, b) => a - b);
+  const q = (p) => spread.length ? spread[Math.floor(p * (spread.length - 1))] : 0;
+  const all = [0, q(.1), q(.9)].concat(...mains.map((m) => m.vals), focus ? focus.pct : []);
+  const minRaw = Math.min(...all), maxRaw = Math.max(...all);
+  const pad = Math.max((maxRaw - minRaw) * .08, .5), min = minRaw - pad, max = maxRaw + pad;
+  const xAt = (i) => left + i / (n - 1) * (W - left - right), yAt = (v) => top + (max - v) / (max - min) * (H - top - bottom);
+  const tone = (v) => v > 0.05 ? "pos" : v < -0.05 ? "neg" : "flat";
+  const lineSvg = (l) => '<path class="pidx-line tk' + (l.ticker === pidxFocus ? " on " + tone(l.pct[n - 1]) : "") + '" d="' + pidxPath(l.pct, xAt, yAt) + '"></path>';
+  const grids = [maxRaw, 0, minRaw].filter((v, i, a) => a.indexOf(v) === i).map((v) => {
+    const y = yAt(v).toFixed(2);
+    return '<line class="' + (v === 0 ? "pidx-zero" : "chart-grid") + '" x1="' + left + '" y1="' + y + '" x2="' + (W - right) + '" y2="' + y + '"></line>' +
+      '<text class="chart-axis" x="' + (W - right + 8) + '" y="' + (Number(y) + 4) + '">' + (v === 0 ? "0%" : fmtPct(v)) + '</text>';
+  }).join("");
+  const dates = [0, Math.floor((n - 1) / 2), n - 1].map((i, k) =>
+    '<text class="chart-axis" text-anchor="' + (k === 0 ? "start" : k === 2 ? "end" : "middle") + '" x="' + xAt(i).toFixed(2) + '" y="' + (H - 8) + '">' +
+    fmtDateVN(data.dates[i]).slice(0, 5) + '</text>').join("");
+  svg.innerHTML = '<defs><clipPath id="pidx-clip"><rect x="0" y="' + top + '" width="' + W + '" height="' + (H - top - bottom) + '"></rect></clipPath></defs>' +
+    grids + dates + '<g clip-path="url(#pidx-clip)">' + grp.lines.filter((l) => l !== focus).map(lineSvg).join("") + '</g>' +
+    mains.map((m) => '<path class="pidx-line ' + m.key + '" d="' + pidxPath(m.vals, xAt, yAt) + '"></path>').join("") +
+    (focus ? lineSvg(focus) : "") +
+    '<line class="chart-guide" id="pidx-guide" y1="' + top + '" y2="' + (H - bottom) + '" hidden></line>';
+  pidxPoints = data.dates.map((d, i) => ({ d, x:xAt(i),
+    rows:mains.slice().reverse().map((m) => PIDX_LABEL[m.key] + " " + fmtPct(m.vals[i])).concat(focus ? [focus.ticker + " " + fmtPct(focus.pct[i])] : []) }));
+  $("pidx-legend").innerHTML = mains.slice().reverse().map((m) => '<span><i class="' + m.key + '"></i>' + PIDX_LABEL[m.key] + ' ' + pidxPctHtml(m.vals[n - 1]) + '</span>').join("");
+  $("pidx-list").innerHTML = grp.lines.slice().sort((a, b) => b.pct[n - 1] - a.pct[n - 1]).map((l) =>
+    '<button type="button" data-pidx-focus="' + esc(l.ticker) + '" aria-pressed="' + (l.ticker === pidxFocus) + '">' + esc(l.ticker) + ' ' + pidxPctHtml(l.pct[n - 1]) + '</button>').join("");
+  $("pidx-note").textContent = grp.missing.length ? "Chưa có lịch sử giá đầu khung: " + grp.missing.join(", ") : "";
+  svg.setAttribute("aria-label", "Biến động từ " + fmtDateVN(data.dates[0]) + " đến " + fmtDateVN(data.dates[n - 1]) + ": " +
+    mains.map((m) => PIDX_LABEL[m.key] + " " + fmtPct(m.vals[n - 1])).join(", "));
+  status.hidden = true;
+  svg.removeAttribute("hidden");
+}
+function showPidxPoint(e){
+  if(!pidxPoints.length) return;
+  const svg = $("pidx-svg"), rect = svg.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width * pidxW;
+  let point = pidxPoints[0];
+  pidxPoints.forEach((p) => { if(Math.abs(p.x - x) < Math.abs(point.x - x)) point = p; });
+  const guide = $("pidx-guide"), tooltip = $("pidx-tooltip"), wrapRect = $("pidx-plot-wrap").getBoundingClientRect();
+  guide.setAttribute("x1", point.x); guide.setAttribute("x2", point.x); guide.hidden = false;
+  tooltip.querySelector("strong").textContent = fmtDateVN(point.d);
+  tooltip.querySelector("span").textContent = point.rows.join("\n");
+  tooltip.hidden = false;
+  const px = point.x / pidxW * rect.width + (rect.left - wrapRect.left);
+  const halfW = Math.max(64, tooltip.offsetWidth / 2 + 4);
+  tooltip.style.left = Math.max(halfW, Math.min(wrapRect.width - halfW, px)) + "px";
+  tooltip.style.top = (tooltip.offsetHeight + 8) + "px";
+}
+function hidePidxPoint(){
+  $("pidx-tooltip").hidden = true;
+  const guide = $("pidx-guide");
+  if(guide) guide.hidden = true;
+}
+function initPortfolioIndex(){
+  const dialog = $("pidx-dialog"), svg = $("pidx-svg");
+  document.querySelectorAll("[data-pidx-open]").forEach((btn) => btn.addEventListener("click", () => {
+    pidxSet = btn.dataset.pidxOpen;
+    pidxFocus = "";
+    pidxReturnFocus = btn;
+    dialog.showModal();
+    $("pidx-close").focus();
+    renderPidxChart();
+    pidxLoadAll(pidxTickers()).then(() => { if(dialog.open) renderPidxChart(); });
+  }));
+  dialog.addEventListener("click", (e) => {
+    const set = e.target.closest("[data-pidx-set]"), range = e.target.closest("[data-pidx-range]"), focus = e.target.closest("[data-pidx-focus]");
+    if(set){ pidxSet = set.dataset.pidxSet; pidxFocus = ""; }
+    else if(range) pidxRange = Number(range.dataset.pidxRange);
+    else if(focus) pidxFocus = pidxFocus === focus.dataset.pidxFocus ? "" : focus.dataset.pidxFocus;
+    else return;
+    renderPidxChart();
+  });
+  svg.addEventListener("pointerdown", showPidxPoint);
+  svg.addEventListener("pointermove", showPidxPoint);
+  svg.addEventListener("pointerleave", hidePidxPoint);
+  svg.addEventListener("pointercancel", hidePidxPoint);
+  window.addEventListener("resize", () => { if(dialog.open) renderPidxChart(); });
+  $("pidx-close").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => {
+    pidxPoints = [];
+    svg.replaceChildren();
+    hidePidxPoint();
+    if(pidxReturnFocus?.isConnected) pidxReturnFocus.focus();
+    pidxReturnFocus = null;
+  });
+}
+
 const UI_ICON = {
   search:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
   note:'<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>',
@@ -5424,6 +5722,7 @@ async function refreshAllPrices(){
     status.className = "price-refresh-status" + (missing.length || historyFailed ? " err" : "");
     status.textContent = notices.join(" · ");
     void refreshDecisionScores();
+    pidxInvalidate();
     toast(missing.length || historyFailed
       ? "Đã cập nhật " + updated.length + "/" + syms.length + " mã · Có mục cần kiểm tra"
       : "Đã cập nhật " + updated.length + " mã");
@@ -7361,6 +7660,7 @@ initCompact();
 initSetup();
 initMembers();
 initStockChart();
+initPortfolioIndex();
 render();
 initGate();
 </script>
