@@ -1760,7 +1760,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "141185690222",
   appId: "1:141185690222:web:a2e989a2682abe6011147f"
 };
-const OWNER_EMAIL = "nghiant@youmed.vn";
+const OWNER_EMAIL = "trungnghia.asean@gmail.com";
 /* Nhiều tài khoản (đợt 1, 01/11/2026): sổ mỗi người ở users/{uid}/…, chỉ chính chủ đọc/ghi (firestore.rules).
    ↔ BOOK_COLLECTIONS ở functions/members.js. Dữ liệu bot (screening_*, decision_*, orderflow_*, settings) vẫn ở cấp ngoài cùng.
    Mọi chỗ đọc/ghi sổ đi qua bookCol()/bookDoc() — đừng gọi thẳng collection(fs, "transactions"). */

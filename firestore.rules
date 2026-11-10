@@ -11,7 +11,7 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
     function isOwner() {
-      return verified() && request.auth.token.email == 'nghiant@youmed.vn';
+      return verified() && request.auth.token.email == 'trungnghia.asean@gmail.com';
     }
     function memberDoc() {
       return /databases/$(database)/documents/members/$(request.auth.token.email);

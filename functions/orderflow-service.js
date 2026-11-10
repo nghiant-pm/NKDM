@@ -7,7 +7,7 @@ const { ownerBook, sourceFor } = require("./members");
 
 const VPS_API = "https://bgapidatafeed.vps.com.vn/getliststockdata/";
 const NQS_API = "https://dulieu.nguoiquansat.vn/Company/OrderHistory";
-const OWNER = "nghiant@youmed.vn";
+const OWNER = "trungnghia.asean@gmail.com";
 
 function vnClock(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit",

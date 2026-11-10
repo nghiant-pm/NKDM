@@ -7,7 +7,11 @@
    ↔ BOOK_COLLECTIONS ở public/index.html (bản sao có chủ ý). */
 const { getAuth } = require("firebase-admin/auth");
 
-const OWNER_EMAIL = "nghiant@youmed.vn";
+const OWNER_EMAIL = "trungnghia.asean@gmail.com";
+/* Đổi chủ sang Gmail cá nhân (11/2026, YouMed → MetaMed bỏ email công ty). Sổ đang ở users/{uid chủ cũ}: chủ mới chưa
+   đăng nhập lần nào thì bot vẫn đọc/ghi sổ chủ cũ; lần đầu chủ mới đăng nhập, migrateOwnerBook chép sổ chủ cũ sang
+   (sổ chủ cũ giữ làm dự phòng) và hạ chủ cũ thành thành viên. */
+const PREV_OWNER_EMAIL = "nghiant@youmed.vn";
 const BOOK_COLLECTIONS = ["transactions", "cashflows", "tickers", "daily_snapshots", "watchlist", "strategies",
   "signals", "watch_prices", "orders", "theses", "plans", "prefs"];
 const BOOK = new Set(BOOK_COLLECTIONS);
@@ -15,9 +19,14 @@ const BOOK = new Set(BOOK_COLLECTIONS);
 let ownerUid = null;
 async function ownerBook(db) {
   const member = (await db.collection("members").doc(OWNER_EMAIL).get()).data();
-  if (!member?.migratedAt) return db;
+  if (!member?.migratedAt) return (await prevOwnerBook(db)) || db;
   if (!ownerUid) ownerUid = member.uid || (await getAuth().getUserByEmail(OWNER_EMAIL)).uid;
   return db.collection("users").doc(ownerUid);
+}
+/** Sổ của chủ cũ (đã chuyển sang users/{uid}) — null nếu chưa có. */
+async function prevOwnerBook(db) {
+  const prev = (await db.collection("members").doc(PREV_OWNER_EMAIL).get()).data();
+  return prev?.migratedAt && prev.uid ? db.collection("users").doc(prev.uid) : null;
 }
 /** Đọc một collection: thuộc sổ → sổ owner, còn lại → dữ liệu chung. */
 const sourceFor = (db, book) => (name) => (BOOK.has(name) ? book : db).collection(name);
@@ -53,9 +62,10 @@ async function migrateOwnerBook(db, uid) {
   const memberRef = db.collection("members").doc(OWNER_EMAIL);
   const member = (await memberRef.get()).data();
   if (member?.migratedAt) return { status: "done", counts: member.migratedCounts || {} };
+  const prev = await prevOwnerBook(db), from = prev || db;
   const book = db.collection("users").doc(uid), writer = db.bulkWriter(), counts = {};
   for (const name of BOOK_COLLECTIONS) {
-    const snap = await db.collection(name).get();
+    const snap = await from.collection(name).get();
     counts[name] = snap.size;
     snap.docs.forEach((d) => writer.set(book.collection(name).doc(d.id), d.data()));
   }
@@ -66,7 +76,8 @@ async function migrateOwnerBook(db, uid) {
   }
   const now = new Date().toISOString();
   await memberRef.set({ role: "owner", status: "active", uid, name: member?.name || "", addedAt: member?.addedAt || now,
-    migratedAt: now, migratedCounts: counts }, { merge: true });
+    migratedAt: now, migratedCounts: counts, ...(prev ? { migratedFrom: PREV_OWNER_EMAIL } : {}) }, { merge: true });
+  if (prev) await db.collection("members").doc(PREV_OWNER_EMAIL).set({ role: "member" }, { merge: true });
   ownerUid = uid;
   return { status: "migrated", counts };
 }

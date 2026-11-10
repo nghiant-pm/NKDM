@@ -4,6 +4,17 @@ Ngày mới nhất trên đầu.
 
 ---
 
+## 2026-11-10 (Đổi chủ sang Gmail cá nhân)
+
+Công ty đổi pháp nhân, email `nghiant@youmed.vn` bỏ trong ~2 tháng. Owner chọn chuyển chủ app sang Gmail cá nhân `trungnghia.asean@gmail.com`.
+- Email owner đổi ở 5 chỗ (rules `isOwner()`, `members.js`, `orderflow-service.js`, `tcbs-service.js`, `index.html`); email cũ thành `PREV_OWNER_EMAIL`.
+- **Không gián đoạn bot:** Gmail chưa đăng nhập lần nào thì `ownerBook()` vẫn trả sổ chủ cũ (`users/{uid youmed}`).
+- **Lần đầu Gmail đăng nhập:** bước "Đang chuyển sổ…" có sẵn (`migrateOwnerBook`) nay chép từ sổ chủ cũ (trước đây chép từ bản ngoài cùng), ghi `migratedFrom`, hạ `members/nghiant@youmed.vn` thành `role:"member"` (vẫn xem sổ cũ, khoá được trong app). Sổ cũ giữ nguyên làm dự phòng.
+- **Kiểm:** emulator 13 ca — bot dùng sổ cũ trước khi chuyển · rules: Gmail có quyền chủ, youmed mất quyền chủ nhưng vẫn xem sổ của mình · chép đủ số dòng từ sổ chủ cũ, không lấy bản ngoài cùng · sổ cũ còn nguyên · sau chuyển bot dùng sổ Gmail · gọi lại không chép lần 2.
+- File: `firestore.rules` · `functions/members.js` · `functions/orderflow-service.js` · `functions/tcbs-service.js` · `public/index.html` · `CLAUDE.md`
+
+---
+
 ## 2026-11-09 (Chỉ số danh mục: nhóm tự chọn + so VN30)
 
 Owner muốn gom riêng vài mã (vd 3 mã) thành một đường rồi so với VN-Index hoặc VN30.

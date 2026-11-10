@@ -254,6 +254,8 @@ Rules Firestore (01/11/2026): `isOwner()` gõ cứng email owner (không bao gi�
 ---
 
 ## ⚠️ Những chỗ NHÂN BẢN CÓ CHỦ Ý — sửa 1 chỗ phải sửa mấy chỗ
+- **Email owner gõ cứng 5 chỗ:** `firestore.rules` `isOwner()` · `functions/members.js` `OWNER_EMAIL` · `functions/orderflow-service.js` `OWNER`
+  · `functions/tcbs-service.js` `OWNER_EMAIL` · `public/index.html` `OWNER_EMAIL`. Đổi chủ → đặt email cũ vào `PREV_OWNER_EMAIL` (members.js) để sổ được chép sang.
 - **Danh sách collection sổ riêng** `BOOK_COLLECTIONS` (`public/index.html`) ↔ `BOOK_COLLECTIONS` (`functions/members.js`) ↔ chú thích
   nhánh `users/{uid}` trong `firestore.rules`. Thêm collection sổ mới → thêm cả ba; app đọc/ghi sổ CHỈ qua `bookCol`/`bookDoc`/`watch`.
 - **Tour hướng dẫn chỉ vào id thật** của `index.html` (`#setup-card`, `#compact-summary-toggle`, `#advice-section`, `#compact-positions-slot`,
@@ -334,7 +336,7 @@ Rules Firestore (01/11/2026): `isOwner()` gõ cứng email owner (không bao gi�
 ---
 
 ## Đã CHỐT và CẤM dựng lại
-- **Firebase project đặt trên tài khoản công ty `nghiant@youmed.vn`.** Claude đã nêu rủi ro (IT admin tổ chức truy cập được dữ liệu tài chính cá nhân); owner cân nhắc và **chọn giữ**. Không nêu lại.
+- **Firebase project đặt trên tài khoản công ty `nghiant@youmed.vn`.** Claude đã nêu rủi ro (IT admin tổ chức truy cập được dữ liệu tài chính cá nhân); owner cân nhắc và **chọn giữ**. Không nêu lại. Từ 10/11/2026 **chủ app = Gmail cá nhân `trungnghia.asean@gmail.com`** (công ty bỏ email youmed.vn); quyền Owner project trên Google Cloud owner tự thêm Gmail.
 - **Không có ngưỡng chặn mua thêm theo mã** (số lần / % vốn tối đa mỗi mã) — vẫn giữ. Từ 16/10/2026 owner chốt thêm cửa lọc
   CHUNG của kế hoạch ngày: tối đa `maxBuys` lệnh mua/ngày + tiền mặt sau lệnh ≥ `minCashRatio` (thay quyết định cũ "không chặn").
 - **Sổ lệnh 3 mức cho máy cung–cầu cũng lấy từ `bgapidatafeed.vps.com.vn`, gọi từ Cloud Function** — đo thật 07/10/2026:

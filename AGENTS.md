@@ -190,7 +190,7 @@ Rules Firestore cho phép đọc/ghi **chỉ khi `request.auth.token.email == OW
 ---
 
 ## Đã CHỐT và CẤM dựng lại
-- **Firebase project đặt trên tài khoản công ty `nghiant@youmed.vn`.** Codex đã nêu rủi ro (IT admin tổ chức truy cập được dữ liệu tài chính cá nhân); owner cân nhắc và **chọn giữ**. Không nêu lại.
+- **Firebase project đặt trên tài khoản công ty `nghiant@youmed.vn`.** Codex đã nêu rủi ro (IT admin tổ chức truy cập được dữ liệu tài chính cá nhân); owner cân nhắc và **chọn giữ**. Không nêu lại. Từ 10/11/2026 **chủ app = Gmail cá nhân `trungnghia.asean@gmail.com`** (công ty bỏ email youmed.vn).
 - **Không có ngưỡng chặn mua thêm** (số lần / % vốn tối đa mỗi mã). Owner biết rủi ro dồn vốn và **chốt chưa làm**. Đừng tự thêm.
 - **Giá lấy từ datafeed VPS** (`bgapidatafeed.vps.com.vn`) — nguồn duy nhất kiểm chứng được
   là cho gọi cross-origin. TCBS, SSI, VNDirect, CafeF, DNSE, Yahoo **đều bị CORS chặn**,

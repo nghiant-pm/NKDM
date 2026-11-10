@@ -7,7 +7,7 @@
 const { HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 
-const OWNER_EMAIL = "nghiant@youmed.vn";
+const OWNER_EMAIL = "trungnghia.asean@gmail.com";
 const TCBS_BASE = "https://openapi.tcbs.com.vn";
 const REQUEST_TIMEOUT_MS = 20000;
 const TRADE_PAGE_SIZE = 50;
